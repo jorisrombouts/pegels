@@ -50,7 +50,6 @@ export function QuickAddModal() {
       categorySource: "user",
       needsReview: false,
       tagIds: [],
-      ignored: false,
       kind,
       goalId: null,
     };

@@ -61,7 +61,6 @@ export const transactions = pgTable(
     tagIds: jsonb("tag_ids").$type<string[]>().notNull(),
     splits: jsonb("splits").$type<Split[]>(), // nullable
     notes: text("notes"),
-    ignored: boolean("ignored").notNull(),
   },
   (t) => [index("transactions_user_date_idx").on(t.userId, t.date)],
 );
