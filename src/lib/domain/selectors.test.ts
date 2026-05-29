@@ -60,9 +60,9 @@ describe("goalProgress", () => {
 });
 
 describe("monthNet", () => {
-  it("sums included rows, ignoring excluded ones", () => {
-    const txs = [tx(-487), tx(38500, { categoryId: null }), tx(-5000, { ignored: true })];
-    expect(monthNet(txs, "2025-03")).toBe(38500 - 487);
+  it("counts only expense rows; income and transfers are excluded", () => {
+    const txs = [tx(-487), tx(38500, { categoryId: null }), tx(-5000, { kind: "transfer" })];
+    expect(monthNet(txs, "2025-03")).toBe(-487);
   });
 });
 
@@ -84,11 +84,11 @@ describe("categorySpendInMonth", () => {
   const resto: Category = { id: "resto", name: "Restaurants", icon: "🍽️", color: "10 60% 50%", parentId: "food" };
   const m = buildMaps([checking], [food, resto]);
 
-  it("rolls up subcategory spend and honors ignored rows", () => {
+  it("rolls up subcategory spend and excludes non-expense rows", () => {
     const txs = [
       tx(-300, { categoryId: "food" }),
       tx(-200, { categoryId: "resto" }), // subcategory of food
-      tx(-999, { categoryId: "resto", ignored: true }), // excluded
+      tx(-999, { categoryId: "resto", kind: "transfer" }), // excluded (not an expense)
     ];
     expect(categorySpendInMonth(txs, m, "food", "2025-03")).toBe(500);
     expect(categorySpendInMonth(txs, m, "resto", "2025-03")).toBe(200);
