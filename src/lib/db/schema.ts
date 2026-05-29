@@ -1,5 +1,5 @@
 import { pgTable, text, integer, real, boolean, jsonb, index } from "drizzle-orm/pg-core";
-import type { AccountKind, CategorySource, Split, GoalContribution } from "../domain/types";
+import type { AccountKind, CategorySource, Split, GoalContribution, TransactionKind } from "../domain/types";
 
 // Every table is scoped by userId (stub today; real auth later). Embedded arrays
 // (tagIds, splits, contributions) are JSONB — document-scoped, never queried alone.
@@ -58,6 +58,8 @@ export const transactions = pgTable(
     categoryConfidence: real("category_confidence"),
     categorySource: text("category_source").$type<CategorySource>().notNull(),
     needsReview: boolean("needs_review").notNull(),
+    kind: text("kind").$type<TransactionKind>().notNull(),
+    goalId: text("goal_id"),
     tagIds: jsonb("tag_ids").$type<string[]>().notNull(),
     splits: jsonb("splits").$type<Split[]>(), // nullable
     notes: text("notes"),
