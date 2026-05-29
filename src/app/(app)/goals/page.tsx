@@ -44,7 +44,7 @@ function GoalsView({ initialGoalId }: { initialGoalId: string | null }) {
   const isDesktop = useMediaQuery("(min-width: 1024px)");
   const [selectedId, setSelectedId] = useState<string | null>(initialGoalId);
 
-  const progress = data.goals.map((g) => goalProgress(g));
+  const progress = data.goals.map((g) => goalProgress(g, data.transactions));
   const totalSaved = progress.reduce((s, p) => s + p.saved, 0);
   const totalTarget = progress.reduce((s, p) => s + p.goal.target, 0);
   const overallPct = totalTarget > 0 ? totalSaved / totalTarget : 0;

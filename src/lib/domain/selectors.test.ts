@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { budgetForecasts, budgetStatuses, buildMaps, categorySpendInMonth, detectTransfersOnImport, goalProgress, monthNet, monthProgress } from "./selectors";
+import { budgetForecasts, budgetStatuses, buildMaps, categorySpendInMonth, detectTransfersOnImport, goalProgress, goalSaved, monthNet, monthProgress } from "./selectors";
 import type { Account, Budget, Category, Goal, Transaction } from "./types";
 
 const checking: Account = { id: "a", name: "Checking", type: "Checking", kind: "spending", icon: "🏦", color: "0 0% 0%", balance: 0, archived: false };
@@ -44,18 +44,35 @@ describe("goalProgress", () => {
   };
 
   it("sums baseline + contributions into saved and pct", () => {
-    const p = goalProgress(base, new Date("2025-06-01"));
-    expect(p.saved).toBe(700);
-    expect(p.pct).toBeCloseTo(0.7);
+    const p = goalProgress(base, [], new Date("2025-06-01"));
+    expect(p.saved).toBe(600);
+    expect(p.pct).toBeCloseTo(0.6);
   });
 
   it("reports days left and overdue", () => {
-    expect(goalProgress(base, new Date("2025-06-01")).daysLeft).toBeGreaterThan(0);
-    expect(goalProgress(base, new Date("2026-06-01")).daysLeft).toBeLessThan(0);
+    expect(goalProgress(base, [], new Date("2025-06-01")).daysLeft).toBeGreaterThan(0);
+    expect(goalProgress(base, [], new Date("2026-06-01")).daysLeft).toBeLessThan(0);
   });
 
   it("is on track while the deadline is in the future", () => {
-    expect(goalProgress(base, new Date("2025-06-01")).onTrack).toBe(true);
+    expect(goalProgress(base, [], new Date("2025-06-01")).onTrack).toBe(true);
+  });
+});
+
+describe("goalSaved / goalProgress (transaction-driven)", () => {
+  const goal = { id: "g", name: "Japan", icon: "🗾", target: 25000, baseline: 6000, deadline: null, accountId: "spar", contributions: [] };
+  const txs = [
+    { ...tx(-3000), id: "t1", goalId: "g", kind: "transfer" as const, date: "2025-03-14" },
+    { ...tx(1000), id: "t2", goalId: "g", kind: "transfer" as const, date: "2025-04-02" },
+    { ...tx(-500), id: "t3", goalId: null, kind: "expense" as const, date: "2025-03-01" },
+  ];
+  it("sums baseline + |amount| of linked transfers", () => {
+    expect(goalSaved(goal as never, txs as never)).toBe(6000 + 3000 + 1000);
+  });
+  it("goalProgress reports saved and pct from transactions", () => {
+    const p = goalProgress(goal as never, txs as never, new Date("2025-05-01"));
+    expect(p.saved).toBe(10000);
+    expect(p.pct).toBeCloseTo(0.4);
   });
 });
 
