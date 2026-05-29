@@ -20,7 +20,6 @@ export function TransactionRow({
   masked?: boolean;
 }) {
   const isTransfer = tx.kind === "transfer";
-  const isIncome = tx.amount > 0 && !isTransfer;
   return (
     <button
       type="button"
@@ -54,10 +53,7 @@ export function TransactionRow({
         />
       )}
 
-      <span
-        className={cn("tnum shrink-0 text-sm font-semibold", isTransfer && "line-through")}
-        style={{ color: isIncome ? "hsl(var(--positive))" : undefined }}
-      >
+      <span className={cn("tnum shrink-0 text-sm font-semibold", isTransfer && "line-through")}>
         {formatSEK(tx.amount, masked)}
       </span>
     </button>
