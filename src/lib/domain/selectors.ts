@@ -101,7 +101,7 @@ export function monthSpend(
 ): number {
   return transactions.reduce((sum, tx) => {
     if (!inMonth(tx, key) || !accountMatches(tx, accountFilter)) return sum;
-    return sum + effectiveExpense(tx, maps.accountById.get(tx.accountId));
+    return sum + effectiveExpense(tx);
   }, 0);
 }
 
@@ -115,7 +115,7 @@ export function categorySpendInMonth(
   return transactions.reduce((sum, tx) => {
     if (!inMonth(tx, key)) return sum;
     if (!isInCategory(tx.categoryId, categoryId, maps.categoryById)) return sum;
-    return sum + effectiveExpense(tx, maps.accountById.get(tx.accountId));
+    return sum + effectiveExpense(tx);
   }, 0);
 }
 
@@ -135,7 +135,7 @@ export function spendByRootCategory(
   const totals = new Map<string, number>();
   for (const tx of transactions) {
     if (!inMonth(tx, key) || !accountMatches(tx, accountFilter)) continue;
-    const amount = effectiveExpense(tx, maps.accountById.get(tx.accountId));
+    const amount = effectiveExpense(tx);
     if (amount === 0) continue;
     const root = rootCategoryId(tx.categoryId, maps.categoryById) ?? "cat-other";
     totals.set(root, (totals.get(root) ?? 0) + amount);
@@ -166,7 +166,7 @@ export function spendByAccount(
       amount: transactions.reduce(
         (sum, tx) =>
           inMonth(tx, key) && tx.accountId === account.id
-            ? sum + effectiveExpense(tx, account)
+            ? sum + effectiveExpense(tx)
             : sum,
         0,
       ),
@@ -344,7 +344,7 @@ export function dailySpend(
   for (const tx of transactions) {
     if (!inMonth(tx, key)) continue;
     const day = new Date(tx.date).getDate();
-    totals[day - 1] += effectiveExpense(tx, maps.accountById.get(tx.accountId));
+    totals[day - 1] += effectiveExpense(tx);
   }
   return totals.map((amount, i) => ({ day: i + 1, amount }));
 }

@@ -9,10 +9,9 @@ const checking: Account = {
   kind: "spending",
   icon: "🏦",
   color: "217 91% 60%",
+  balance: 0,
   archived: false,
 };
-
-const savings: Account = { ...checking, id: "acc-save", name: "Nordea Sparkonto", type: "Savings", kind: "savings" };
 
 function tx(overrides: Partial<Transaction>): Transaction {
   return {
@@ -36,19 +35,23 @@ function tx(overrides: Partial<Transaction>): Transaction {
 
 describe("effectiveExpense", () => {
   it("counts a plain expense as its absolute amount", () => {
-    expect(effectiveExpense(tx({ amount: -487 }), checking)).toBe(487);
+    expect(effectiveExpense(tx({ amount: -487 }))).toBe(487);
   });
 
   it("does not count income (positive amount)", () => {
-    expect(effectiveExpense(tx({ amount: 38500 }), checking)).toBe(0);
+    expect(effectiveExpense(tx({ amount: 38500, kind: "income" }))).toBe(0);
   });
 
-  it("does not count ignored transactions", () => {
-    expect(effectiveExpense(tx({ amount: -5000, ignored: true }), checking)).toBe(0);
+  it("counts only expense-kind transactions", () => {
+    const base = { id: "t", date: "2025-03-01", description: "x", accountId: "a", categoryId: null, predictedCategoryId: null, categoryConfidence: null, categorySource: "user" as const, needsReview: false, tagIds: [], ignored: false, goalId: null };
+    expect(effectiveExpense({ ...base, amount: -100, kind: "expense" })).toBe(100);
+    expect(effectiveExpense({ ...base, amount: -100, kind: "transfer" })).toBe(0);
+    expect(effectiveExpense({ ...base, amount: 100, kind: "income" })).toBe(0);
   });
 
-  it("does not count expenses on a savings account (transfer to savings)", () => {
-    expect(effectiveExpense(tx({ amount: -5000, accountId: savings.id }), savings)).toBe(0);
+  it("counts only the mine portion of a split expense", () => {
+    const base = { id: "t", date: "2025-03-01", description: "x", accountId: "a", categoryId: null, predictedCategoryId: null, categoryConfidence: null, categorySource: "user" as const, needsReview: false, tagIds: [], ignored: false, goalId: null, kind: "expense" as const };
+    expect(effectiveExpense({ ...base, amount: -1000, splits: [{ id: "s1", amount: 500, mine: true }, { id: "s2", amount: 500, mine: false }] })).toBe(500);
   });
 
   it("counts only the `mine` portion of a split", () => {
@@ -59,22 +62,17 @@ describe("effectiveExpense", () => {
         { id: "b", amount: 445, mine: false },
       ],
     });
-    expect(effectiveExpense(t, checking)).toBe(445);
-  });
-
-  it("treats a Revolut transfer-in like income (not spending)", () => {
-    const revolut: Account = { ...checking, id: "acc-rev", name: "Revolut", type: "Revolut" };
-    expect(effectiveExpense(tx({ amount: 1000, accountId: revolut.id }), revolut)).toBe(0);
+    expect(effectiveExpense(t)).toBe(445);
   });
 });
 
 describe("includedNet", () => {
-  it("excludes ignored rows from the net", () => {
-    expect(includedNet(tx({ amount: -5000, ignored: true }))).toBe(0);
+  it("excludes non-expense rows from the net", () => {
+    expect(includedNet(tx({ amount: 38500, kind: "income" }))).toBe(0);
+    expect(includedNet(tx({ amount: -5000, kind: "transfer" }))).toBe(0);
   });
 
-  it("keeps income positive and expenses negative", () => {
-    expect(includedNet(tx({ amount: 38500 }))).toBe(38500);
+  it("keeps expenses negative", () => {
     expect(includedNet(tx({ amount: -487 }))).toBe(-487);
   });
 
