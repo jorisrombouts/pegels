@@ -7,7 +7,7 @@ import { formatSEK, dayLabel } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type { Category, Transaction } from "@/lib/domain/types";
 
-/** Last few transactions; income is green, excluded rows are struck through. */
+/** Last few transactions; income is never shown, transfers are dimmed and struck through. */
 export function RecentActivity({
   transactions,
   categoryById,
@@ -31,8 +31,8 @@ export function RecentActivity({
       />
       <ul className="divide-y divide-[hsl(var(--glass-border))]">
         {transactions.map((tx) => {
+          if (tx.kind === "income") return null;
           const isTransfer = tx.kind === "transfer";
-          const isIncome = tx.amount > 0 && !isTransfer;
           return (
             <li key={tx.id}>
               <button
@@ -46,10 +46,7 @@ export function RecentActivity({
                 <span className="tnum w-12 shrink-0 text-[11px] text-muted-foreground">{dayLabel(tx.date)}</span>
                 <span className={cn("min-w-0 flex-1 truncate text-sm", isTransfer && "line-through")}>{tx.description}</span>
                 {tx.categoryId && <CategoryChip category={categoryById.get(tx.categoryId)} className="hidden sm:inline-flex" />}
-                <span
-                  className={cn("tnum shrink-0 text-sm font-semibold", isTransfer && "line-through")}
-                  style={{ color: isIncome ? "hsl(var(--positive))" : undefined }}
-                >
+                <span className={cn("tnum shrink-0 text-sm font-semibold", isTransfer && "line-through")}>
                   {formatSEK(tx.amount, masked)}
                 </span>
               </button>

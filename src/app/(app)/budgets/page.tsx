@@ -30,7 +30,7 @@ export default function BudgetsPage() {
   const isDesktop = useMediaQuery("(min-width: 1024px)");
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
-  const maps = buildMaps(data.accounts, data.categories);
+  const maps = buildMaps(data.categories);
   const statuses = budgetForecasts(data.budgets, data.transactions, maps, month);
   const totalSpent = statuses.reduce((s, b) => s + b.spent, 0);
   const totalLimit = statuses.reduce((s, b) => s + b.limit, 0);

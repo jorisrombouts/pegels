@@ -1,10 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { budgetForecasts, budgetStatuses, buildMaps, categorySpendInMonth, detectTransfersOnImport, goalProgress, goalSaved, monthNet, monthProgress } from "./selectors";
-import type { Account, Budget, Category, Goal, Transaction } from "./types";
+import type { Budget, Category, Goal, Transaction } from "./types";
 
-const checking: Account = { id: "a", name: "Checking", type: "Checking", kind: "spending", icon: "🏦", color: "0 0% 0%", balance: 0, archived: false };
 const food: Category = { id: "food", name: "Food", icon: "🍔", color: "150 60% 45%", parentId: null };
-const maps = buildMaps([checking], [food]);
+const maps = buildMaps([food]);
 
 function tx(amount: number, o: Partial<Transaction> = {}): Transaction {
   return {
@@ -98,7 +97,7 @@ describe("monthProgress", () => {
 
 describe("categorySpendInMonth", () => {
   const resto: Category = { id: "resto", name: "Restaurants", icon: "🍽️", color: "10 60% 50%", parentId: "food" };
-  const m = buildMaps([checking], [food, resto]);
+  const m = buildMaps([food, resto]);
 
   it("rolls up subcategory spend and excludes non-expense rows", () => {
     const txs = [

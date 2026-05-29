@@ -3,13 +3,11 @@ import type { Account, Budget, Category, Goal, Transaction } from "./types";
 import { monthKey } from "@/lib/format";
 
 export interface Maps {
-  accountById: Map<string, Account>;
   categoryById: Map<string, Category>;
 }
 
-export function buildMaps(accounts: Account[], categories: Category[]): Maps {
+export function buildMaps(categories: Category[]): Maps {
   return {
-    accountById: new Map(accounts.map((a) => [a.id, a])),
     categoryById: new Map(categories.map((c) => [c.id, c])),
   };
 }

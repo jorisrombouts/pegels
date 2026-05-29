@@ -12,7 +12,7 @@ import {
 import type { Dataset } from "@/data/mock";
 
 export function computeDashboard(data: Dataset, month: string, accountFilter: string, today = new Date()) {
-  const maps = buildMaps(data.accounts, data.categories);
+  const maps = buildMaps(data.categories);
 
   const spent = monthSpend(data.transactions, maps, month, accountFilter);
   const prevKey = prevMonthKey(month);
