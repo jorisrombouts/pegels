@@ -126,10 +126,7 @@ export const widgets: Record<string, (ctx: DashCtx, size: WidgetSize) => React.R
                 />
               </>
             ) : (
-              <>
-                <HeroStat label="Avg / day" value={`${formatSEKAbs(d.avgPerDay, masked)}/day`} sub={`over ${d.daysElapsed} days`} />
-                <HeroStat label="Income" value={formatSEKAbs(d.income, masked)} sub="received this month" tone="hsl(var(--positive))" />
-              </>
+              <HeroStat label="Avg / day" value={`${formatSEKAbs(d.avgPerDay, masked)}/day`} sub={`over ${d.daysElapsed} days`} />
             )}
           </div>
         </div>

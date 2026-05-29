@@ -1,4 +1,4 @@
-import { render } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { colSpan, widgets, widgetTitles, type DashCtx } from "./registry";
 import { computeDashboard } from "./compute";
@@ -45,6 +45,19 @@ function makeCtx(): DashCtx {
 }
 
 const SIZES: WidgetSize[] = ["small", "medium", "large"];
+
+describe("total widget no-budget hero", () => {
+  it("shows 'Avg / day' but not 'Income' when there are no budgets", () => {
+    const ctx = makeCtx();
+    const noBudget: DashCtx = {
+      ...ctx,
+      d: computeDashboard({ ...seedDataset, budgets: [] }, "2025-03", "all", new Date("2025-03-31T12:00:00Z")),
+    };
+    render(<>{widgets.total(noBudget, "large")}</>);
+    expect(screen.getByText("Avg / day")).toBeInTheDocument();
+    expect(screen.queryByText("Income")).not.toBeInTheDocument();
+  });
+});
 
 describe("every widget renders at every size", () => {
   const ctx = makeCtx();
