@@ -71,6 +71,8 @@ function t(
     needsReview: false,
     tagIds: [],
     ignored: false,
+    kind: amount < 0 ? "expense" : "income",
+    goalId: null,
     ...opts,
   };
 }
@@ -78,7 +80,7 @@ function t(
 export const transactions: Transaction[] = [
   // ── March 2025 (the month shown in the screenshots) ──
   t("2025-03-01", "Hyra Mars", -12500, "cat-rent", { tagIds: ["tag-fixed"], categoryConfidence: 0.97 }),
-  t("2025-03-01", "Lön Företaget AB", 38500, null, { needsReview: true, categoryConfidence: null }),
+  t("2025-03-01", "Lön Företaget AB", 38500, null, { needsReview: true, categoryConfidence: null, kind: "income" }),
   t("2025-03-02", "ICA Maxi Haninge", -487, "cat-groceries"),
   t("2025-03-03", "Spotify AB", -119, "cat-subscriptions", { tagIds: ["tag-subscription"] }),
   t("2025-03-04", "SL Månadskort", -970, "cat-transit", { tagIds: ["tag-fixed"] }),
@@ -100,8 +102,8 @@ export const transactions: Transaction[] = [
   t("2025-03-12", "Filmstaden Sergel", -185, "cat-entertainment", { tagIds: ["tag-partner"] }),
   t("2025-03-13", "OKQ8 Bensin", -720, "cat-fuel"),
   t("2025-03-13", "Max Burgers", -132, "cat-restaurants", { accountId: "acc-rev" }),
-  t("2025-03-14", "Överföring till Sparkonto", -5000, null, { ignored: true, categoryConfidence: null, categorySource: "user" }),
-  t("2025-03-14", "Överföring från Lönekonto", 5000, null, { accountId: "acc-spar", ignored: true, categoryConfidence: null, categorySource: "user" }),
+  t("2025-03-14", "Överföring till Sparkonto", -5000, null, { ignored: true, categoryConfidence: null, categorySource: "user", kind: "transfer" }),
+  t("2025-03-14", "Överföring från Lönekonto", 5000, null, { accountId: "acc-spar", ignored: true, categoryConfidence: null, categorySource: "user", kind: "transfer" }),
   t("2025-03-15", "Systembolaget", -349, "cat-food", { tagIds: ["tag-partner"] }),
   t("2025-03-16", "ICA Nära", -268, "cat-groceries"),
   t("2025-03-17", "Klarna - Zalando", -1290, "cat-clothing"),
@@ -122,7 +124,7 @@ export const transactions: Transaction[] = [
 
   // ── February 2025 (for trend comparisons) ──
   t("2025-02-01", "Hyra Februari", -12500, "cat-rent", { tagIds: ["tag-fixed"] }),
-  t("2025-02-01", "Lön Företaget AB", 38500, null),
+  t("2025-02-01", "Lön Företaget AB", 38500, null, { kind: "income" }),
   t("2025-02-05", "ICA Maxi", -612, "cat-groceries"),
   t("2025-02-09", "SL Månadskort", -970, "cat-transit"),
   t("2025-02-14", "Restaurang Operakällaren", -1450, "cat-restaurants", { tagIds: ["tag-partner"] }),

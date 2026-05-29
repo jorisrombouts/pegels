@@ -8,6 +8,7 @@ describe("db mappers", () => {
       id: "t1", date: "2025-03-01", description: "x", amount: -100, accountId: "a",
       categoryId: null, predictedCategoryId: null, categoryConfidence: null,
       categorySource: "user", needsReview: false, tagIds: ["tag-1"], ignored: false,
+      kind: "expense", goalId: null,
     };
     const row = transactionToRow(tx, "u1");
     expect(row.userId).toBe("u1");
@@ -22,7 +23,7 @@ describe("db mappers", () => {
       categoryId: "c", predictedCategoryId: "c", categoryConfidence: 0.9,
       categorySource: "model", needsReview: false, tagIds: ["t", "u"],
       splits: [{ id: "s1", amount: 445, mine: true }, { id: "s2", amount: 445, mine: false, label: "P" }],
-      notes: "hi", ignored: false,
+      notes: "hi", ignored: false, kind: "expense", goalId: null,
     };
     expect(rowToTransaction(transactionToRow(tx, "u"))).toEqual(tx);
   });

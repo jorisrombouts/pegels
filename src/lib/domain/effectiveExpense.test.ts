@@ -28,6 +28,8 @@ function tx(overrides: Partial<Transaction>): Transaction {
     needsReview: false,
     tagIds: [],
     ignored: false,
+    kind: "expense",
+    goalId: null,
     ...overrides,
   };
 }
