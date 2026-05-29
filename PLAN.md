@@ -2,22 +2,34 @@
 
 > **Current status — 2026-05-29** (header added after recovering this plan from session
 > history; the log below is the verbatim historical record and still says "Saldo" — the
-> project is now **pegels**, and several items it marks TODO/PLANNED have since shipped.)
+> project is now **pegels**. Several items it marks TODO/PLANNED have since shipped, and the
+> core spending invariant in the Context below has since **changed** — see the ⚠️ note.)
 >
-> **All UI-first work is complete** — 133 tests passing, build + lint clean. Built since the
-> log was last written:
+> **All UI-first work is complete** — 142 tests passing, build + lint clean, deployed against
+> Neon (migrated + seeded). Built since the log was last written:
 > - Dashboard polish batch #3–#6 (trend line morph, "This month" button via
 >   `month-switcher.tsx`, hero "This month" widget, recurated default layout).
 > - **Settings → customizable nav bar** — fully built (`navConfig` store + `NavigationSection`
 >   with reorder + primary cap).
 > - **Budget forecasts** (history-blended, current-month-only) — `budgetForecasts()` in
 >   `selectors.ts`, surfaced on `/budgets` (projected total + per-row trending/on-track).
->   No model needed; forecasting is arithmetic, distinct from the OpenAI categorization work.
 > - **✅ Phase 4a — Neon Postgres + Drizzle data layer** — Neon is now the source of truth.
 >   Server-owned layer (`src/lib/db/` schema + `queries.ts`, `src/app/actions/data.ts` server
 >   actions) with cascades preserved; `useData()` rewritten as a TanStack Query facade (same
 >   shape, optimistic updates, offline-read cache). Stub `getUserId()` is the auth seam.
->   `effectiveExpense` + selectors unchanged. Scripts: `db:push` / `db:seed`.
+>   Scripts: `db:push` / `db:seed`.
+> - **✅ Transaction roles, transaction-driven goals, hidden income** (spec + plan in
+>   `docs/superpowers/`, 2026-05-29; 12 commits; verified live against Neon). **⚠️ This
+>   supersedes the `effectiveExpense` invariant described in the Context below:**
+>     - Every transaction now has `kind: "expense" | "income" | "transfer"` (+ optional
+>       `goalId`). The `ignored` flag and the savings-account exemption are **removed** —
+>       `effectiveExpense` counts a tx **iff `kind === "expense"`** (split → `mine` only).
+>     - **Transfers** (e.g. SEB→Revolut/savings) count as neither expense nor income; CSV
+>       import **auto-detects** transfer pairs against existing transactions (no double-count).
+>     - **Goals are transaction-driven**: `goalSaved = baseline + Σ|linked transfer amounts|`;
+>       `Goal.contributions[]` removed. Mark a transfer "→ goal" in the detail panel.
+>     - **Income is hidden everywhere** (no Activity rows, no dashboard stat; "Net" → "Spent")
+>       and never counted — repayments are just ignored income (splits keep your real cost).
 >
 > **Still left to implement (Phase 4b+):**
 > - **Auth.js Google sign-in** — make `getUserId()` (`src/lib/auth.ts`) read the real session.
