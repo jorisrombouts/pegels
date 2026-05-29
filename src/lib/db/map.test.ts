@@ -23,9 +23,12 @@ describe("db mappers", () => {
       categoryId: "c", predictedCategoryId: "c", categoryConfidence: 0.9,
       categorySource: "model", needsReview: false, tagIds: ["t", "u"],
       splits: [{ id: "s1", amount: 445, mine: true }, { id: "s2", amount: 445, mine: false, label: "P" }],
-      notes: "hi", kind: "expense", goalId: null,
+      notes: "hi", kind: "transfer", goalId: "goal-x",
     };
-    expect(rowToTransaction(transactionToRow(tx, "u"))).toEqual(tx);
+    const row = transactionToRow(tx, "u");
+    expect(row.kind).toBe("transfer");
+    expect(row.goalId).toBe("goal-x");
+    expect(rowToTransaction(row)).toEqual(tx);
   });
 
   it("goal: round-trips contributions and nullable fields", () => {

@@ -39,8 +39,8 @@ export function rowToTransaction(r: TransactionRow): Transaction {
     tagIds: r.tagIds ?? [],
     splits: r.splits ?? undefined,
     notes: r.notes ?? undefined,
-    kind: r.amount < 0 ? "expense" : "income",
-    goalId: null,
+    kind: r.kind,
+    goalId: r.goalId,
   };
 }
 
@@ -88,6 +88,8 @@ export function transactionToRow(t: Transaction, userId: string): TransactionRow
     categoryConfidence: t.categoryConfidence,
     categorySource: t.categorySource,
     needsReview: t.needsReview,
+    kind: t.kind,
+    goalId: t.goalId,
     tagIds: t.tagIds,
     splits: t.splits ?? null,
     notes: t.notes ?? null,
