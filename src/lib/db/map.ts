@@ -57,7 +57,6 @@ export function rowToGoal(r: GoalRow): Goal {
     baseline: r.baseline,
     deadline: r.deadline,
     accountId: r.accountId,
-    contributions: r.contributions ?? [],
   };
 }
 
@@ -110,6 +109,5 @@ export function goalToRow(g: Goal, userId: string): GoalRow {
     baseline: g.baseline,
     deadline: g.deadline,
     accountId: g.accountId,
-    contributions: g.contributions,
   };
 }
