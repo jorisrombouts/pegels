@@ -349,6 +349,52 @@ export function dailySpend(
   return totals.map((amount, i) => ({ day: i + 1, amount }));
 }
 
+const TRANSFER_DAY_WINDOW = 3;
+
+export interface ExistingTransferUpdate { id: string; goalId: string | null }
+export interface TransferDetection { rows: Transaction[]; existingUpdates: ExistingTransferUpdate[] }
+
+/**
+ * Detect internal transfers when importing `newRows`, pairing each against `existing`
+ * transactions (opposite amount, different account, within TRANSFER_DAY_WINDOW days, not
+ * already a transfer). Marks the new row as a transfer and returns updates for the matched
+ * existing counterpart. The OUTFLOW leg (amount < 0) links to a goal when the INFLOW's
+ * account backs one. Pure — returns new data, mutates nothing.
+ */
+export function detectTransfersOnImport(
+  newRows: Transaction[],
+  existing: Transaction[],
+  goals: Pick<Goal, "id" | "accountId">[],
+): TransferDetection {
+  const goalByAccount = new Map(goals.filter((g) => g.accountId).map((g) => [g.accountId as string, g.id]));
+  const days = (a: string, b: string) => Math.abs((new Date(a).getTime() - new Date(b).getTime()) / 86_400_000);
+  const usedExisting = new Set<string>();
+  const existingUpdates: ExistingTransferUpdate[] = [];
+
+  const rows = newRows.map((orig) => {
+    const r = { ...orig };
+    const e = existing.find(
+      (x) => !usedExisting.has(x.id) && x.kind !== "transfer" && x.amount === -r.amount && x.accountId !== r.accountId && days(x.date, r.date) <= TRANSFER_DAY_WINDOW,
+    );
+    if (!e) return r;
+    usedExisting.add(e.id);
+    r.kind = "transfer";
+    if (r.amount < 0) {
+      // new row is the outflow; existing is the inflow → dest = existing.accountId
+      const goalId = goalByAccount.get(e.accountId) ?? null;
+      r.goalId = goalId;
+      existingUpdates.push({ id: e.id, goalId: null });
+    } else {
+      // new row is the inflow; existing is the outflow → dest = new row's account
+      const goalId = goalByAccount.get(r.accountId) ?? e.goalId ?? null;
+      existingUpdates.push({ id: e.id, goalId });
+    }
+    return r;
+  });
+
+  return { rows, existingUpdates };
+}
+
 export interface CapitalSummary {
   spendingBalance: number;
   savingsBalance: number;

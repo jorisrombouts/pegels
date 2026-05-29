@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { budgetForecasts, budgetStatuses, buildMaps, categorySpendInMonth, goalProgress, monthNet, monthProgress } from "./selectors";
+import { budgetForecasts, budgetStatuses, buildMaps, categorySpendInMonth, detectTransfersOnImport, goalProgress, monthNet, monthProgress } from "./selectors";
 import type { Account, Budget, Category, Goal, Transaction } from "./types";
 
 const checking: Account = { id: "a", name: "Checking", type: "Checking", kind: "spending", icon: "🏦", color: "0 0% 0%", balance: 0, archived: false };
@@ -92,6 +92,46 @@ describe("categorySpendInMonth", () => {
     ];
     expect(categorySpendInMonth(txs, m, "food", "2025-03")).toBe(500);
     expect(categorySpendInMonth(txs, m, "resto", "2025-03")).toBe(200);
+  });
+});
+
+describe("detectTransfersOnImport", () => {
+  const goals = [{ id: "g-japan", accountId: "spar" }];
+  const mk = (id: string, accountId: string, amount: number, date: string) => ({ id, accountId, amount, date, kind: (amount < 0 ? "expense" : "income") as const, goalId: null });
+
+  it("marks a new inflow as transfer and updates the existing outflow leg", () => {
+    const existing = [mk("seb-out", "seb", -5000, "2025-03-10")];
+    const { rows, existingUpdates } = detectTransfersOnImport([mk("rev-in", "rev", 5000, "2025-03-11")] as never, existing as never, goals as never);
+    expect(rows[0].kind).toBe("transfer");
+    expect(existingUpdates).toEqual([{ id: "seb-out", goalId: null }]);
+  });
+
+  it("links the outflow to a goal when the inflow account backs one", () => {
+    const existing = [mk("seb-out", "seb", -3000, "2025-03-10")];
+    const { rows, existingUpdates } = detectTransfersOnImport([mk("spar-in", "spar", 3000, "2025-03-10")] as never, existing as never, goals as never);
+    expect(rows[0].kind).toBe("transfer");
+    expect(existingUpdates).toEqual([{ id: "seb-out", goalId: "g-japan" }]);
+  });
+
+  it("when the NEW row is the outflow, it gets the goal and existing inflow has none", () => {
+    const existing = [mk("spar-in", "spar", 3000, "2025-03-10")];
+    const { rows, existingUpdates } = detectTransfersOnImport([mk("seb-out", "seb", -3000, "2025-03-11")] as never, existing as never, goals as never);
+    expect(rows[0].kind).toBe("transfer");
+    expect(rows[0].goalId).toBe("g-japan");
+    expect(existingUpdates).toEqual([{ id: "spar-in", goalId: null }]);
+  });
+
+  it("leaves an unmatched inflow as income with no updates", () => {
+    const { rows, existingUpdates } = detectTransfersOnImport([mk("x", "rev", 5000, "2025-03-11")] as never, [] as never, goals as never);
+    expect(rows[0].kind).toBe("income");
+    expect(existingUpdates).toEqual([]);
+  });
+
+  it("does not pair same-account rows", () => {
+    const existing = [mk("a", "seb", -5000, "2025-03-10")];
+    const { rows, existingUpdates } = detectTransfersOnImport([mk("b", "seb", 5000, "2025-03-10")] as never, existing as never, goals as never);
+    expect(rows[0].kind).toBe("income");
+    expect(existingUpdates).toEqual([]);
   });
 });
 

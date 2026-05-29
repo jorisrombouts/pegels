@@ -11,9 +11,10 @@ import { useData } from "@/store/data";
 import { useUI } from "@/store/ui";
 import { parseCsv, parseAmount, parseDate, type ColumnField, type ParsedCsv } from "@/lib/parse-csv";
 import { categorize, needsReview } from "@/lib/categorize";
+import { detectTransfersOnImport, type ExistingTransferUpdate } from "@/lib/domain/selectors";
 import { formatSEK } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import type { Transaction } from "@/lib/domain/types";
+import type { Transaction, TransactionKind } from "@/lib/domain/types";
 
 interface DraftRow {
   date: string;
@@ -23,13 +24,15 @@ interface DraftRow {
   confidence: number;
   tagIds: string[];
   include: boolean;
+  kind: TransactionKind;
+  goalId: string | null;
 }
 
 const FIELD_LABEL: Record<ColumnField, string> = { date: "Date", description: "Description", amount: "Amount" };
 
 export function ImportModal() {
   const router = useRouter();
-  const { accounts, categories, transactions, addTransactions } = useData();
+  const { accounts, categories, transactions, goals, addTransactions, updateTransaction } = useData();
   const importOpen = useUI((s) => s.importOpen);
   const setImportOpen = useUI((s) => s.setImportOpen);
 
@@ -39,12 +42,14 @@ export function ImportModal() {
   const [mapping, setMapping] = useState({ date: 0, description: 1, amount: 2 });
   const [accountId, setAccountId] = useState(accounts.find((a) => a.kind === "spending")?.id ?? accounts[0]?.id ?? "");
   const [rows, setRows] = useState<DraftRow[]>([]);
+  const [existingUpdates, setExistingUpdates] = useState<ExistingTransferUpdate[]>([]);
 
   function reset() {
     setStep("upload");
     setParsed(null);
     setFileName("");
     setRows([]);
+    setExistingUpdates([]);
   }
 
   function loadText(text: string, name: string) {
@@ -68,14 +73,22 @@ export function ImportModal() {
     const existing = new Set(
       transactions.filter((t) => t.accountId === accountId).map((t) => `${t.date}|${t.amount}|${t.description}`),
     );
-    return parsed.rows.map((r) => {
+    const drafts = parsed.rows.map((r, i) => {
       const date = parseDate(r[mapping.date] ?? "");
       const description = r[mapping.description] ?? "";
       const amount = parseAmount(r[mapping.amount] ?? "");
       const { categoryId, confidence } = categorize(description);
       const isDup = existing.has(`${date}|${amount}|${description}`);
-      return { date, description, amount, categoryId, confidence, tagIds: [], include: !isDup };
+      const kind: TransactionKind = amount < 0 ? "expense" : "income";
+      return { id: String(i), date, description, amount, accountId, categoryId, confidence, tagIds: [], include: !isDup, kind, goalId: null as string | null };
     });
+    // Pair each new row against existing transactions (the other leg arrived in a prior import).
+    const detected = detectTransfersOnImport(drafts as unknown as Transaction[], transactions, goals);
+    setExistingUpdates(detected.existingUpdates);
+    return drafts.map((d, i): DraftRow => ({
+      date: d.date, description: d.description, amount: d.amount, categoryId: d.categoryId,
+      confidence: d.confidence, tagIds: d.tagIds, include: d.include, kind: detected.rows[i].kind, goalId: detected.rows[i].goalId,
+    }));
   }
 
   const existingKeys = new Set(
@@ -108,10 +121,12 @@ export function ImportModal() {
       categorySource: "model",
       needsReview: needsReview(r.confidence),
       tagIds: r.tagIds,
-      kind: r.amount < 0 ? "expense" : "income",
-      goalId: null,
+      kind: r.kind,
+      goalId: r.goalId,
     }));
     addTransactions(txs);
+    // Reclassify each matched existing leg as a transfer (and link/unlink its goal).
+    existingUpdates.forEach((u) => updateTransaction(u.id, { kind: "transfer", goalId: u.goalId }));
     setImportOpen(false);
     reset();
     router.push("/transactions");
