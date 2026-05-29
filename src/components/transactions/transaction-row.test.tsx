@@ -21,10 +21,10 @@ describe("TransactionRow", () => {
     expect(screen.getByText("ICA Maxi")).toBeInTheDocument();
   });
 
-  it("strikes through and labels excluded transactions", () => {
+  it("dims and labels transfer transactions", () => {
     render(<TransactionRow tx={tx({ description: "Överföring", kind: "transfer" })} category={undefined} selected={false} onSelect={() => {}} />);
     expect(screen.getByText("Överföring").className).toContain("line-through");
-    expect(screen.getByText("Excluded")).toBeInTheDocument();
+    expect(screen.getByText("Transfer")).toBeInTheDocument();
   });
 
   it("shows a needs-review indicator", () => {
