@@ -1,4 +1,5 @@
 import { screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 import { renderWithData } from "@/test/render";
 import { TransactionDetail, DetailEmpty } from "./transaction-detail";
@@ -12,10 +13,17 @@ describe("TransactionDetail", () => {
     expect(screen.getByText("97%")).toBeInTheDocument();
   });
 
-  it("exposes an exclude-from-totals switch and a notes field", () => {
+  it("exposes a notes field", () => {
     renderWithData(<TransactionDetail txId="tx-001" />);
-    expect(screen.getByLabelText("Exclude from totals")).toBeInTheDocument();
     expect(screen.getByPlaceholderText("Add a note…")).toBeInTheDocument();
+  });
+
+  it("shows a Type control and a goal picker when Transfer is chosen", async () => {
+    const user = userEvent.setup();
+    renderWithData(<TransactionDetail txId="tx-001" />);
+    expect(screen.getByText("Type")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /transfer/i }));
+    expect(screen.getByText(/Counts toward goal/i)).toBeInTheDocument();
   });
 
   it("falls back to the empty state for an unknown id", () => {
