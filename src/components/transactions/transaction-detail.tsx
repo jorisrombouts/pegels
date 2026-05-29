@@ -2,7 +2,6 @@
 
 import { Check, EyeOff, MousePointerClick } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
 import { Field, Textarea } from "@/components/ui/input";
 import { TagEditor } from "./tag-editor";
 import { SplitEditor } from "./split-editor";
@@ -27,7 +26,7 @@ export function DetailEmpty() {
 }
 
 export function TransactionDetail({ txId }: { txId: string }) {
-  const { transactions, categories, accounts, updateTransaction } = useData();
+  const { transactions, categories, accounts, goals, updateTransaction } = useData();
   const masked = useUI((s) => s.masked);
   const tx = transactions.find((t) => t.id === txId);
   if (!tx) return <DetailEmpty />;
@@ -36,26 +35,26 @@ export function TransactionDetail({ txId }: { txId: string }) {
   const categoryById = new Map(categories.map((c) => [c.id, c]));
   const predicted = tx.predictedCategoryId ? categoryById.get(tx.predictedCategoryId) : undefined;
   const showPredictedHint = tx.categorySource === "user" && predicted && tx.predictedCategoryId !== tx.categoryId;
-  const isIncome = tx.amount > 0 && !tx.ignored;
+  const isIncome = tx.kind === "income";
 
   return (
     <div className="space-y-6">
       {/* Headline */}
-      <div className={cn(tx.ignored && "opacity-60")}>
-        <p className={cn("text-lg font-semibold", tx.ignored && "line-through")}>{tx.description}</p>
+      <div className={cn(tx.kind === "transfer" && "opacity-60")}>
+        <p className={cn("text-lg font-semibold", tx.kind === "transfer" && "line-through")}>{tx.description}</p>
         <p className="mt-0.5 text-xs text-muted-foreground">
           {dayLabel(tx.date)} · {account?.name}
         </p>
         <div className="mt-2 flex items-center gap-3">
           <span
-            className={cn("font-display tnum text-4xl font-bold", tx.ignored && "line-through")}
+            className={cn("font-display tnum text-4xl font-bold", tx.kind === "transfer" && "line-through")}
             style={{ color: isIncome ? "hsl(var(--positive))" : undefined }}
           >
             {formatSEK(tx.amount, masked)}
           </span>
-          {tx.ignored && (
+          {tx.kind === "transfer" && (
             <span className="inline-flex items-center gap-1 rounded-full bg-[hsl(var(--muted)/0.6)] px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
-              <EyeOff className="size-3" /> Excluded
+              <EyeOff className="size-3" /> Transfer
             </span>
           )}
         </div>
@@ -114,18 +113,50 @@ export function TransactionDetail({ txId }: { txId: string }) {
         <SplitEditor amount={tx.amount} splits={tx.splits} onChange={(splits) => updateTransaction(tx.id, { splits })} />
       </div>
 
-      {/* Exclude */}
-      <div className="flex items-start justify-between gap-4 rounded-2xl glass-inset p-4">
-        <div>
-          <p className="text-sm font-medium">Exclude from totals</p>
-          <p className="mt-0.5 text-xs text-muted-foreground">Excluded transactions don&apos;t count toward your dashboard or month totals.</p>
+      {/* Type */}
+      <div className="space-y-2">
+        <Label>Type</Label>
+        <div className="flex overflow-hidden rounded-xl glass-inset p-1">
+          {(["expense", "income", "transfer"] as const).map((k) => (
+            <button
+              key={k}
+              type="button"
+              onClick={() => updateTransaction(tx.id, { kind: k, goalId: k === "transfer" ? tx.goalId : null })}
+              className={cn(
+                "pressable flex-1 rounded-lg px-3 py-1.5 text-sm font-medium capitalize",
+                tx.kind === k ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              {k}
+            </button>
+          ))}
         </div>
-        <Switch
-          checked={tx.ignored}
-          onCheckedChange={(v) => updateTransaction(tx.id, { ignored: v })}
-          aria-label="Exclude from totals"
-        />
+        <p className="text-xs text-muted-foreground">
+          Transfers move money between your own accounts — they don&apos;t count as spending or income.
+        </p>
       </div>
+
+      {tx.kind === "transfer" && (
+        <div className="space-y-1.5">
+          <Label>Counts toward goal (optional)</Label>
+          <Select
+            value={tx.goalId ?? "__none__"}
+            onValueChange={(v) => updateTransaction(tx.id, { goalId: v === "__none__" ? null : v })}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="No goal" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__none__">No goal</SelectItem>
+              {goals.map((g) => (
+                <SelectItem key={g.id} value={g.id}>
+                  {g.icon} {g.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
 
       {/* Notes */}
       <Field label="Notes">
