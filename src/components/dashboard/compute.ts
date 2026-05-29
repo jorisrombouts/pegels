@@ -57,7 +57,7 @@ export function computeDashboard(data: Dataset, month: string, accountFilter: st
     byAccount: spendByAccount(data.transactions, maps, data.accounts, month),
     budgets,
     budgetLimitTotal,
-    goals: data.goals.map((g) => goalProgress(g, today)),
+    goals: data.goals.map((g) => goalProgress(g, data.transactions, today)),
     capital: capitalSummary(data.accounts),
   };
 }

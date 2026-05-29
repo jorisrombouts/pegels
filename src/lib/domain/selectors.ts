@@ -261,8 +261,12 @@ export interface GoalProgress {
   onTrack: boolean;
 }
 
-export function goalProgress(goal: Goal, today = new Date()): GoalProgress {
-  const saved = goal.baseline + goal.contributions.reduce((s, c) => s + c.amount, 0);
+export function goalSaved(goal: Goal, transactions: Transaction[]): number {
+  return transactions.reduce((sum, t) => (t.goalId === goal.id ? sum + Math.abs(t.amount) : sum), goal.baseline);
+}
+
+export function goalProgress(goal: Goal, transactions: Transaction[], today = new Date()): GoalProgress {
+  const saved = goalSaved(goal, transactions);
   const pct = goal.target > 0 ? saved / goal.target : 0;
   let daysLeft: number | null = null;
   if (goal.deadline) {
