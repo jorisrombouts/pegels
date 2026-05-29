@@ -137,6 +137,13 @@ export const transactions: Transaction[] = [
   t("2025-01-12", "SL Månadskort", -970, "cat-transit"),
   t("2025-01-20", "Netflix", -169, "cat-subscriptions", { tagIds: ["tag-subscription"] }),
   t("2025-01-28", "Elräkning Vattenfall", -1020, "cat-electricity"),
+
+  // ── Goal-funding transfers (outflow from Lönekonto into savings goals) ──
+  t("2025-01-31", "Sparande Emergency Fund", -3000, null, { kind: "transfer", goalId: "goal-emergency" }),
+  t("2025-02-28", "Sparande Emergency Fund", -2000, null, { kind: "transfer", goalId: "goal-emergency" }),
+  t("2025-03-14", "Sparande Emergency Fund", -3000, null, { kind: "transfer", goalId: "goal-emergency" }),
+  t("2025-02-15", "Sparande Japan Trip", -1500, null, { kind: "transfer", goalId: "goal-japan" }),
+  t("2025-03-10", "Sparande Japan Trip", -1000, null, { kind: "transfer", goalId: "goal-japan" }),
 ];
 
 export const budgets: Budget[] = [
@@ -155,11 +162,6 @@ export const goals: Goal[] = [
     baseline: 24000,
     deadline: "2025-12-31",
     accountId: "acc-spar",
-    contributions: [
-      { id: "gc1", date: "2025-01-31", amount: 3000 },
-      { id: "gc2", date: "2025-02-28", amount: 2000 },
-      { id: "gc3", date: "2025-03-14", amount: 3000 },
-    ],
   },
   {
     id: "goal-japan",
@@ -169,10 +171,6 @@ export const goals: Goal[] = [
     baseline: 6000,
     deadline: "2025-06-02",
     accountId: "acc-spar",
-    contributions: [
-      { id: "gc4", date: "2025-02-15", amount: 1500 },
-      { id: "gc5", date: "2025-03-10", amount: 1000 },
-    ],
   },
 ];
 

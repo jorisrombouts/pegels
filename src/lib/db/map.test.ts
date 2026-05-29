@@ -31,10 +31,10 @@ describe("db mappers", () => {
     expect(rowToTransaction(row)).toEqual(tx);
   });
 
-  it("goal: round-trips contributions and nullable fields", () => {
+  it("goal: round-trips nullable fields", () => {
     const g: Goal = {
       id: "g", name: "n", icon: "🗾", target: 100, baseline: 10,
-      deadline: null, accountId: null, contributions: [{ id: "c1", date: "2025-01-01", amount: 5 }],
+      deadline: null, accountId: null,
     };
     const row = goalToRow(g, "u");
     expect(row.userId).toBe("u");

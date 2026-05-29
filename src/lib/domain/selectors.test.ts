@@ -40,10 +40,9 @@ describe("budgetStatuses", () => {
 describe("goalProgress", () => {
   const base: Goal = {
     id: "g", name: "Trip", icon: "🗾", target: 1000, baseline: 600, accountId: null, deadline: "2025-12-31",
-    contributions: [{ id: "c", date: "2025-01-01", amount: 100 }],
   };
 
-  it("sums baseline + contributions into saved and pct", () => {
+  it("sums baseline into saved and pct with no linked transfers", () => {
     const p = goalProgress(base, [], new Date("2025-06-01"));
     expect(p.saved).toBe(600);
     expect(p.pct).toBeCloseTo(0.6);
@@ -60,7 +59,7 @@ describe("goalProgress", () => {
 });
 
 describe("goalSaved / goalProgress (transaction-driven)", () => {
-  const goal = { id: "g", name: "Japan", icon: "🗾", target: 25000, baseline: 6000, deadline: null, accountId: "spar", contributions: [] };
+  const goal = { id: "g", name: "Japan", icon: "🗾", target: 25000, baseline: 6000, deadline: null, accountId: "spar" };
   const txs = [
     { ...tx(-3000), id: "t1", goalId: "g", kind: "transfer" as const, date: "2025-03-14" },
     { ...tx(1000), id: "t2", goalId: "g", kind: "transfer" as const, date: "2025-04-02" },

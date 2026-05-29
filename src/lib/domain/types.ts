@@ -77,21 +77,14 @@ export interface Budget {
   month: string | null;
 }
 
-export interface GoalContribution {
-  id: string;
-  date: string; // ISO
-  amount: number; // positive SEK
-}
-
 export interface Goal {
   id: string;
   name: string;
   icon: string; // emoji
   target: number;
-  /** Baseline already put aside before contributions were logged. */
+  /** Baseline already put aside before linked transfers were logged. */
   baseline: number;
   deadline: string | null; // ISO date
   /** Optional linked savings account. */
   accountId: string | null;
-  contributions: GoalContribution[];
 }
