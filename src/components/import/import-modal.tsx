@@ -108,7 +108,6 @@ export function ImportModal() {
       categorySource: "model",
       needsReview: needsReview(r.confidence),
       tagIds: r.tagIds,
-      ignored: false,
       kind: r.amount < 0 ? "expense" : "income",
       goalId: null,
     }));

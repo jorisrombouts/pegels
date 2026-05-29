@@ -10,7 +10,7 @@ function tx(amount: number, o: Partial<Transaction> = {}): Transaction {
   return {
     id: `t${Math.random()}`, date: "2025-03-10", description: "x", amount, accountId: "a",
     categoryId: "food", predictedCategoryId: "food", categoryConfidence: 0.9, categorySource: "model",
-    needsReview: false, tagIds: [], ignored: false,
+    needsReview: false, tagIds: [],
     kind: amount < 0 ? "expense" : "income", goalId: null, ...o,
   };
 }

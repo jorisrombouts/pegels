@@ -10,7 +10,7 @@ function tx(o: Partial<Transaction>): Transaction {
   return {
     id: "t", date: "2025-03-02", description: "ICA Maxi", amount: -487, accountId: "acc-lon",
     categoryId: "cat-groceries", predictedCategoryId: "cat-groceries", categoryConfidence: 0.9,
-    categorySource: "model", needsReview: false, tagIds: [], ignored: false,
+    categorySource: "model", needsReview: false, tagIds: [],
     kind: "expense", goalId: null, ...o,
   };
 }
@@ -22,7 +22,7 @@ describe("TransactionRow", () => {
   });
 
   it("strikes through and labels excluded transactions", () => {
-    render(<TransactionRow tx={tx({ description: "Överföring", ignored: true })} category={undefined} selected={false} onSelect={() => {}} />);
+    render(<TransactionRow tx={tx({ description: "Överföring", kind: "transfer" })} category={undefined} selected={false} onSelect={() => {}} />);
     expect(screen.getByText("Överföring").className).toContain("line-through");
     expect(screen.getByText("Excluded")).toBeInTheDocument();
   });

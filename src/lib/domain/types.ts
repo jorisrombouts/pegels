@@ -62,8 +62,6 @@ export interface Transaction {
   tagIds: string[];
   splits?: Split[];
   notes?: string;
-  /** User flagged: visible everywhere, counted nowhere. */
-  ignored: boolean;
   /** What this money event is. Drives counting + visibility. */
   kind: TransactionKind;
   /** Goal this transfer funds (only when kind === "transfer"). */

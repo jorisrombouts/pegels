@@ -31,7 +31,8 @@ export function RecentActivity({
       />
       <ul className="divide-y divide-[hsl(var(--glass-border))]">
         {transactions.map((tx) => {
-          const isIncome = tx.amount > 0 && !tx.ignored;
+          const isTransfer = tx.kind === "transfer";
+          const isIncome = tx.amount > 0 && !isTransfer;
           return (
             <li key={tx.id}>
               <button
@@ -39,14 +40,14 @@ export function RecentActivity({
                 onClick={() => onSelect?.(tx.id)}
                 className={cn(
                   "pressable -mx-2 flex w-[calc(100%+1rem)] items-center gap-3 rounded-lg px-2 py-2.5 text-left hover:bg-[hsl(var(--muted)/0.45)]",
-                  tx.ignored && "opacity-60",
+                  isTransfer && "opacity-60",
                 )}
               >
                 <span className="tnum w-12 shrink-0 text-[11px] text-muted-foreground">{dayLabel(tx.date)}</span>
-                <span className={cn("min-w-0 flex-1 truncate text-sm", tx.ignored && "line-through")}>{tx.description}</span>
+                <span className={cn("min-w-0 flex-1 truncate text-sm", isTransfer && "line-through")}>{tx.description}</span>
                 {tx.categoryId && <CategoryChip category={categoryById.get(tx.categoryId)} className="hidden sm:inline-flex" />}
                 <span
-                  className={cn("tnum shrink-0 text-sm font-semibold", tx.ignored && "line-through")}
+                  className={cn("tnum shrink-0 text-sm font-semibold", isTransfer && "line-through")}
                   style={{ color: isIncome ? "hsl(var(--positive))" : undefined }}
                 >
                   {formatSEK(tx.amount, masked)}
