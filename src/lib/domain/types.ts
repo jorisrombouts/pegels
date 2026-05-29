@@ -44,6 +44,8 @@ export interface Split {
 
 export type CategorySource = "model" | "user";
 
+export type TransactionKind = "expense" | "income" | "transfer";
+
 export interface Transaction {
   id: string;
   date: string; // ISO yyyy-mm-dd
@@ -62,6 +64,10 @@ export interface Transaction {
   notes?: string;
   /** User flagged: visible everywhere, counted nowhere. */
   ignored: boolean;
+  /** What this money event is. Drives counting + visibility. */
+  kind: TransactionKind;
+  /** Goal this transfer funds (only when kind === "transfer"). */
+  goalId: string | null;
 }
 
 export interface Budget {

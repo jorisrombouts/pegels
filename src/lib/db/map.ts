@@ -40,6 +40,8 @@ export function rowToTransaction(r: TransactionRow): Transaction {
     splits: r.splits ?? undefined,
     notes: r.notes ?? undefined,
     ignored: r.ignored,
+    kind: r.amount < 0 ? "expense" : "income",
+    goalId: null,
   };
 }
 
