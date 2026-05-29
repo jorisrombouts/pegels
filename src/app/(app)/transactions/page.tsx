@@ -9,7 +9,6 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { TransactionRow } from "@/components/transactions/transaction-row";
 import { TransactionDetail, DetailEmpty } from "@/components/transactions/transaction-detail";
 import { useData } from "@/store/data";
@@ -17,8 +16,8 @@ import { useUI } from "@/store/ui";
 import { useMediaQuery } from "@/lib/use-media-query";
 import { spring } from "@/lib/motion";
 import { MonthSwitcher } from "@/components/month-switcher";
-import { inMonth, isInCategory, monthNet } from "@/lib/domain/selectors";
-import { formatSEK } from "@/lib/format";
+import { buildMaps, inMonth, isInCategory, monthSpend } from "@/lib/domain/selectors";
+import { formatSEKAbs } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 interface InitialFilters {
@@ -68,12 +67,14 @@ function TransactionsView({ initial }: { initial: InitialFilters }) {
   const [hasSplitsOnly, setHasSplitsOnly] = useState(initial.splits);
   const [selectedId, setSelectedId] = useState<string | null>(initial.tx);
 
-  const categoryById = new Map(categories.map((c) => [c.id, c]));
+  const maps = buildMaps(accounts, categories);
+  const categoryById = maps.categoryById;
   const budgetCategoryId = budgetFilter === "all" ? null : budgets.find((b) => b.id === budgetFilter)?.categoryId ?? null;
 
-  const monthTxs = transactions.filter((t) => inMonth(t, month));
+  const visibleTxs = transactions.filter((t) => t.kind !== "income");
+  const monthTxs = visibleTxs.filter((t) => inMonth(t, month));
   const count = monthTxs.length;
-  const net = monthNet(transactions, month);
+  const spent = monthSpend(transactions, maps, month);
 
   const filtered = monthTxs
     .filter((t) => {
@@ -143,14 +144,9 @@ function TransactionsView({ initial }: { initial: InitialFilters }) {
       {/* Month nav */}
       <div className="mb-3 flex items-center justify-between gap-3">
         <MonthSwitcher suffix={count} />
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <span className="tnum cursor-default text-sm font-semibold text-muted-foreground">
-              Net {formatSEK(net, masked)}
-            </span>
-          </TooltipTrigger>
-          <TooltipContent>Net of included transactions (excluded items not counted).</TooltipContent>
-        </Tooltip>
+        <span className="tnum text-sm font-semibold text-muted-foreground">
+          Spent {formatSEKAbs(spent, masked)}
+        </span>
       </div>
 
       {/* Master / detail */}
