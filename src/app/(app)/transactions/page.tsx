@@ -67,7 +67,7 @@ function TransactionsView({ initial }: { initial: InitialFilters }) {
   const [hasSplitsOnly, setHasSplitsOnly] = useState(initial.splits);
   const [selectedId, setSelectedId] = useState<string | null>(initial.tx);
 
-  const maps = buildMaps(accounts, categories);
+  const maps = buildMaps(categories);
   const categoryById = maps.categoryById;
   const budgetCategoryId = budgetFilter === "all" ? null : budgets.find((b) => b.id === budgetFilter)?.categoryId ?? null;
 

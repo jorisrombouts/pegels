@@ -30,7 +30,7 @@ describe("dashboard registry", () => {
 
 // Build a realistic context from the seed data, exactly like the page does.
 function makeCtx(): DashCtx {
-  const maps = buildMaps(seedDataset.accounts, seedDataset.categories);
+  const maps = buildMaps(seedDataset.categories);
   const month = "2025-03";
   return {
     d: computeDashboard(seedDataset, month, "all", new Date("2025-03-31T12:00:00Z")),

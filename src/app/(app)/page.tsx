@@ -34,13 +34,13 @@ export default function DashboardPage() {
   );
   const [editing, setEditing] = useState(false);
 
-  const maps = buildMaps(data.accounts, data.categories);
+  const maps = buildMaps(data.categories);
   const ctx: DashCtx = {
     d: computeDashboard(data, month, accountFilter),
     masked,
     month,
     categoryById: maps.categoryById,
-    recent: [...data.transactions].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 5),
+    recent: [...data.transactions].filter((t) => t.kind !== "income").sort((a, b) => b.date.localeCompare(a.date)).slice(0, 5),
     trend: categoryTrends(data.transactions, maps, data.categories, month, 6),
     daily: dailySpend(data.transactions, maps, month),
     // Deep-link helper: widgets navigate to filtered pages. Disabled while editing layout.

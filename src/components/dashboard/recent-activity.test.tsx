@@ -27,6 +27,20 @@ describe("RecentActivity", () => {
     expect(screen.getByText("Överföring").className).toContain("line-through");
   });
 
+  it("never renders income rows", () => {
+    render(
+      <RecentActivity
+        transactions={[
+          tx({ id: "d", description: "ICA Maxi", kind: "expense", amount: -487 }),
+          tx({ id: "e", description: "Lön", kind: "income", amount: 38500 }),
+        ]}
+        categoryById={categoryById}
+      />,
+    );
+    expect(screen.getByText("ICA Maxi")).toBeInTheDocument();
+    expect(screen.queryByText("Lön")).not.toBeInTheDocument();
+  });
+
   it("masks amounts when privacy mask is on", () => {
     const { container } = render(<RecentActivity transactions={[tx({ id: "c" })]} categoryById={categoryById} masked />);
     expect(container.textContent).toContain("•••• kr");
