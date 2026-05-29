@@ -41,7 +41,7 @@ export function TransactionRow({
 
       {isTransfer && (
         <span className="hidden shrink-0 items-center gap-1 rounded-full bg-[hsl(var(--muted)/0.6)] px-2 py-0.5 text-[10px] font-medium text-muted-foreground sm:inline-flex">
-          <EyeOff className="size-3" /> Excluded
+          <EyeOff className="size-3" /> Transfer
         </span>
       )}
 
