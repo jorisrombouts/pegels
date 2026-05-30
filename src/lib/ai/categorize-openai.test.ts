@@ -72,6 +72,52 @@ describe("categorizeWithOpenAI", () => {
     ]);
   });
 
+  it("chunks > CHUNK_SIZE rows into parallel calls and merges every index once", async () => {
+    createMock.mockReset();
+    // Echo back one result per index found in this call's user message.
+    createMock.mockImplementation(
+      async (params: { messages: { role: string; content: string }[] }) => {
+        const userMsg = params.messages.find((m) => m.role === "user")!.content;
+        const indices = userMsg
+          .split("\n")
+          .map((line) => line.match(/^(\d+) \|/))
+          .filter((m): m is RegExpMatchArray => m !== null)
+          .map((m) => Number(m[1]));
+        return {
+          choices: [
+            {
+              message: {
+                content: JSON.stringify({
+                  results: indices.map((index) => ({
+                    index,
+                    kind: "expense",
+                    categoryId: "cat-groceries",
+                    confidence: 0.5,
+                  })),
+                }),
+              },
+            },
+          ],
+        };
+      },
+    );
+
+    const rows = Array.from({ length: 90 }, (_, i) => ({
+      index: i,
+      description: `ROW ${i}`,
+      amount: -i,
+    }));
+
+    const results = await categorizeWithOpenAI(rows, categories);
+
+    expect(createMock).toHaveBeenCalledTimes(3); // 90 / 40 → 3 chunks
+    const returnedIndices = results.map((r) => r.index).sort((a, b) => a - b);
+    expect(returnedIndices).toEqual(Array.from({ length: 90 }, (_, i) => i));
+    // no duplicates
+    expect(new Set(returnedIndices).size).toBe(90);
+    createMock.mockReset();
+  });
+
   it("nulls out a categoryId that isn't in the provided list", async () => {
     createMock.mockResolvedValueOnce({
       choices: [
