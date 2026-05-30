@@ -53,6 +53,10 @@
 > - **Light-theme ("Silver Slate") polish** — deferred.
 > - Optional follow-ups: offline **write** queue/replay; dashboard "Budgets" widget forecast;
 >   recurring-charge-aware forecasting; better classification of bare-number internal transfers.
+> - **Persist dashboard layout + nav config per user** (future) — the widget order/sizes
+>   (`layout`) and `navConfig` currently live in the Zustand UI store (localStorage, per-browser).
+>   Move them into Neon keyed by `getUserId()` so the layout follows the user across devices.
+>   (Not to be implemented yet — recorded for later.)
 
 ## Context
 

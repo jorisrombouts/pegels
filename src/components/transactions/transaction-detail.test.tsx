@@ -9,7 +9,7 @@ describe("TransactionDetail", () => {
   it("renders the headline, account and model confidence", () => {
     renderWithData(<TransactionDetail txId="tx-001" />);
     expect(screen.getByText("Hyra Mars")).toBeInTheDocument();
-    expect(screen.getByText(/Nordea Lönekonto/)).toBeInTheDocument();
+    expect(screen.getByText(/SEB/)).toBeInTheDocument();
     expect(screen.getByText("97%")).toBeInTheDocument();
   });
 
