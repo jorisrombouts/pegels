@@ -16,6 +16,8 @@ export interface Account {
   color: string; // hsl triplet "h s% l%"
   /** Current balance in SEK (UI-first; a backend would derive this). */
   balance: number;
+  /** Bank account number; transactions referencing it are auto-classified as transfers. */
+  accountNumber?: string | null;
   archived: boolean;
 }
 

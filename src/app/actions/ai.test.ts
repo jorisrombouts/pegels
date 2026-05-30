@@ -26,6 +26,9 @@ beforeEach(() => {
   recentExamplesMock.mockResolvedValue([]);
   insertExamplesMock.mockResolvedValue(undefined);
   getDatasetMock.mockResolvedValue({
+    accounts: [
+      { id: "acc-spar", name: "SEB Savings", accountNumber: "99887766554" },
+    ],
     categories: [
       { id: "cat-groceries", name: "Groceries" },
       { id: "cat-mortgage", name: "Mortgage" },
@@ -45,6 +48,15 @@ describe("categorizeTransactions", () => {
     expect(out[0]).toMatchObject({ index: 0, kind: "transfer", categoryId: null, confidence: 1 });
     expect(out[1]).toMatchObject({ index: 1, kind: "income", categoryId: null, confidence: 1 });
     expect(out[2]).toMatchObject({ index: 2, kind: "expense", categoryId: "cat-mortgage", confidence: 1 });
+  });
+
+  it("classifies a row referencing an own account number as a transfer", async () => {
+    categorizeWithOpenAIMock.mockResolvedValue([]);
+    const out = await categorizeTransactions([
+      { index: 0, description: "Överföring 99887766554", amount: 5000 },
+    ]);
+    expect(categorizeWithOpenAIMock).not.toHaveBeenCalled();
+    expect(out[0]).toMatchObject({ index: 0, kind: "transfer", categoryId: null, confidence: 1 });
   });
 
   it("merges OpenAI results for non-ruled rows", async () => {

@@ -54,7 +54,7 @@ describe("db mappers", () => {
   });
 
   it("account: round-trips", () => {
-    const a: Account = { id: "a", name: "n", type: "Checking", kind: "spending", icon: "🏦", color: "0 0% 0%", balance: 100, archived: false };
+    const a: Account = { id: "a", name: "n", type: "Checking", kind: "spending", icon: "🏦", color: "0 0% 0%", balance: 100, accountNumber: null, archived: false };
     expect(rowToAccount(accountToRow(a, "u"))).toEqual(a);
   });
 });
