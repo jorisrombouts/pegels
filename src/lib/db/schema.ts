@@ -79,6 +79,26 @@ export const budgets = pgTable(
   (t) => [index("budgets_user_idx").on(t.userId)],
 );
 
+export const categorizationExamples = pgTable(
+  "categorization_examples",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id").notNull(),
+    rawDescription: text("raw_description").notNull(),
+    cleanedDescription: text("cleaned_description").notNull(),
+    amount: numeric("amount", { precision: 12, scale: 2 }).notNull(),
+    predictedKind: text("predicted_kind").$type<TransactionKind>(),
+    predictedCategoryId: text("predicted_category_id"),
+    predictedConfidence: real("predicted_confidence"),
+    finalKind: text("final_kind").$type<TransactionKind>().notNull(),
+    finalCategoryId: text("final_category_id"),
+    corrected: boolean("corrected").notNull(),
+    source: text("source").$type<"import" | "detail">().notNull(),
+    createdAt: text("created_at").notNull(), // ISO string, set by the caller
+  },
+  (t) => [index("catex_user_idx").on(t.userId)],
+);
+
 export const goals = pgTable(
   "goals",
   {

@@ -1,6 +1,6 @@
-import { and, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { db } from "./index";
-import { accounts, categories, tags, transactions, budgets, goals } from "./schema";
+import { accounts, categories, tags, transactions, budgets, goals, categorizationExamples } from "./schema";
 import {
   rowToAccount, rowToCategory, rowToTag, rowToTransaction, rowToBudget, rowToGoal,
   accountToRow, categoryToRow, tagToRow, transactionToRow, budgetToRow, goalToRow,
@@ -100,6 +100,30 @@ export async function removeBudget(userId: string, id: string): Promise<void> {
 
 export async function removeGoal(userId: string, id: string): Promise<void> {
   await db.delete(goals).where(and(eq(goals.userId, userId), eq(goals.id, id)));
+}
+
+// ── Categorization training set ──
+
+export async function insertCategorizationExamples(
+  userId: string,
+  rows: Omit<typeof categorizationExamples.$inferInsert, "userId">[],
+): Promise<void> {
+  if (!rows.length) return;
+  await db.insert(categorizationExamples).values(rows.map((r) => ({ ...r, userId })));
+}
+
+export async function recentCategorizationExamples(userId: string, limit = 40) {
+  const rows = await db
+    .select()
+    .from(categorizationExamples)
+    .where(eq(categorizationExamples.userId, userId))
+    .orderBy(desc(categorizationExamples.createdAt))
+    .limit(limit);
+  return rows.map((r) => ({
+    cleanedDescription: r.cleanedDescription,
+    finalKind: r.finalKind,
+    finalCategoryId: r.finalCategoryId,
+  }));
 }
 
 // ── Bulk ──
