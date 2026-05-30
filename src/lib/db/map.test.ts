@@ -31,6 +31,18 @@ describe("db mappers", () => {
     expect(rowToTransaction(row)).toEqual(tx);
   });
 
+  it("transaction: round-trips a decimal amount", () => {
+    const tx: Transaction = {
+      id: "t3", date: "2025-03-03", description: "z", amount: -188.75, accountId: "a",
+      categoryId: null, predictedCategoryId: null, categoryConfidence: null,
+      categorySource: "user", needsReview: false, tagIds: [],
+      kind: "expense", goalId: null,
+    };
+    const back = rowToTransaction(transactionToRow(tx, "u"));
+    expect(back.amount).toBe(-188.75);
+    expect(back).toEqual(tx);
+  });
+
   it("goal: round-trips nullable fields", () => {
     const g: Goal = {
       id: "g", name: "n", icon: "🗾", target: 100, baseline: 10,
