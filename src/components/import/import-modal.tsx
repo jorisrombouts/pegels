@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { FileText, Upload, Loader2 } from "lucide-react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
@@ -45,16 +45,13 @@ export function ImportModal() {
   const [fileName, setFileName] = useState("");
   const [parsed, setParsed] = useState<ParsedCsv | null>(null);
   const [mapping, setMapping] = useState({ date: 0, description: 1, amount: 2 });
-  const [accountId, setAccountId] = useState(accounts.find((a) => a.kind === "spending")?.id ?? accounts[0]?.id ?? "");
   const [rows, setRows] = useState<DraftRow[]>([]);
 
   // The modal mounts globally before the Query data loads, so `accounts` is empty at first
-  // render. Default the "Import into" account once accounts arrive (if not already chosen).
-  useEffect(() => {
-    if (!accountId && accounts.length) {
-      setAccountId(accounts.find((a) => a.kind === "spending")?.id ?? accounts[0].id);
-    }
-  }, [accounts, accountId]);
+  // render. Derive the "Import into" account (default to the first spending account) instead
+  // of syncing it via an effect, so it's correct as soon as accounts arrive.
+  const [pickedAccountId, setPickedAccountId] = useState("");
+  const accountId = pickedAccountId || accounts.find((a) => a.kind === "spending")?.id || accounts[0]?.id || "";
   const [existingUpdates, setExistingUpdates] = useState<ExistingTransferUpdate[]>([]);
   const [categorizing, setCategorizing] = useState(false);
 
@@ -231,7 +228,7 @@ export function ImportModal() {
                 </div>
 
                 <Field label="Import into">
-                  <Select value={accountId} onValueChange={setAccountId}>
+                  <Select value={accountId} onValueChange={setPickedAccountId}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
                       {accounts.map((a) => (
