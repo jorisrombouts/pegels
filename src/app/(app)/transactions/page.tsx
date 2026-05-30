@@ -71,8 +71,7 @@ function TransactionsView({ initial }: { initial: InitialFilters }) {
   const categoryById = maps.categoryById;
   const budgetCategoryId = budgetFilter === "all" ? null : budgets.find((b) => b.id === budgetFilter)?.categoryId ?? null;
 
-  const visibleTxs = transactions.filter((t) => t.kind !== "income");
-  const monthTxs = visibleTxs.filter((t) => inMonth(t, month));
+  const monthTxs = transactions.filter((t) => inMonth(t, month));
   const count = monthTxs.length;
   const spent = monthSpend(transactions, maps, month);
 

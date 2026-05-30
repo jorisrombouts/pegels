@@ -43,4 +43,12 @@ describe("TransactionRow", () => {
     const { container } = render(<TransactionRow tx={tx({})} category={groceries} selected={false} onSelect={() => {}} masked />);
     expect(container.textContent).toContain("•••• kr");
   });
+
+  it("always masks the amount for income rows even when privacy mask is off", () => {
+    render(<TransactionRow tx={tx({ amount: 42500, kind: "income", description: "Lön" })} category={undefined} selected={false} onSelect={() => {}} />);
+    expect(screen.getByText("Lön")).toBeInTheDocument();
+    expect(screen.queryByText(/42\s?500/)).not.toBeInTheDocument();
+    expect(screen.getByText(/••••/)).toBeInTheDocument();
+    expect(screen.getByText("Income")).toBeInTheDocument();
+  });
 });

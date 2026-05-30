@@ -20,6 +20,8 @@ export function TransactionRow({
   masked?: boolean;
 }) {
   const isTransfer = tx.kind === "transfer";
+  const isIncome = tx.kind === "income";
+  const showMasked = masked || isIncome;
   return (
     <button
       type="button"
@@ -45,6 +47,12 @@ export function TransactionRow({
         </span>
       )}
 
+      {isIncome && (
+        <span className="hidden shrink-0 items-center rounded-full bg-[hsl(var(--muted)/0.6)] px-2 py-0.5 text-[10px] font-medium text-muted-foreground sm:inline-flex">
+          Income
+        </span>
+      )}
+
       {!isTransfer && tx.categoryId && (
         <CategoryChip
           category={category}
@@ -54,7 +62,7 @@ export function TransactionRow({
       )}
 
       <span className={cn("tnum shrink-0 text-sm font-semibold", isTransfer && "line-through")}>
-        {formatSEK(tx.amount, masked)}
+        {formatSEK(tx.amount, showMasked)}
       </span>
     </button>
   );
