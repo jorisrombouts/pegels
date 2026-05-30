@@ -7,7 +7,7 @@ import { Field, Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { useData } from "@/store/data";
-import { monthLabel } from "@/lib/format";
+import { monthLabel, parseKronor } from "@/lib/format";
 import type { Budget } from "@/lib/domain/types";
 
 /**
@@ -21,7 +21,7 @@ export function BudgetEditor({ budget, month, onClose }: { budget: Budget | null
   const [repeat, setRepeat] = useState(budget ? budget.month === null : true);
 
   function save() {
-    const lim = Math.abs(parseFloat(limit.replace(",", ".")) || 0);
+    const lim = Math.abs(parseKronor(limit));
     if (!categoryId || lim <= 0) return;
     upsertBudget({ id: budget?.id ?? `bud-${Date.now()}`, categoryId, limit: lim, month: repeat ? null : month });
     onClose();

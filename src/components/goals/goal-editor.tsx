@@ -7,7 +7,7 @@ import { Field, Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useData } from "@/store/data";
 import { goalSaved } from "@/lib/domain/selectors";
-import { formatSEKAbs } from "@/lib/format";
+import { formatSEKAbs, parseKronor } from "@/lib/format";
 import type { Goal } from "@/lib/domain/types";
 
 const NONE = "none";
@@ -23,17 +23,17 @@ export function GoalEditor({ goal, onClose }: { goal: Goal | null; onClose: () =
   const [deadline, setDeadline] = useState(goal?.deadline ?? "");
   const [accountId, setAccountId] = useState(goal?.accountId ?? NONE);
 
-  const saved = goal ? goalSaved(goal, transactions) : parseFloat(baseline.replace(",", ".")) || 0;
+  const saved = goal ? goalSaved(goal, transactions) : parseKronor(baseline);
 
   function save() {
-    const tgt = Math.abs(parseFloat(target.replace(",", ".")) || 0);
+    const tgt = Math.abs(parseKronor(target));
     if (!name.trim() || tgt <= 0) return;
     upsertGoal({
       id: goal?.id ?? `goal-${Date.now()}`,
       name: name.trim(),
       icon: icon || "🎯",
       target: tgt,
-      baseline: Math.abs(parseFloat(baseline.replace(",", ".")) || 0),
+      baseline: Math.abs(parseKronor(baseline)),
       deadline: deadline || null,
       accountId: accountId === NONE ? null : accountId,
     });
