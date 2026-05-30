@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { FileText, Upload, Loader2 } from "lucide-react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
@@ -47,6 +47,14 @@ export function ImportModal() {
   const [mapping, setMapping] = useState({ date: 0, description: 1, amount: 2 });
   const [accountId, setAccountId] = useState(accounts.find((a) => a.kind === "spending")?.id ?? accounts[0]?.id ?? "");
   const [rows, setRows] = useState<DraftRow[]>([]);
+
+  // The modal mounts globally before the Query data loads, so `accounts` is empty at first
+  // render. Default the "Import into" account once accounts arrive (if not already chosen).
+  useEffect(() => {
+    if (!accountId && accounts.length) {
+      setAccountId(accounts.find((a) => a.kind === "spending")?.id ?? accounts[0].id);
+    }
+  }, [accounts, accountId]);
   const [existingUpdates, setExistingUpdates] = useState<ExistingTransferUpdate[]>([]);
   const [categorizing, setCategorizing] = useState(false);
 
