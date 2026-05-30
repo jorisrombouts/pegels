@@ -49,7 +49,7 @@ export async function categorizeTransactions(rows: AiRow[]): Promise<AiResult[]>
   let aiResults: AiResult[] = [];
   if (remaining.length) {
     try {
-      aiResults = await categorizeWithOpenAI(remaining, categories, exampleList);
+      aiResults = await categorizeWithOpenAI(remaining, categories, exampleList, `cat:${userId}`);
     } catch {
       aiResults = remaining.map((r) => {
         const g = categorize(r.description);

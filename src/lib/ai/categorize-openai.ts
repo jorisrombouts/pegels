@@ -55,15 +55,18 @@ export function buildMessages(rows: AiRow[], categories: AiCategory[], examples:
   ];
 }
 
-export async function categorizeWithOpenAI(
+const CHUNK_SIZE = 40;
+
+async function categorizeChunk(
+  client: OpenAI,
   rows: AiRow[],
   categories: AiCategory[],
-  examples: AiExample[] = [],
+  examples: AiExample[],
+  cacheKey?: string,
 ): Promise<AiResult[]> {
-  const client = new OpenAI();
   const messages = buildMessages(rows, categories, examples);
 
-  const completion = await client.chat.completions.create({
+  const params = {
     model: "gpt-4o-mini",
     messages,
     response_format: {
@@ -94,13 +97,44 @@ export async function categorizeWithOpenAI(
         },
       },
     },
-  });
+    ...(cacheKey ? { prompt_cache_key: cacheKey, prompt_cache_retention: "24h" } : {}),
+  } as OpenAI.Chat.Completions.ChatCompletionCreateParamsNonStreaming;
+
+  const completion = await client.chat.completions.create(params);
 
   const content = completion.choices[0].message.content ?? "{}";
   const parsed = JSON.parse(content) as { results?: AiResult[] };
+  return parsed.results ?? [];
+}
+
+export async function categorizeWithOpenAI(
+  rows: AiRow[],
+  categories: AiCategory[],
+  examples: AiExample[] = [],
+  cacheKey?: string,
+): Promise<AiResult[]> {
+  const client = new OpenAI();
+
+  const chunks: AiRow[][] = [];
+  for (let i = 0; i < rows.length; i += CHUNK_SIZE) {
+    chunks.push(rows.slice(i, i + CHUNK_SIZE));
+  }
+
+  const settled = await Promise.allSettled(
+    chunks.map((chunk) => categorizeChunk(client, chunk, categories, examples, cacheKey)),
+  );
+
+  const fulfilled = settled.filter(
+    (s): s is PromiseFulfilledResult<AiResult[]> => s.status === "fulfilled",
+  );
+  if (fulfilled.length === 0 && rows.length > 0) {
+    throw new Error("All categorization chunks failed");
+  }
+
+  const merged = ([] as AiResult[]).concat(...fulfilled.map((s) => s.value));
   const validIds = new Set(categories.map((c) => c.id));
 
-  return (parsed.results ?? []).map((r) => ({
+  return merged.map((r) => ({
     index: r.index,
     kind: r.kind,
     categoryId: r.categoryId && validIds.has(r.categoryId) ? r.categoryId : null,
