@@ -1,11 +1,11 @@
 # Saldo — Rebuild as PWA (Next.js + Neon + OpenAI)
 
-> **Current status — 2026-05-29** (header added after recovering this plan from session
+> **Current status — 2026-05-30** (header added after recovering this plan from session
 > history; the log below is the verbatim historical record and still says "Saldo" — the
 > project is now **pegels**. Several items it marks TODO/PLANNED have since shipped, and the
 > core spending invariant in the Context below has since **changed** — see the ⚠️ note.)
 >
-> **All UI-first work is complete** — 142 tests passing, build + lint clean, deployed against
+> **All UI-first work is complete** — 174 tests passing, build + lint clean, deployed against
 > Neon (migrated + seeded). Built since the log was last written:
 > - Dashboard polish batch #3–#6 (trend line morph, "This month" button via
 >   `month-switcher.tsx`, hero "This month" widget, recurated default layout).
@@ -28,16 +28,31 @@
 >       import **auto-detects** transfer pairs against existing transactions (no double-count).
 >     - **Goals are transaction-driven**: `goalSaved = baseline + Σ|linked transfer amounts|`;
 >       `Goal.contributions[]` removed. Mark a transfer "→ goal" in the detail panel.
->     - **Income is hidden everywhere** (no Activity rows, no dashboard stat; "Net" → "Spent")
->       and never counted — repayments are just ignored income (splits keep your real cost).
+>     - **Income never counts**; no dashboard stat, "Net" → "Spent". (Display since refined —
+>       see the real-bank-import item below.)
+> - **✅ Real bank import + OpenAI categorization + training set** (spec/plan in
+>   `docs/superpowers/` & `.claude/plans/`, 2026-05-30; 10 commits; verified live on a real SEB
+>   305-row export + live OpenAI + Neon):
+>     - **Money is now decimal** — all amounts `numeric(12,2)`, shown in Swedish notation
+>       (`100,75 kr`); inputs parse `100,75`.
+>     - **Real SEB parser** — dot-decimal `Belopp`, merchant descriptions cleaned of the
+>       trailing `/YY-MM-DD`; realistic sample CSV.
+>     - **Category taxonomy expanded** to 23 (Mortgage, Insurance, Travel, Shopping, …).
+>     - **OpenAI categorization** (`gpt-4o-mini` structured output → `{kind, categoryId,
+>       confidence}`) in `src/lib/ai/` + `src/app/actions/ai.ts`, with deterministic rules
+>       (Revolut/SEB-Kort/Amex/Avanza→transfer, LÖN→income, LÅN→expense/Mortgage) + keyword
+>       fallback; wired async into the import review step.
+>     - **Training set** — Neon `categorization_examples` logs prediction-vs-correction (import
+>       + detail edits); recent corrections feed back as few-shot examples (self-improving).
+>     - **Income display** — rows stay visible with the **amount always masked**; the detail
+>       panel reveals it; changing Type un-masks (`getUserId()` still the single-user stub).
 >
 > **Still left to implement (Phase 4b+):**
 > - **Auth.js Google sign-in** — make `getUserId()` (`src/lib/auth.ts`) read the real session.
-> - **OpenAI categorization** + confidence + training set (replaces the mock `categorize.ts`).
-> - **Overspend alerts via PWA Web Push**; **Vercel deploy** (Neon + OpenAI env vars).
+> - **Vercel deploy** (Neon + OpenAI env vars); **overspend alerts via PWA Web Push** (deferred).
 > - **Light-theme ("Silver Slate") polish** — deferred.
 > - Optional follow-ups: offline **write** queue/replay; dashboard "Budgets" widget forecast;
->   recurring-charge-aware forecasting.
+>   recurring-charge-aware forecasting; better classification of bare-number internal transfers.
 
 ## Context
 
