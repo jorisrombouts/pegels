@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { FileText, Upload, Loader2 } from "lucide-react";
+import { FileText, Upload, Loader2, Search } from "lucide-react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Field, Input } from "@/components/ui/input";
@@ -55,6 +55,8 @@ export function ImportModal() {
   const [existingUpdates, setExistingUpdates] = useState<ExistingTransferUpdate[]>([]);
   const [categorizing, setCategorizing] = useState(false);
   const [kindFilter, setKindFilter] = useState<"all" | TransactionKind>("all");
+  const [reviewOnly, setReviewOnly] = useState(false);
+  const [search, setSearch] = useState("");
 
   function reset() {
     setStep("upload");
@@ -150,6 +152,13 @@ export function ImportModal() {
   included.forEach((r) => { kindCounts[r.kind] += 1; });
   const kindTotals = { expense: 0, income: 0, transfer: 0 } as Record<TransactionKind, number>;
   rows.forEach((r) => { kindTotals[r.kind] += 1; });
+  const reviewTotal = rows.filter((r) => needsReview(r.confidence)).length;
+  const query = search.trim().toLowerCase();
+  const matchesFilters = (r: DraftRow) =>
+    (kindFilter === "all" || r.kind === kindFilter) &&
+    (!reviewOnly || needsReview(r.confidence)) &&
+    (!query || r.description.toLowerCase().includes(query));
+  const visibleCount = rows.filter(matchesFilters).length;
   const dates = rows.map((r) => r.date).filter(Boolean).sort();
 
   function update(i: number, patch: Partial<DraftRow>) {
@@ -289,15 +298,34 @@ export function ImportModal() {
                   {label} <span className="tnum opacity-70">{count}</span>
                 </button>
               ))}
+              <button
+                type="button"
+                onClick={() => setReviewOnly((v) => !v)}
+                className={cn(
+                  "pressable rounded-full px-3 py-1 text-xs font-medium",
+                  reviewOnly ? "bg-[hsl(var(--warning))] text-white" : "glass-inset text-muted-foreground hover:text-foreground",
+                )}
+              >
+                Needs review <span className="tnum opacity-70">{reviewTotal}</span>
+              </button>
+              <div className="relative ml-auto">
+                <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Search description"
+                  className="w-48 py-1 pl-8 pr-2 text-xs"
+                />
+              </div>
             </div>
 
             {/* Review table */}
             <div className="max-h-[44vh] overflow-y-auto rounded-2xl border border-[hsl(var(--glass-border))]">
-              {(kindFilter === "all" ? rows.length : kindTotals[kindFilter]) === 0 && (
-                <p className="px-3 py-6 text-center text-sm text-muted-foreground">No {kindFilter === "all" ? "" : kindFilter + " "}rows.</p>
+              {visibleCount === 0 && (
+                <p className="px-3 py-6 text-center text-sm text-muted-foreground">No rows match these filters.</p>
               )}
               {rows.map((r, i) => {
-                if (kindFilter !== "all" && r.kind !== kindFilter) return null;
+                if (!matchesFilters(r)) return null;
                 const dup = isDup(r);
                 return (
                   <div key={i} className={cn("flex items-center gap-2 border-b border-[hsl(var(--glass-border))] px-3 py-2 last:border-0", dup && "opacity-60")}>
