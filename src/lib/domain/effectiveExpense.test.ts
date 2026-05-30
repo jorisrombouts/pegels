@@ -4,7 +4,7 @@ import type { Account, Transaction } from "./types";
 
 const checking: Account = {
   id: "acc-check",
-  name: "Nordea Lönekonto",
+  name: "SEB",
   type: "Checking",
   kind: "spending",
   icon: "🏦",

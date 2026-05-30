@@ -27,7 +27,7 @@ describe("classifyRules", () => {
 
   it("maps LÖN to income and LÅN to mortgage expense", () => {
     expect(classifyRules("LÖN")).toEqual({ kind: "income", categoryId: null });
-    expect(classifyRules("Bolån Nordea")).toEqual({ kind: "expense", categoryId: "cat-mortgage" });
+    expect(classifyRules("Bolån SEB")).toEqual({ kind: "expense", categoryId: "cat-mortgage" });
   });
 
   it("returns null when no rule applies", () => {

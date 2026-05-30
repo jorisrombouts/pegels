@@ -47,7 +47,7 @@ export function AccountEditor({ account, onClose }: { account: Account | null; o
       <Field label="Name">
         <div className="flex gap-2">
           <EmojiPicker value={icon} onChange={setIcon} />
-          <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Nordea Lönekonto" className="flex-1" />
+          <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. SEB" className="flex-1" />
         </div>
       </Field>
 

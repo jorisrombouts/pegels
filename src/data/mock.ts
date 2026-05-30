@@ -17,9 +17,9 @@ export interface Dataset {
 }
 
 export const accounts: Account[] = [
-  { id: "acc-lon", name: "Nordea Lönekonto", type: "Checking", kind: "spending", icon: "🏦", color: "217 91% 60%", balance: 18450, archived: false },
-  { id: "acc-spar", name: "Nordea Sparkonto", type: "Savings", kind: "savings", icon: "🐷", color: "150 60% 48%", balance: 64200, archived: false },
-  { id: "acc-rev", name: "Revolut", type: "Revolut", kind: "spending", icon: "💳", color: "270 70% 62%", balance: 3850, archived: false },
+  { id: "acc-lon", name: "SEB", type: "Checking", kind: "spending", icon: "🏦", color: "217 91% 60%", balance: 12000, archived: false },
+  { id: "acc-spar", name: "Avanza", type: "Investments", kind: "savings", icon: "📈", color: "150 60% 48%", balance: 50000, archived: false },
+  { id: "acc-rev", name: "Revolut", type: "Revolut", kind: "spending", icon: "💳", color: "270 70% 62%", balance: 2000, archived: false },
 ];
 
 export const categories: Category[] = [
