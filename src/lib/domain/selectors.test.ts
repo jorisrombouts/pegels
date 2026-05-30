@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { budgetForecasts, budgetStatuses, buildMaps, categorySpendInMonth, detectTransfersOnImport, goalProgress, goalSaved, monthNet, monthProgress } from "./selectors";
+import { budgetForecasts, budgetStatuses, buildMaps, categorySpendInMonth, detectTransfersOnImport, earliestDataMonth, goalProgress, goalSaved, latestDataMonth, monthNet, monthProgress } from "./selectors";
 import type { Budget, Category, Goal, Transaction } from "./types";
 
 const food: Category = { id: "food", name: "Food", icon: "🍔", color: "150 60% 45%", parentId: null };
@@ -78,6 +78,23 @@ describe("monthNet", () => {
   it("counts only expense rows; income and transfers are excluded", () => {
     const txs = [tx(-487), tx(38500, { categoryId: null }), tx(-5000, { kind: "transfer" })];
     expect(monthNet(txs, "2025-03")).toBe(-487);
+  });
+});
+
+describe("earliestDataMonth / latestDataMonth", () => {
+  it("returns the min and max month keys across transactions", () => {
+    const txs = [
+      tx(-100, { date: "2025-03-10" }),
+      tx(-100, { date: "2025-01-20" }),
+      tx(-100, { date: "2025-05-02" }),
+    ];
+    expect(earliestDataMonth(txs)).toBe("2025-01");
+    expect(latestDataMonth(txs)).toBe("2025-05");
+  });
+
+  it("returns null with no transactions", () => {
+    expect(earliestDataMonth([])).toBeNull();
+    expect(latestDataMonth([])).toBeNull();
   });
 });
 

@@ -22,7 +22,6 @@ export const defaultLayout: WidgetLayout[] = [
   { id: "trend", size: "large" },
   { id: "recent", size: "medium" },
   { id: "goals", size: "medium" },
-  { id: "capital", size: "medium" },
   { id: "byaccount", size: "medium" },
   { id: "calendar", size: "medium" },
   { id: "pace", size: "medium" },

@@ -69,6 +69,16 @@ export function latestDataMonth(transactions: Transaction[]): string | null {
   return max;
 }
 
+/** The oldest month (yyyy-mm) that has any transaction. */
+export function earliestDataMonth(transactions: Transaction[]): string | null {
+  let min: string | null = null;
+  for (const t of transactions) {
+    const k = monthKey(t.date);
+    if (!min || k < min) min = k;
+  }
+  return min;
+}
+
 export interface MonthProgress {
   daysInMonth: number;
   daysElapsed: number;
