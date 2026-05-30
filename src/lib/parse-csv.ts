@@ -70,16 +70,41 @@ export function parseCsv(text: string): ParsedCsv {
   return { headers, rows, mapping: autoDetect(headers) };
 }
 
-/** Parse Swedish-formatted amounts: "−12 500,00", "1 234,56", "-970" → number. */
+/**
+ * Parse amounts in both Swedish-comma ("−12 500,00") and SEB dot-decimal
+ * ("-3000.000", "-188.750") formats → 2-decimal number.
+ */
 export function parseAmount(raw: string): number {
-  const cleaned = raw
-    .replace(/−/g, "-") // unicode minus → ascii
-    .replace(/[\s ]/g, "") // spaces / nbsp thousands separators
-    .replace(/kr/gi, "")
-    .replace(/\.(?=\d{3}\b)/g, "") // dot thousands separators
-    .replace(",", ".");
+  const normalized = raw.replace(/−/g, "-").replace(/kr/gi, ""); // unicode minus → ascii, strip currency
+  let cleaned: string;
+  if (normalized.includes(",")) {
+    // Swedish decimal: spaces/dots are thousands separators, comma is decimal.
+    cleaned = normalized
+      .replace(/[\s ]/g, "")
+      .replace(/\./g, "")
+      .replace(",", ".");
+  } else {
+    // Dot format (SEB): spaces are thousands; keep only the last dot as decimal.
+    const noSpaces = normalized.replace(/[\s ]/g, "");
+    const lastDot = noSpaces.lastIndexOf(".");
+    cleaned =
+      lastDot === -1
+        ? noSpaces
+        : noSpaces.slice(0, lastDot).replace(/\./g, "") + noSpaces.slice(lastDot);
+  }
   const n = parseFloat(cleaned);
-  return Number.isFinite(n) ? n : 0;
+  return Number.isFinite(n) ? Math.round(n * 100) / 100 : 0;
+}
+
+/**
+ * Clean a SEB merchant description: strip a trailing "/YY-MM-DD" or
+ * "/YYYY-MM-DD" and collapse internal whitespace.
+ */
+export function cleanDescription(raw: string): string {
+  return raw
+    .replace(/\s*\/\d{2,4}-\d{2}-\d{2}\s*$/, "")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 /** Normalize a date cell to ISO yyyy-mm-dd (accepts yyyy-mm-dd or dd/mm/yyyy). */
