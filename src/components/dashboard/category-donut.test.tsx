@@ -13,7 +13,7 @@ describe("CategoryDonut", () => {
     const { container } = render(<CategoryDonut data={data} total={16970} />);
     expect(screen.getByTestId("category-donut")).toBeInTheDocument();
     // Normalize all whitespace (formatSEK uses a non-breaking space).
-    expect((container.textContent ?? "").replace(/\s/g, "")).toContain("−16970kr");
+    expect((container.textContent ?? "").replace(/\s/g, "")).toContain("−16970,00kr");
   });
 
   it("masks the center total when privacy mask is on", () => {

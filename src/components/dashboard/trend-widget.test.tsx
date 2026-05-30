@@ -16,7 +16,7 @@ describe("TrendWidget", () => {
   it("shows the title and the Total series' latest value by default", () => {
     const { container } = render(<TrendWidget series={series} size="medium" />);
     expect(screen.getByText("Trend · 6 months")).toBeInTheDocument();
-    expect(money(container.textContent ?? "")).toContain("24142kr");
+    expect(money(container.textContent ?? "")).toContain("24142,00kr");
     expect(screen.getByText(/Total · March 2025/)).toBeInTheDocument();
   });
 
@@ -24,7 +24,7 @@ describe("TrendWidget", () => {
     const { container } = render(<TrendWidget series={series} size="medium" />);
     expect(screen.getByRole("button", { name: "Total" })).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: /Food & Drinks/ }));
-    expect(money(container.textContent ?? "")).toContain("4470kr");
+    expect(money(container.textContent ?? "")).toContain("4470,00kr");
     expect(screen.getByText(/Food & Drinks · March 2025/)).toBeInTheDocument();
   });
 

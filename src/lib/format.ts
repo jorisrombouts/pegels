@@ -1,9 +1,10 @@
-/** Swedish locale formatting (PRD §3.4): `12 450 kr`, sv-SE, no decimals. */
+/** Swedish locale formatting (PRD §3.4): `12 450,00 kr`, sv-SE, 2 decimals. */
 
 const sek = new Intl.NumberFormat("sv-SE", {
   style: "currency",
   currency: "SEK",
-  maximumFractionDigits: 0,
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
 });
 
 const MASK = "•••• kr";
@@ -21,6 +22,16 @@ export function formatSEK(amount: number, masked = false): string {
 export function formatSEKAbs(amount: number, masked = false): string {
   if (masked) return MASK;
   return sek.format(Math.abs(amount));
+}
+
+/** Parse a user-typed kronor amount ("100,75", "100.75", "1 200", "75 kr") → number. */
+export function parseKronor(input: string): number {
+  const cleaned = input
+    .replace(/\s|kr/gi, "")
+    .replace(/−/g, "-")
+    .replace(",", ".");
+  const n = parseFloat(cleaned);
+  return Number.isFinite(n) ? n : 0;
 }
 
 /** Percentage like "+171%" / "−4%" with an explicit sign. */
