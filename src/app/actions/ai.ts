@@ -6,7 +6,7 @@ import {
   insertCategorizationExamples,
   recentCategorizationExamples,
 } from "@/lib/db/queries";
-import { classifyRules, categorize } from "@/lib/categorize";
+import { classifyRules, categorize, matchesOwnAccount } from "@/lib/categorize";
 import { categorizeWithOpenAI, type AiExample, type AiResult, type AiRow } from "@/lib/ai/categorize-openai";
 import type { TransactionKind } from "@/lib/domain/types";
 
@@ -36,13 +36,19 @@ export async function categorizeTransactions(rows: AiRow[]): Promise<AiResult[]>
     categoryName: e.finalCategoryId ? categoryName.get(e.finalCategoryId) ?? null : null,
   }));
 
-  // 1) deterministic rules first
+  // 1) deterministic rules first (keyword rules + the user's own account numbers → transfer)
+  const ownNumbers = data.accounts.map((a) => a.accountNumber).filter((n): n is string => !!n);
   const ruled = new Map<number, AiResult>();
   const remaining: AiRow[] = [];
   for (const r of rows) {
     const rule = classifyRules(r.description);
-    if (rule) ruled.set(r.index, { index: r.index, kind: rule.kind, categoryId: rule.categoryId, confidence: 1 });
-    else remaining.push(r);
+    if (rule) {
+      ruled.set(r.index, { index: r.index, kind: rule.kind, categoryId: rule.categoryId, confidence: 1 });
+    } else if (matchesOwnAccount(r.description, ownNumbers)) {
+      ruled.set(r.index, { index: r.index, kind: "transfer", categoryId: null, confidence: 1 });
+    } else {
+      remaining.push(r);
+    }
   }
 
   // 2) OpenAI for the rest; on any failure, fall back to keyword categorize + sign-based kind

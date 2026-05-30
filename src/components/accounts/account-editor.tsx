@@ -20,6 +20,7 @@ export function AccountEditor({ account, onClose }: { account: Account | null; o
   const [kind, setKind] = useState<AccountKind>(account?.kind ?? "spending");
   const [icon, setIcon] = useState(account?.icon ?? "🏦");
   const [color, setColor] = useState(account?.color ?? COLOR_SWATCHES[0]);
+  const [accountNumber, setAccountNumber] = useState(account?.accountNumber ?? "");
   const [archived, setArchived] = useState(account?.archived ?? false);
 
   function save() {
@@ -32,6 +33,7 @@ export function AccountEditor({ account, onClose }: { account: Account | null; o
       icon: icon || "🏦",
       color,
       balance: account?.balance ?? 0,
+      accountNumber: accountNumber.trim() || null,
       archived,
     });
     onClose();
@@ -53,6 +55,11 @@ export function AccountEditor({ account, onClose }: { account: Account | null; o
 
       <Field label="Type">
         <Input value={type} onChange={(e) => setType(e.target.value)} placeholder="e.g. Checking, Revolut" />
+      </Field>
+
+      <Field label="Account number">
+        <Input value={accountNumber} onChange={(e) => setAccountNumber(e.target.value)} placeholder="e.g. 99887766554" inputMode="numeric" />
+        <p className="mt-1 text-xs text-muted-foreground">Imports referencing this number are auto-marked as transfers.</p>
       </Field>
 
       <div className="space-y-1.5">

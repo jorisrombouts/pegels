@@ -13,7 +13,7 @@ type GoalRow = typeof goals.$inferSelect;
 // ── row -> domain (drop userId, null -> undefined for optional fields) ──
 
 export function rowToAccount(r: AccountRow): Account {
-  return { id: r.id, name: r.name, type: r.type, kind: r.kind, icon: r.icon, color: r.color, balance: Number(r.balance), archived: r.archived };
+  return { id: r.id, name: r.name, type: r.type, kind: r.kind, icon: r.icon, color: r.color, balance: Number(r.balance), accountNumber: r.accountNumber, archived: r.archived };
 }
 
 export function rowToCategory(r: CategoryRow): Category {
@@ -63,7 +63,7 @@ export function rowToGoal(r: GoalRow): Goal {
 // ── domain -> row (inject userId, undefined -> null for optional fields) ──
 
 export function accountToRow(a: Account, userId: string): AccountRow {
-  return { id: a.id, userId, name: a.name, type: a.type, kind: a.kind, icon: a.icon, color: a.color, balance: String(a.balance), archived: a.archived };
+  return { id: a.id, userId, name: a.name, type: a.type, kind: a.kind, icon: a.icon, color: a.color, balance: String(a.balance), accountNumber: a.accountNumber ?? null, archived: a.archived };
 }
 
 export function categoryToRow(c: Category, userId: string): CategoryRow {

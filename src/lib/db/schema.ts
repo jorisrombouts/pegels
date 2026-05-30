@@ -15,6 +15,7 @@ export const accounts = pgTable(
     icon: text("icon").notNull(),
     color: text("color").notNull(),
     balance: numeric("balance", { precision: 12, scale: 2 }).notNull(),
+    accountNumber: text("account_number"),
     archived: boolean("archived").notNull(),
   },
   (t) => [index("accounts_user_idx").on(t.userId)],
