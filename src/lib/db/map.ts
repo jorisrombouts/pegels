@@ -13,7 +13,7 @@ type GoalRow = typeof goals.$inferSelect;
 // ── row -> domain (drop userId, null -> undefined for optional fields) ──
 
 export function rowToAccount(r: AccountRow): Account {
-  return { id: r.id, name: r.name, type: r.type, kind: r.kind, icon: r.icon, color: r.color, balance: r.balance, archived: r.archived };
+  return { id: r.id, name: r.name, type: r.type, kind: r.kind, icon: r.icon, color: r.color, balance: Number(r.balance), archived: r.archived };
 }
 
 export function rowToCategory(r: CategoryRow): Category {
@@ -29,7 +29,7 @@ export function rowToTransaction(r: TransactionRow): Transaction {
     id: r.id,
     date: r.date,
     description: r.description,
-    amount: r.amount,
+    amount: Number(r.amount),
     accountId: r.accountId,
     categoryId: r.categoryId,
     predictedCategoryId: r.predictedCategoryId,
@@ -45,7 +45,7 @@ export function rowToTransaction(r: TransactionRow): Transaction {
 }
 
 export function rowToBudget(r: BudgetRow): Budget {
-  return { id: r.id, categoryId: r.categoryId, limit: r.limit, month: r.month };
+  return { id: r.id, categoryId: r.categoryId, limit: Number(r.limit), month: r.month };
 }
 
 export function rowToGoal(r: GoalRow): Goal {
@@ -53,8 +53,8 @@ export function rowToGoal(r: GoalRow): Goal {
     id: r.id,
     name: r.name,
     icon: r.icon,
-    target: r.target,
-    baseline: r.baseline,
+    target: Number(r.target),
+    baseline: Number(r.baseline),
     deadline: r.deadline,
     accountId: r.accountId,
   };
@@ -63,7 +63,7 @@ export function rowToGoal(r: GoalRow): Goal {
 // ── domain -> row (inject userId, undefined -> null for optional fields) ──
 
 export function accountToRow(a: Account, userId: string): AccountRow {
-  return { id: a.id, userId, name: a.name, type: a.type, kind: a.kind, icon: a.icon, color: a.color, balance: a.balance, archived: a.archived };
+  return { id: a.id, userId, name: a.name, type: a.type, kind: a.kind, icon: a.icon, color: a.color, balance: String(a.balance), archived: a.archived };
 }
 
 export function categoryToRow(c: Category, userId: string): CategoryRow {
@@ -80,7 +80,7 @@ export function transactionToRow(t: Transaction, userId: string): TransactionRow
     userId,
     date: t.date,
     description: t.description,
-    amount: t.amount,
+    amount: String(t.amount),
     accountId: t.accountId,
     categoryId: t.categoryId,
     predictedCategoryId: t.predictedCategoryId,
@@ -96,7 +96,7 @@ export function transactionToRow(t: Transaction, userId: string): TransactionRow
 }
 
 export function budgetToRow(b: Budget, userId: string): BudgetRow {
-  return { id: b.id, userId, categoryId: b.categoryId, limit: b.limit, month: b.month };
+  return { id: b.id, userId, categoryId: b.categoryId, limit: String(b.limit), month: b.month };
 }
 
 export function goalToRow(g: Goal, userId: string): GoalRow {
@@ -105,8 +105,8 @@ export function goalToRow(g: Goal, userId: string): GoalRow {
     userId,
     name: g.name,
     icon: g.icon,
-    target: g.target,
-    baseline: g.baseline,
+    target: String(g.target),
+    baseline: String(g.baseline),
     deadline: g.deadline,
     accountId: g.accountId,
   };

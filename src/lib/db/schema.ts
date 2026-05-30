@@ -1,4 +1,4 @@
-import { pgTable, text, integer, real, boolean, jsonb, index } from "drizzle-orm/pg-core";
+import { pgTable, text, numeric, real, boolean, jsonb, index } from "drizzle-orm/pg-core";
 import type { AccountKind, CategorySource, Split, TransactionKind } from "../domain/types";
 
 // Every table is scoped by userId (stub today; real auth later). Embedded arrays
@@ -14,7 +14,7 @@ export const accounts = pgTable(
     kind: text("kind").$type<AccountKind>().notNull(),
     icon: text("icon").notNull(),
     color: text("color").notNull(),
-    balance: integer("balance").notNull(),
+    balance: numeric("balance", { precision: 12, scale: 2 }).notNull(),
     archived: boolean("archived").notNull(),
   },
   (t) => [index("accounts_user_idx").on(t.userId)],
@@ -51,7 +51,7 @@ export const transactions = pgTable(
     userId: text("user_id").notNull(),
     date: text("date").notNull(), // ISO yyyy-mm-dd
     description: text("description").notNull(),
-    amount: integer("amount").notNull(), // signed SEK; negative = expense
+    amount: numeric("amount", { precision: 12, scale: 2 }).notNull(), // signed decimal SEK; negative = expense
     accountId: text("account_id").notNull(),
     categoryId: text("category_id"),
     predictedCategoryId: text("predicted_category_id"),
@@ -73,7 +73,7 @@ export const budgets = pgTable(
     id: text("id").primaryKey(),
     userId: text("user_id").notNull(),
     categoryId: text("category_id").notNull(),
-    limit: integer("limit").notNull(),
+    limit: numeric("limit", { precision: 12, scale: 2 }).notNull(),
     month: text("month"), // "yyyy-mm" or null (repeats)
   },
   (t) => [index("budgets_user_idx").on(t.userId)],
@@ -86,8 +86,8 @@ export const goals = pgTable(
     userId: text("user_id").notNull(),
     name: text("name").notNull(),
     icon: text("icon").notNull(),
-    target: integer("target").notNull(),
-    baseline: integer("baseline").notNull(),
+    target: numeric("target", { precision: 12, scale: 2 }).notNull(),
+    baseline: numeric("baseline", { precision: 12, scale: 2 }).notNull(),
     deadline: text("deadline"), // ISO date or null
     accountId: text("account_id"), // linked savings account or null
   },
