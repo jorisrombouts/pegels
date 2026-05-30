@@ -54,6 +54,7 @@ export function ImportModal() {
   const accountId = pickedAccountId || accounts.find((a) => a.kind === "spending")?.id || accounts[0]?.id || "";
   const [existingUpdates, setExistingUpdates] = useState<ExistingTransferUpdate[]>([]);
   const [categorizing, setCategorizing] = useState(false);
+  const [kindFilter, setKindFilter] = useState<"all" | TransactionKind>("all");
 
   function reset() {
     setStep("upload");
@@ -147,6 +148,8 @@ export function ImportModal() {
   const moneyOut = included.filter((r) => r.amount < 0).reduce((s, r) => s + r.amount, 0);
   const kindCounts = { expense: 0, income: 0, transfer: 0 } as Record<TransactionKind, number>;
   included.forEach((r) => { kindCounts[r.kind] += 1; });
+  const kindTotals = { expense: 0, income: 0, transfer: 0 } as Record<TransactionKind, number>;
+  rows.forEach((r) => { kindTotals[r.kind] += 1; });
   const dates = rows.map((r) => r.date).filter(Boolean).sort();
 
   function update(i: number, patch: Partial<DraftRow>) {
@@ -266,9 +269,35 @@ export function ImportModal() {
               <Stat label="Types" value={`${kindCounts.expense} expense · ${kindCounts.transfer} transfer · ${kindCounts.income} income`} />
             </div>
 
+            {/* Filters */}
+            <div className="flex flex-wrap items-center gap-1.5">
+              {([
+                ["all", "All", rows.length],
+                ["expense", "Expense", kindTotals.expense],
+                ["transfer", "Transfer", kindTotals.transfer],
+                ["income", "Income", kindTotals.income],
+              ] as const).map(([key, label, count]) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setKindFilter(key)}
+                  className={cn(
+                    "pressable rounded-full px-3 py-1 text-xs font-medium",
+                    kindFilter === key ? "bg-primary text-primary-foreground" : "glass-inset text-muted-foreground hover:text-foreground",
+                  )}
+                >
+                  {label} <span className="tnum opacity-70">{count}</span>
+                </button>
+              ))}
+            </div>
+
             {/* Review table */}
             <div className="max-h-[44vh] overflow-y-auto rounded-2xl border border-[hsl(var(--glass-border))]">
+              {(kindFilter === "all" ? rows.length : kindTotals[kindFilter]) === 0 && (
+                <p className="px-3 py-6 text-center text-sm text-muted-foreground">No {kindFilter === "all" ? "" : kindFilter + " "}rows.</p>
+              )}
               {rows.map((r, i) => {
+                if (kindFilter !== "all" && r.kind !== kindFilter) return null;
                 const dup = isDup(r);
                 return (
                   <div key={i} className={cn("flex items-center gap-2 border-b border-[hsl(var(--glass-border))] px-3 py-2 last:border-0", dup && "opacity-60")}>
