@@ -56,6 +56,8 @@ export function ImportModal() {
   const [categorizing, setCategorizing] = useState(false);
   const [kindFilter, setKindFilter] = useState<"all" | TransactionKind>("all");
   const [reviewOnly, setReviewOnly] = useState(false);
+  const [uncategorizedOnly, setUncategorizedOnly] = useState(false);
+  const [hideDuplicates, setHideDuplicates] = useState(false);
   const [search, setSearch] = useState("");
 
   function reset() {
@@ -153,10 +155,14 @@ export function ImportModal() {
   const kindTotals = { expense: 0, income: 0, transfer: 0 } as Record<TransactionKind, number>;
   rows.forEach((r) => { kindTotals[r.kind] += 1; });
   const reviewTotal = rows.filter((r) => needsReview(r.confidence)).length;
+  const isUncategorized = (r: DraftRow) => r.kind === "expense" && !r.categoryId;
+  const uncategorizedTotal = rows.filter(isUncategorized).length;
   const query = search.trim().toLowerCase();
   const matchesFilters = (r: DraftRow) =>
     (kindFilter === "all" || r.kind === kindFilter) &&
     (!reviewOnly || needsReview(r.confidence)) &&
+    (!uncategorizedOnly || isUncategorized(r)) &&
+    (!hideDuplicates || !isDup(r)) &&
     (!query || r.description.toLowerCase().includes(query));
   const visibleCount = rows.filter(matchesFilters).length;
   const dates = rows.map((r) => r.date).filter(Boolean).sort();
@@ -307,6 +313,26 @@ export function ImportModal() {
                 )}
               >
                 Needs review <span className="tnum opacity-70">{reviewTotal}</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setUncategorizedOnly((v) => !v)}
+                className={cn(
+                  "pressable rounded-full px-3 py-1 text-xs font-medium",
+                  uncategorizedOnly ? "bg-primary text-primary-foreground" : "glass-inset text-muted-foreground hover:text-foreground",
+                )}
+              >
+                Uncategorized <span className="tnum opacity-70">{uncategorizedTotal}</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setHideDuplicates((v) => !v)}
+                className={cn(
+                  "pressable rounded-full px-3 py-1 text-xs font-medium",
+                  hideDuplicates ? "bg-primary text-primary-foreground" : "glass-inset text-muted-foreground hover:text-foreground",
+                )}
+              >
+                Hide duplicates <span className="tnum opacity-70">{dupCount}</span>
               </button>
               <div className="relative ml-auto">
                 <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
