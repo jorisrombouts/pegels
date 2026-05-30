@@ -530,3 +530,27 @@ mode (noted DONE); the rest are to implement on approval.
 - **Settings → customizable nav bar** (planned above) — next candidate.
 - Light-theme ("Silver Slate") polish — deferred.
 - Backend (Phase 4): Neon + Drizzle, OpenAI categorization + training set, Google auth.
+
+## Idea: user-defined categorization rules page (2026-05-30, not finalized)
+Captured for later — user will refine when they pick it up.
+
+**Problem.** LLM categorization struggles when the bank description is poor/cryptic,
+and some merchants are *always* the same category — paying the LLM to re-guess them
+every import is wasteful and occasionally wrong.
+
+**Idea.** A new **Rules** page where the user creates/customizes their own
+categorization rules. A matched transaction is classified deterministically and
+**skipped by LLM inference** (saves cost + guarantees consistency).
+
+**Rough shape (to refine):**
+- A rule = match condition → outcome. Match likely on description (contains / starts-with
+  / regex?), possibly also amount sign/range or account. Outcome sets `kind` and/or
+  `categoryId` (+ confidence 1).
+- Stored per-user in the DB (new `categorization_rules` table); editable in a Rules page
+  (list, add, edit, delete, reorder for precedence).
+- Runs in the categorize pipeline **before** the OpenAI call — generalizes today's
+  hardcoded `classifyRules` (REVOLUT/SEB KORT/AVANZA/LÖN/LÅN) and `matchesOwnAccount`
+  (own account numbers) into user-managed data. Those built-ins could seed the first rules.
+- Open questions: precedence/ordering, regex vs simple contains, whether rules also
+  retro-apply to existing transactions (like the savings-number backfill), and how this
+  interacts with the training-set feedback loop.
