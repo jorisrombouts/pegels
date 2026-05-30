@@ -8,8 +8,9 @@ vi.mock("next/navigation", () => ({
 }));
 
 describe("TransactionsPage", () => {
-  it("does not show income (salary) rows in the activity list", () => {
+  it("shows income (salary) rows in the activity list with the amount masked", () => {
     renderWithData(<TransactionsPage />);
-    expect(screen.queryByText("Lön Företaget AB")).not.toBeInTheDocument();
+    expect(screen.getByText("Lön Företaget AB")).toBeInTheDocument();
+    expect(screen.queryByText(/38\s?500/)).not.toBeInTheDocument();
   });
 });
