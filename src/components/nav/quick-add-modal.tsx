@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useData } from "@/store/data";
 import { useUI } from "@/store/ui";
 import { cn } from "@/lib/utils";
+import { parseKronor } from "@/lib/format";
 import type { Transaction } from "@/lib/domain/types";
 
 function todayISO() {
@@ -36,7 +37,7 @@ export function QuickAddModal() {
   }
 
   function submit() {
-    const value = Math.abs(parseFloat(amount.replace(",", ".")) || 0);
+    const value = Math.abs(parseKronor(amount));
     if (!description || value === 0 || !accountId) return;
     const tx: Transaction = {
       id: `tx-${Date.now()}`,

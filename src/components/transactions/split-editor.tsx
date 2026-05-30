@@ -4,7 +4,7 @@ import { X } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { formatSEKAbs } from "@/lib/format";
+import { formatSEKAbs, parseKronor } from "@/lib/format";
 import type { Split } from "@/lib/domain/types";
 
 let splitSeq = 0;
@@ -67,7 +67,7 @@ export function SplitEditor({
           />
           <Input
             value={String(s.amount)}
-            onChange={(e) => update(s.id, { amount: Math.abs(parseFloat(e.target.value) || 0) })}
+            onChange={(e) => update(s.id, { amount: Math.abs(parseKronor(e.target.value)) })}
             inputMode="decimal"
             className="w-24"
           />
