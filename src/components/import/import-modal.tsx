@@ -2,15 +2,16 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { FileText, Upload } from "lucide-react";
+import { FileText, Upload, Loader2 } from "lucide-react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Field, Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useData } from "@/store/data";
 import { useUI } from "@/store/ui";
-import { parseCsv, parseAmount, parseDate, type ColumnField, type ParsedCsv } from "@/lib/parse-csv";
-import { categorize, needsReview } from "@/lib/categorize";
+import { parseCsv, parseAmount, parseDate, cleanDescription, type ColumnField, type ParsedCsv } from "@/lib/parse-csv";
+import { needsReview } from "@/lib/categorize";
+import { categorizeTransactions } from "@/app/actions/ai";
 import { detectTransfersOnImport, type ExistingTransferUpdate } from "@/lib/domain/selectors";
 import { formatSEK } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -43,6 +44,7 @@ export function ImportModal() {
   const [accountId, setAccountId] = useState(accounts.find((a) => a.kind === "spending")?.id ?? accounts[0]?.id ?? "");
   const [rows, setRows] = useState<DraftRow[]>([]);
   const [existingUpdates, setExistingUpdates] = useState<ExistingTransferUpdate[]>([]);
+  const [categorizing, setCategorizing] = useState(false);
 
   function reset() {
     setStep("upload");
@@ -50,6 +52,7 @@ export function ImportModal() {
     setFileName("");
     setRows([]);
     setExistingUpdates([]);
+    setCategorizing(false);
   }
 
   function loadText(text: string, name: string) {
@@ -68,19 +71,35 @@ export function ImportModal() {
     loadText(await res.text(), "seb-april-2025.csv (sample)");
   }
 
-  function buildRows(): DraftRow[] {
+  async function buildRows(): Promise<DraftRow[]> {
     if (!parsed) return [];
     const existing = new Set(
       transactions.filter((t) => t.accountId === accountId).map((t) => `${t.date}|${t.amount}|${t.description}`),
     );
-    const drafts = parsed.rows.map((r, i) => {
+    const base = parsed.rows.map((r) => {
       const date = parseDate(r[mapping.date] ?? "");
-      const description = r[mapping.description] ?? "";
+      const description = cleanDescription(r[mapping.description] ?? "");
       const amount = parseAmount(r[mapping.amount] ?? "");
-      const { categoryId, confidence } = categorize(description);
-      const isDup = existing.has(`${date}|${amount}|${description}`);
-      const kind: TransactionKind = amount < 0 ? "expense" : "income";
-      return { id: String(i), date, description, amount, accountId, categoryId, confidence, tagIds: [], include: !isDup, kind, goalId: null as string | null };
+      return { date, description, amount };
+    });
+    // One AI pass: rules → OpenAI → fallback (server-side), each result mapped back by index.
+    const ai = await categorizeTransactions(base.map((b, i) => ({ index: i, description: b.description, amount: b.amount })));
+    const drafts = base.map((b, i) => {
+      const res = ai.find((a) => a.index === i);
+      const isDup = existing.has(`${b.date}|${b.amount}|${b.description}`);
+      return {
+        id: String(i),
+        date: b.date,
+        description: b.description,
+        amount: b.amount,
+        accountId,
+        categoryId: res?.categoryId ?? null,
+        confidence: res?.confidence ?? 0.4,
+        tagIds: [],
+        include: !isDup,
+        kind: (res?.kind ?? (b.amount < 0 ? "expense" : "income")) as TransactionKind,
+        goalId: null as string | null,
+      };
     });
     // Pair each new row against existing transactions (the other leg arrived in a prior import).
     const detected = detectTransfersOnImport(drafts as unknown as Transaction[], transactions, goals);
@@ -89,6 +108,17 @@ export function ImportModal() {
       date: d.date, description: d.description, amount: d.amount, categoryId: d.categoryId,
       confidence: d.confidence, tagIds: d.tagIds, include: d.include, kind: detected.rows[i].kind, goalId: detected.rows[i].goalId,
     }));
+  }
+
+  async function handleContinue() {
+    setCategorizing(true);
+    try {
+      const built = await buildRows();
+      setRows(built);
+      setStep("review");
+    } finally {
+      setCategorizing(false);
+    }
   }
 
   const existingKeys = new Set(
@@ -183,7 +213,9 @@ export function ImportModal() {
                 </Field>
 
                 <div className="flex justify-end">
-                  <Button onClick={() => { setRows(buildRows()); setStep("review"); }} disabled={!accountId}>Continue</Button>
+                  <Button onClick={handleContinue} disabled={!accountId || categorizing}>
+                    {categorizing ? (<><Loader2 className="size-4 animate-spin" /> Categorizing…</>) : "Continue"}
+                  </Button>
                 </div>
               </>
             )}
