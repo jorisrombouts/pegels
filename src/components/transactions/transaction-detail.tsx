@@ -5,6 +5,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Field, Textarea } from "@/components/ui/input";
 import { TagEditor } from "./tag-editor";
 import { SplitEditor } from "./split-editor";
+import { logDetailCorrection } from "@/app/actions/ai";
 import { useData } from "@/store/data";
 import { useUI } from "@/store/ui";
 import { formatSEK, dayLabel } from "@/lib/format";
@@ -80,7 +81,19 @@ export function TransactionDetail({ txId }: { txId: string }) {
         </div>
         <Select
           value={tx.categoryId ?? ""}
-          onValueChange={(v) => updateTransaction(tx.id, { categoryId: v, categorySource: "user", needsReview: false })}
+          onValueChange={(v) => {
+            void logDetailCorrection({
+              rawDescription: tx.description,
+              cleanedDescription: tx.description,
+              amount: tx.amount,
+              predictedKind: tx.kind,
+              predictedCategoryId: tx.predictedCategoryId,
+              predictedConfidence: tx.categoryConfidence,
+              finalKind: tx.kind,
+              finalCategoryId: v,
+            });
+            updateTransaction(tx.id, { categoryId: v, categorySource: "user", needsReview: false });
+          }}
         >
           <SelectTrigger>
             <SelectValue placeholder="Uncategorized" />
@@ -121,7 +134,19 @@ export function TransactionDetail({ txId }: { txId: string }) {
             <button
               key={k}
               type="button"
-              onClick={() => updateTransaction(tx.id, { kind: k, goalId: k === "transfer" ? tx.goalId : null })}
+              onClick={() => {
+                void logDetailCorrection({
+                  rawDescription: tx.description,
+                  cleanedDescription: tx.description,
+                  amount: tx.amount,
+                  predictedKind: tx.kind,
+                  predictedCategoryId: tx.predictedCategoryId,
+                  predictedConfidence: tx.categoryConfidence,
+                  finalKind: k,
+                  finalCategoryId: tx.categoryId,
+                });
+                updateTransaction(tx.id, { kind: k, goalId: k === "transfer" ? tx.goalId : null });
+              }}
               className={cn(
                 "pressable flex-1 rounded-lg px-3 py-1.5 text-sm font-medium capitalize",
                 tx.kind === k ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground",

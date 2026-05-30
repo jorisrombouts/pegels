@@ -1,18 +1,30 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 
-const { getDatasetMock, categorizeWithOpenAIMock } = vi.hoisted(() => ({
+const { getDatasetMock, categorizeWithOpenAIMock, recentExamplesMock, insertExamplesMock } = vi.hoisted(() => ({
   getDatasetMock: vi.fn(),
   categorizeWithOpenAIMock: vi.fn(),
+  recentExamplesMock: vi.fn(),
+  insertExamplesMock: vi.fn(),
 }));
 
-vi.mock("@/lib/db/queries", () => ({ getDataset: getDatasetMock }));
+vi.mock("@/lib/db/queries", () => ({
+  getDataset: getDatasetMock,
+  recentCategorizationExamples: recentExamplesMock,
+  insertCategorizationExamples: insertExamplesMock,
+}));
 vi.mock("@/lib/ai/categorize-openai", () => ({ categorizeWithOpenAIMock, categorizeWithOpenAI: categorizeWithOpenAIMock }));
+// vitest.setup.ts stubs @/app/actions/ai globally (Neon import guard); test the real module.
+vi.unmock("@/app/actions/ai");
 
-import { categorizeTransactions } from "./ai";
+import { categorizeTransactions, logImportExamples, logDetailCorrection } from "./ai";
 
 beforeEach(() => {
   getDatasetMock.mockReset();
   categorizeWithOpenAIMock.mockReset();
+  recentExamplesMock.mockReset();
+  insertExamplesMock.mockReset();
+  recentExamplesMock.mockResolvedValue([]);
+  insertExamplesMock.mockResolvedValue(undefined);
   getDatasetMock.mockResolvedValue({
     categories: [
       { id: "cat-groceries", name: "Groceries" },
@@ -70,5 +82,73 @@ describe("categorizeTransactions", () => {
     categorizeWithOpenAIMock.mockResolvedValue([]); // AI returns nothing for the remaining row
     const out = await categorizeTransactions([{ index: 0, description: "UNMATCHED", amount: -42 }]);
     expect(out[0]).toMatchObject({ kind: "expense", categoryId: null, confidence: 0.4 });
+  });
+
+  it("feeds recent corrections back to OpenAI as few-shot examples", async () => {
+    recentExamplesMock.mockResolvedValue([
+      { cleanedDescription: "ICA KVANTUM", finalKind: "expense", finalCategoryId: "cat-groceries" },
+      { cleanedDescription: "REVOLUT", finalKind: "transfer", finalCategoryId: null },
+      { cleanedDescription: "UNKNOWN CAT", finalKind: "expense", finalCategoryId: "cat-gone" },
+    ]);
+    categorizeWithOpenAIMock.mockResolvedValue([]);
+    await categorizeTransactions([{ index: 0, description: "MYSTERY", amount: -10 }]);
+    expect(recentExamplesMock).toHaveBeenCalledWith("user-stub", 40);
+    const examples = categorizeWithOpenAIMock.mock.calls[0][2];
+    expect(examples).toEqual([
+      { description: "ICA KVANTUM", kind: "expense", categoryName: "Groceries" },
+      { description: "REVOLUT", kind: "transfer", categoryName: null },
+      { description: "UNKNOWN CAT", kind: "expense", categoryName: null }, // unknown id → null name
+    ]);
+  });
+});
+
+describe("logImportExamples", () => {
+  it("flags corrected rows and builds insert rows", async () => {
+    await logImportExamples([
+      // kept the AI's guess → not corrected
+      {
+        rawDescription: "ICA", cleanedDescription: "ICA", amount: -100,
+        predictedKind: "expense", predictedCategoryId: "cat-groceries", predictedConfidence: 0.9,
+        finalKind: "expense", finalCategoryId: "cat-groceries",
+      },
+      // changed the category → corrected
+      {
+        rawDescription: "SHELL", cleanedDescription: "SHELL", amount: -50,
+        predictedKind: "expense", predictedCategoryId: "cat-groceries", predictedConfidence: 0.6,
+        finalKind: "expense", finalCategoryId: "cat-fuel",
+      },
+      // changed the kind → corrected
+      {
+        rawDescription: "AVANZA", cleanedDescription: "AVANZA", amount: -200,
+        predictedKind: "expense", predictedCategoryId: null, predictedConfidence: 0.5,
+        finalKind: "transfer", finalCategoryId: null,
+      },
+    ]);
+    expect(insertExamplesMock).toHaveBeenCalledOnce();
+    const [userId, rows] = insertExamplesMock.mock.calls[0];
+    expect(userId).toBe("user-stub");
+    expect(rows.map((r: { corrected: boolean }) => r.corrected)).toEqual([false, true, true]);
+    expect(rows[0]).toMatchObject({ source: "import", amount: "-100", finalCategoryId: "cat-groceries" });
+    expect(rows[0].id).toMatch(/^ex-/);
+    expect(typeof rows[0].createdAt).toBe("string");
+  });
+
+  it("no-ops on empty input", async () => {
+    await logImportExamples([]);
+    expect(insertExamplesMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("logDetailCorrection", () => {
+  it("always marks corrected and source detail", async () => {
+    await logDetailCorrection({
+      rawDescription: "SPOTIFY", cleanedDescription: "SPOTIFY", amount: -119,
+      predictedKind: "expense", predictedCategoryId: "cat-groceries", predictedConfidence: 0.7,
+      finalKind: "expense", finalCategoryId: "cat-entertainment",
+    });
+    const [userId, rows] = insertExamplesMock.mock.calls[0];
+    expect(userId).toBe("user-stub");
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ corrected: true, source: "detail", finalCategoryId: "cat-entertainment" });
   });
 });

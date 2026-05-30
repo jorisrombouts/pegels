@@ -1,15 +1,40 @@
 "use server";
 
 import { getUserId } from "@/lib/auth";
-import { getDataset } from "@/lib/db/queries";
+import {
+  getDataset,
+  insertCategorizationExamples,
+  recentCategorizationExamples,
+} from "@/lib/db/queries";
 import { classifyRules, categorize } from "@/lib/categorize";
-import { categorizeWithOpenAI, type AiResult, type AiRow } from "@/lib/ai/categorize-openai";
+import { categorizeWithOpenAI, type AiExample, type AiResult, type AiRow } from "@/lib/ai/categorize-openai";
+import type { TransactionKind } from "@/lib/domain/types";
+
+interface CorrectionInput {
+  rawDescription: string;
+  cleanedDescription: string;
+  amount: number;
+  predictedKind: TransactionKind | null;
+  predictedCategoryId: string | null;
+  predictedConfidence: number | null;
+  finalKind: TransactionKind;
+  finalCategoryId: string | null;
+}
 
 export async function categorizeTransactions(rows: AiRow[]): Promise<AiResult[]> {
   const userId = await getUserId();
   const data = await getDataset(userId);
   const categories = data.categories.map((c) => ({ id: c.id, name: c.name }));
   const validIds = new Set(categories.map((c) => c.id));
+
+  // Feedback loop: feed the user's recent categorizations back as few-shot examples.
+  const categoryName = new Map(categories.map((c) => [c.id, c.name]));
+  const recent = await recentCategorizationExamples(userId, 40);
+  const exampleList: AiExample[] = recent.map((e) => ({
+    description: e.cleanedDescription,
+    kind: e.finalKind,
+    categoryName: e.finalCategoryId ? categoryName.get(e.finalCategoryId) ?? null : null,
+  }));
 
   // 1) deterministic rules first
   const ruled = new Map<number, AiResult>();
@@ -24,7 +49,7 @@ export async function categorizeTransactions(rows: AiRow[]): Promise<AiResult[]>
   let aiResults: AiResult[] = [];
   if (remaining.length) {
     try {
-      aiResults = await categorizeWithOpenAI(remaining, categories /*, examples added in P5 */);
+      aiResults = await categorizeWithOpenAI(remaining, categories, exampleList);
     } catch {
       aiResults = remaining.map((r) => {
         const g = categorize(r.description);
@@ -44,4 +69,36 @@ export async function categorizeTransactions(rows: AiRow[]): Promise<AiResult[]>
     out.push(res);
   }
   return out;
+}
+
+function toExampleRow(ex: CorrectionInput, source: "import" | "detail", corrected: boolean) {
+  return {
+    id: `ex-${crypto.randomUUID()}`,
+    rawDescription: ex.rawDescription,
+    cleanedDescription: ex.cleanedDescription,
+    amount: String(ex.amount),
+    predictedKind: ex.predictedKind,
+    predictedCategoryId: ex.predictedCategoryId,
+    predictedConfidence: ex.predictedConfidence,
+    finalKind: ex.finalKind,
+    finalCategoryId: ex.finalCategoryId,
+    corrected,
+    source,
+    createdAt: new Date().toISOString(),
+  };
+}
+
+/** Log every imported row: predicted = the AI's original guess, final = what the user kept/edited. */
+export async function logImportExamples(rows: CorrectionInput[]): Promise<void> {
+  if (!rows.length) return;
+  const examples = rows.map((ex) => {
+    const corrected = ex.predictedKind !== ex.finalKind || ex.predictedCategoryId !== ex.finalCategoryId;
+    return toExampleRow(ex, "import", corrected);
+  });
+  await insertCategorizationExamples(await getUserId(), examples);
+}
+
+/** Log a single detail-panel correction (always corrected). */
+export async function logDetailCorrection(ex: CorrectionInput): Promise<void> {
+  await insertCategorizationExamples(await getUserId(), [toExampleRow(ex, "detail", true)]);
 }

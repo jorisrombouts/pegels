@@ -11,7 +11,7 @@ import { useData } from "@/store/data";
 import { useUI } from "@/store/ui";
 import { parseCsv, parseAmount, parseDate, cleanDescription, type ColumnField, type ParsedCsv } from "@/lib/parse-csv";
 import { needsReview } from "@/lib/categorize";
-import { categorizeTransactions } from "@/app/actions/ai";
+import { categorizeTransactions, logImportExamples } from "@/app/actions/ai";
 import { detectTransfersOnImport, type ExistingTransferUpdate } from "@/lib/domain/selectors";
 import { formatSEK } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -27,6 +27,10 @@ interface DraftRow {
   include: boolean;
   kind: TransactionKind;
   goalId: string | null;
+  // Original AI prediction, kept separate from the user-editable values above.
+  predictedKind: TransactionKind | null;
+  predictedCategoryId: string | null;
+  predictedConfidence: number | null;
 }
 
 const FIELD_LABEL: Record<ColumnField, string> = { date: "Date", description: "Description", amount: "Amount" };
@@ -99,6 +103,9 @@ export function ImportModal() {
         include: !isDup,
         kind: (res?.kind ?? (b.amount < 0 ? "expense" : "income")) as TransactionKind,
         goalId: null as string | null,
+        predictedKind: (res?.kind ?? null) as TransactionKind | null,
+        predictedCategoryId: res?.categoryId ?? null,
+        predictedConfidence: res?.confidence ?? null,
       };
     });
     // Pair each new row against existing transactions (the other leg arrived in a prior import).
@@ -107,6 +114,7 @@ export function ImportModal() {
     return drafts.map((d, i): DraftRow => ({
       date: d.date, description: d.description, amount: d.amount, categoryId: d.categoryId,
       confidence: d.confidence, tagIds: d.tagIds, include: d.include, kind: detected.rows[i].kind, goalId: detected.rows[i].goalId,
+      predictedKind: d.predictedKind, predictedCategoryId: d.predictedCategoryId, predictedConfidence: d.predictedConfidence,
     }));
   }
 
@@ -155,6 +163,19 @@ export function ImportModal() {
       goalId: r.goalId,
     }));
     addTransactions(txs);
+    // Log the AI's prediction vs. the user's final choice for the feedback loop (fire-and-forget).
+    void logImportExamples(
+      included.map((r) => ({
+        rawDescription: r.description,
+        cleanedDescription: r.description,
+        amount: r.amount,
+        predictedKind: r.predictedKind,
+        predictedCategoryId: r.predictedCategoryId,
+        predictedConfidence: r.predictedConfidence,
+        finalKind: r.kind,
+        finalCategoryId: r.categoryId,
+      })),
+    );
     // Reclassify each matched existing leg as a transfer (and link/unlink its goal).
     existingUpdates.forEach((u) => updateTransaction(u.id, { kind: "transfer", goalId: u.goalId }));
     setImportOpen(false);

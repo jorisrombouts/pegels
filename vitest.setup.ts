@@ -19,6 +19,18 @@ vi.mock("@/app/actions/data", async () => {
   };
 });
 
+// Component tests now reach @/app/actions/ai (training-set capture). Its real module
+// imports @/lib/db/queries → @/lib/db (Neon client), whose neon() throws at import when
+// DATABASE_URL is unset. Stub the action: writes are inert, the feedback fetch returns [].
+vi.mock("@/app/actions/ai", () => {
+  const noop = async () => {};
+  return {
+    categorizeTransactions: async () => [],
+    logImportExamples: noop,
+    logDetailCorrection: noop,
+  };
+});
+
 // jsdom has no matchMedia; next-themes (system mode) and useMediaQuery need it.
 if (typeof window !== "undefined" && !window.matchMedia) {
   window.matchMedia = (query: string) =>
