@@ -145,6 +145,8 @@ export function ImportModal() {
   const reviewCount = included.filter((r) => needsReview(r.confidence)).length;
   const moneyIn = included.filter((r) => r.amount > 0).reduce((s, r) => s + r.amount, 0);
   const moneyOut = included.filter((r) => r.amount < 0).reduce((s, r) => s + r.amount, 0);
+  const kindCounts = { expense: 0, income: 0, transfer: 0 } as Record<TransactionKind, number>;
+  included.forEach((r) => { kindCounts[r.kind] += 1; });
   const dates = rows.map((r) => r.date).filter(Boolean).sort();
 
   function update(i: number, patch: Partial<DraftRow>) {
@@ -261,7 +263,7 @@ export function ImportModal() {
               <Stat label="Money in" value={formatSEK(moneyIn)} tone="positive" />
               <Stat label="Money out" value={formatSEK(moneyOut)} />
               <Stat label="Net" value={formatSEK(moneyIn + moneyOut)} tone={moneyIn + moneyOut >= 0 ? "positive" : undefined} />
-              <Stat label="Account rows" value={String(rows.length)} />
+              <Stat label="Types" value={`${kindCounts.expense} expense · ${kindCounts.transfer} transfer · ${kindCounts.income} income`} />
             </div>
 
             {/* Review table */}
@@ -283,20 +285,34 @@ export function ImportModal() {
                       {dup && <span className="ml-1 text-[10px] text-muted-foreground">Duplicate of existing</span>}
                     </div>
                     <Input value={String(r.amount)} onChange={(e) => update(i, { amount: parseAmount(e.target.value) })} className="w-24 shrink-0 px-2 py-1 text-right text-sm tnum" />
+                    <Select value={r.kind} onValueChange={(v) => update(i, { kind: v as TransactionKind })}>
+                      <SelectTrigger className="w-28 shrink-0 px-2 py-1 text-xs"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="expense">Expense</SelectItem>
+                        <SelectItem value="transfer">Transfer</SelectItem>
+                        <SelectItem value="income">Income</SelectItem>
+                      </SelectContent>
+                    </Select>
                     <div className="flex w-44 shrink-0 items-center gap-1.5">
-                      <Select value={r.categoryId ?? ""} onValueChange={(v) => update(i, { categoryId: v, confidence: 1 })}>
-                        <SelectTrigger className="px-2 py-1 text-xs"><SelectValue placeholder="Uncategorized" /></SelectTrigger>
-                        <SelectContent>
-                          {categories.map((c) => (
-                            <SelectItem key={c.id} value={c.id}>{c.parentId ? "↳ " : ""}{c.icon} {c.name}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <span
-                        className="size-1.5 shrink-0 rounded-full"
-                        title={`${Math.round(r.confidence * 100)}% confidence`}
-                        style={{ backgroundColor: r.confidence >= 0.85 ? "hsl(var(--positive))" : r.confidence >= 0.6 ? "hsl(var(--warning))" : "hsl(var(--negative))" }}
-                      />
+                      {r.kind === "expense" ? (
+                        <>
+                          <Select value={r.categoryId ?? ""} onValueChange={(v) => update(i, { categoryId: v, confidence: 1 })}>
+                            <SelectTrigger className="px-2 py-1 text-xs"><SelectValue placeholder="Uncategorized" /></SelectTrigger>
+                            <SelectContent>
+                              {categories.map((c) => (
+                                <SelectItem key={c.id} value={c.id}>{c.parentId ? "↳ " : ""}{c.icon} {c.name}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <span
+                            className="size-1.5 shrink-0 rounded-full"
+                            title={`${Math.round(r.confidence * 100)}% confidence`}
+                            style={{ backgroundColor: r.confidence >= 0.85 ? "hsl(var(--positive))" : r.confidence >= 0.6 ? "hsl(var(--warning))" : "hsl(var(--negative))" }}
+                          />
+                        </>
+                      ) : (
+                        <span className="px-1 text-xs text-muted-foreground">—</span>
+                      )}
                     </div>
                   </div>
                 );
