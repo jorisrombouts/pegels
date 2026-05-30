@@ -43,7 +43,6 @@ export const widgetTitles: Record<string, string> = {
   goals: "Savings goals",
   calendar: "Daily spend",
   recent: "Recent activity",
-  capital: "Total capital",
   byaccount: "Spend by account",
 };
 
@@ -263,27 +262,6 @@ export const widgets: Record<string, (ctx: DashCtx, size: WidgetSize) => React.R
       masked={masked}
       onSelect={(id) => onNavigate(`/transactions?tx=${id}`)}
     />
-  ),
-
-  capital: ({ d, masked }) => (
-    <Card className="h-full">
-      <CardHeader label="Total capital" />
-      <p className="font-display tnum text-3xl font-bold">{formatSEK(d.capital.total, masked)}</p>
-      <div className="mt-4 flex overflow-hidden rounded-full" style={{ height: 8 }}>
-        <div style={{ width: `${(d.capital.spendingBalance / d.capital.total) * 100}%`, backgroundColor: "hsl(var(--primary))" }} />
-        <div style={{ width: `${(d.capital.savingsBalance / d.capital.total) * 100}%`, backgroundColor: "hsl(var(--positive))" }} />
-      </div>
-      <div className="mt-3 flex justify-between text-sm">
-        <div>
-          <p className="flex items-center gap-1.5 text-xs text-muted-foreground"><Dot color="hsl(var(--primary))" /> Spending</p>
-          <p className="tnum font-semibold">{formatSEK(d.capital.spendingBalance, masked)}</p>
-        </div>
-        <div className="text-right">
-          <p className="flex items-center justify-end gap-1.5 text-xs text-muted-foreground"><Dot color="hsl(var(--positive))" /> Savings</p>
-          <p className="tnum font-semibold">{formatSEK(d.capital.savingsBalance, masked)}</p>
-        </div>
-      </div>
-    </Card>
   ),
 
   byaccount: ({ d, masked, onNavigate }) => (
