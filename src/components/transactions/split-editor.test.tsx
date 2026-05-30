@@ -32,6 +32,6 @@ describe("SplitEditor", () => {
         onChange={() => {}}
       />,
     );
-    expect((screen.getByText(/You pay/).textContent ?? "").replace(/\s/g, "")).toContain("445kr");
+    expect((screen.getByText(/You pay/).textContent ?? "").replace(/\s/g, "")).toContain("445,00kr");
   });
 });
