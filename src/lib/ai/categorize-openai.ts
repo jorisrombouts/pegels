@@ -20,6 +20,7 @@ export interface AiResult {
   kind: TransactionKind;
   categoryId: string | null;
   confidence: number;
+  addTagIds?: string[];
 }
 
 export function buildMessages(rows: AiRow[], categories: AiCategory[], examples: AiExample[]) {

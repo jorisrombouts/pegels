@@ -6,7 +6,8 @@ import {
   insertCategorizationExamples,
   recentCategorizationExamples,
 } from "@/lib/db/queries";
-import { classifyRules, categorize, matchesOwnAccount } from "@/lib/categorize";
+import { categorize, matchesOwnAccount } from "@/lib/categorize";
+import { applyRules } from "@/lib/rules";
 import { categorizeWithOpenAI, type AiExample, type AiResult, type AiRow } from "@/lib/ai/categorize-openai";
 import type { TransactionKind } from "@/lib/domain/types";
 
@@ -36,17 +37,28 @@ export async function categorizeTransactions(rows: AiRow[]): Promise<AiResult[]>
     categoryName: e.finalCategoryId ? categoryName.get(e.finalCategoryId) ?? null : null,
   }));
 
-  // 1) deterministic rules first (keyword rules + the user's own account numbers → transfer)
+  // 1) deterministic: own-account transfers, then user rules
   const ownNumbers = data.accounts.map((a) => a.accountNumber).filter((n): n is string => !!n);
   const ruled = new Map<number, AiResult>();
+  const ruleTags = new Map<number, string[]>(); // tags from a non-resolving rule, merged after the LLM
   const remaining: AiRow[] = [];
   for (const r of rows) {
-    const rule = classifyRules(r.description);
-    if (rule) {
-      ruled.set(r.index, { index: r.index, kind: rule.kind, categoryId: rule.categoryId, confidence: 1 });
-    } else if (matchesOwnAccount(r.description, ownNumbers)) {
-      ruled.set(r.index, { index: r.index, kind: "transfer", categoryId: null, confidence: 1 });
+    if (matchesOwnAccount(r.description, ownNumbers)) {
+      ruled.set(r.index, { index: r.index, kind: "transfer", categoryId: null, confidence: 1, addTagIds: [] });
+      continue;
+    }
+    const outcome = applyRules(r.description, data.rules);
+    const resolves = outcome && (outcome.categoryId != null || outcome.kind === "income" || outcome.kind === "transfer");
+    if (outcome && resolves) {
+      ruled.set(r.index, {
+        index: r.index,
+        kind: outcome.kind ?? (r.amount < 0 ? "expense" : "income"),
+        categoryId: outcome.categoryId ?? null,
+        confidence: 1,
+        addTagIds: outcome.addTagIds,
+      });
     } else {
+      if (outcome) ruleTags.set(r.index, outcome.addTagIds); // tag-only rule: still LLM-categorize, but keep tags
       remaining.push(r);
     }
   }
@@ -72,6 +84,7 @@ export async function categorizeTransactions(rows: AiRow[]): Promise<AiResult[]>
       aiResults.find((a) => a.index === r.index) ??
       ({ index: r.index, kind: r.amount < 0 ? "expense" : "income", categoryId: null, confidence: 0.4 } as AiResult);
     if (res.categoryId && !validIds.has(res.categoryId)) res.categoryId = null;
+    if (!ruled.has(r.index)) res.addTagIds = ruleTags.get(r.index) ?? [];
     out.push(res);
   }
   return out;
