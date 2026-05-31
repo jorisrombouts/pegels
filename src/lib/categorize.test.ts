@@ -4,7 +4,7 @@ import { categorize, classifyRules, matchesOwnAccount, needsReview } from "./cat
 describe("categorize", () => {
   it("matches known merchants with high confidence", () => {
     expect(categorize("ICA Maxi Haninge").categoryId).toBe("cat-groceries");
-    expect(categorize("Spotify AB").categoryId).toBe("cat-subscriptions");
+    expect(categorize("Spotify AB").categoryId).toBe("cat-entertainment");
     expect(categorize("Hyra April").categoryId).toBe("cat-rent");
     expect(categorize("ICA Maxi Haninge").confidence).toBeGreaterThanOrEqual(0.85);
   });
