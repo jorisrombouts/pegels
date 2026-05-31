@@ -16,7 +16,8 @@ import { useUI } from "@/store/ui";
 import { useMediaQuery } from "@/lib/use-media-query";
 import { spring } from "@/lib/motion";
 import { MonthSwitcher } from "@/components/month-switcher";
-import { buildMaps, inMonth, isInCategory, monthSpend, orderCategories } from "@/lib/domain/selectors";
+import { buildMaps, inMonth, isInCategory, orderCategories } from "@/lib/domain/selectors";
+import { effectiveExpense } from "@/lib/domain/effectiveExpense";
 import { formatSEKAbs } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
@@ -72,8 +73,6 @@ function TransactionsView({ initial }: { initial: InitialFilters }) {
   const budgetCategoryId = budgetFilter === "all" ? null : budgets.find((b) => b.id === budgetFilter)?.categoryId ?? null;
 
   const monthTxs = transactions.filter((t) => inMonth(t, month));
-  const count = monthTxs.length;
-  const spent = monthSpend(transactions, maps, month);
 
   const filtered = monthTxs
     .filter((t) => {
@@ -87,6 +86,10 @@ function TransactionsView({ initial }: { initial: InitialFilters }) {
       return true;
     })
     .sort((a, b) => b.date.localeCompare(a.date) || b.id.localeCompare(a.id));
+
+  // Count + spend reflect the active filter (the visible list), not the whole month.
+  const count = filtered.length;
+  const spent = filtered.reduce((sum, t) => sum + effectiveExpense(t), 0);
 
   return (
     <>
