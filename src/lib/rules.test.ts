@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { matchesRule, applyRules, isRiskyMatch, suggestRulesFromMonth } from "./rules";
+import { matchesRule, applyRules, isRiskyMatch, suggestRulesFromMonth, planRuleBackfill } from "./rules";
 import type { CategorizationRule } from "@/lib/domain/types";
 import type { Transaction } from "@/lib/domain/types";
 
@@ -97,5 +97,19 @@ describe("suggestRulesFromMonth", () => {
   it("omits setKind for sign-default expenses", () => {
     const txs = [tx({ description: "ICA Supermar" }), tx({ description: "ICA Supermar" })];
     expect(suggestRulesFromMonth(txs, "2026-01", [])[0].setKind).toBeNull();
+  });
+});
+
+describe("planRuleBackfill", () => {
+  const rules = [{ id: "r", priority: 10, enabled: true, matchText: "ica", matchMode: "contains" as const, setCategoryId: "cat-groceries", setKind: null, addTagIds: ["tag-fixed"], origin: "manual" as const }];
+  it("plans changes and skips manually-corrected rows", () => {
+    const txs = [
+      tx({ id: "a", description: "ICA Maxi", categoryId: null, categorySource: "model", tagIds: [] }),
+      tx({ id: "b", description: "ICA Maxi", categoryId: "cat-x", categorySource: "user", tagIds: [] }), // protected
+      tx({ id: "c", description: "Hemköp", categorySource: "model" }), // no match
+    ];
+    const plan = planRuleBackfill(txs, rules);
+    expect(plan.map((p) => p.id)).toEqual(["a"]);
+    expect(plan[0].patch).toMatchObject({ categoryId: "cat-groceries", tagIds: ["tag-fixed"] });
   });
 });
