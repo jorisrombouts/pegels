@@ -12,7 +12,7 @@ import { useUI } from "@/store/ui";
 import { parseCsv, parseAmount, parseDate, cleanDescription, type ColumnField, type ParsedCsv } from "@/lib/parse-csv";
 import { needsReview } from "@/lib/categorize";
 import { categorizeTransactions, logImportExamples } from "@/app/actions/ai";
-import { detectTransfersOnImport, type ExistingTransferUpdate } from "@/lib/domain/selectors";
+import { detectTransfersOnImport, orderCategories, type ExistingTransferUpdate } from "@/lib/domain/selectors";
 import { formatSEK } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type { Transaction, TransactionKind } from "@/lib/domain/types";
@@ -382,7 +382,7 @@ export function ImportModal() {
                           <Select value={r.categoryId ?? ""} onValueChange={(v) => update(i, { categoryId: v, confidence: 1 })}>
                             <SelectTrigger className="px-2 py-1 text-xs"><SelectValue placeholder="Uncategorized" /></SelectTrigger>
                             <SelectContent>
-                              {categories.map((c) => (
+                              {orderCategories(categories).map((c) => (
                                 <SelectItem key={c.id} value={c.id}>{c.parentId ? "↳ " : ""}{c.icon} {c.name}</SelectItem>
                               ))}
                             </SelectContent>

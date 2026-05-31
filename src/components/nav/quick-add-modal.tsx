@@ -9,6 +9,7 @@ import { useData } from "@/store/data";
 import { useUI } from "@/store/ui";
 import { cn } from "@/lib/utils";
 import { parseKronor } from "@/lib/format";
+import { orderCategories } from "@/lib/domain/selectors";
 import type { Transaction } from "@/lib/domain/types";
 
 function todayISO() {
@@ -109,7 +110,7 @@ export function QuickAddModal() {
                 <SelectValue placeholder="Uncategorized" />
               </SelectTrigger>
               <SelectContent>
-                {categories.map((c) => (
+                {orderCategories(categories).map((c) => (
                   <SelectItem key={c.id} value={c.id}>
                     {c.parentId ? "↳ " : ""}
                     {c.icon} {c.name}

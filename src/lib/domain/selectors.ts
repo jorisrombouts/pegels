@@ -12,6 +12,22 @@ export function buildMaps(categories: Category[]): Maps {
   };
 }
 
+/**
+ * Flatten categories into parent-then-children order, independent of the source
+ * array order — so dropdowns group children under the right parent even after
+ * a category is re-parented. Orphans (parent missing) are appended at the end.
+ */
+export function orderCategories(categories: Category[]): Category[] {
+  const out: Category[] = [];
+  for (const parent of categories.filter((c) => c.parentId === null)) {
+    out.push(parent);
+    out.push(...categories.filter((c) => c.parentId === parent.id));
+  }
+  const placed = new Set(out.map((c) => c.id));
+  out.push(...categories.filter((c) => !placed.has(c.id)));
+  return out;
+}
+
 /** Walk up to the top-level (parentless) category id. */
 export function rootCategoryId(categoryId: string | null, categoryById: Map<string, Category>): string | null {
   let id = categoryId;

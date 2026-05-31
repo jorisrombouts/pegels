@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { useData } from "@/store/data";
 import { monthLabel, parseKronor } from "@/lib/format";
+import { orderCategories } from "@/lib/domain/selectors";
 import type { Budget } from "@/lib/domain/types";
 
 /**
@@ -40,7 +41,7 @@ export function BudgetEditor({ budget, month, onClose }: { budget: Budget | null
             <SelectValue placeholder="Select category" />
           </SelectTrigger>
           <SelectContent>
-            {categories.map((c) => (
+            {orderCategories(categories).map((c) => (
               <SelectItem key={c.id} value={c.id}>
                 {c.parentId ? "↳ " : ""}
                 {c.icon} {c.name}
