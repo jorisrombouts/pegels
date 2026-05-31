@@ -1,5 +1,5 @@
 import { pgTable, text, numeric, real, boolean, jsonb, index } from "drizzle-orm/pg-core";
-import type { AccountKind, CategorySource, Split, TransactionKind } from "../domain/types";
+import type { AccountKind, CategorySource, MatchMode, RuleOrigin, Split, TransactionKind } from "../domain/types";
 
 // Every table is scoped by userId (stub today; real auth later). Embedded arrays
 // (tagIds, splits) are JSONB — document-scoped, never queried alone.
@@ -78,6 +78,24 @@ export const budgets = pgTable(
     month: text("month"), // "yyyy-mm" or null (repeats)
   },
   (t) => [index("budgets_user_idx").on(t.userId)],
+);
+
+export const categorizationRules = pgTable(
+  "categorization_rules",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id").notNull(),
+    priority: real("priority").notNull(),
+    enabled: boolean("enabled").notNull(),
+    matchText: text("match_text").notNull(),
+    matchMode: text("match_mode").$type<MatchMode>().notNull(),
+    setCategoryId: text("set_category_id"),
+    setKind: text("set_kind").$type<TransactionKind>(),
+    addTagIds: jsonb("add_tag_ids").$type<string[]>().notNull(),
+    origin: text("origin").$type<RuleOrigin>().notNull(),
+    createdAt: text("created_at").notNull(),
+  },
+  (t) => [index("rules_user_idx").on(t.userId)],
 );
 
 export const categorizationExamples = pgTable(

@@ -1,7 +1,7 @@
 // Pure row <-> domain mappers. Keep the only null<->undefined and userId-injection
 // logic here so it stays unit-testable without a database.
-import type { Account, Category, Tag, Transaction, Budget, Goal } from "../domain/types";
-import type { accounts, categories, tags, transactions, budgets, goals } from "./schema";
+import type { Account, Category, Tag, Transaction, Budget, Goal, CategorizationRule } from "../domain/types";
+import type { accounts, categories, tags, transactions, budgets, goals, categorizationRules } from "./schema";
 
 type AccountRow = typeof accounts.$inferSelect;
 type CategoryRow = typeof categories.$inferSelect;
@@ -9,6 +9,7 @@ type TagRow = typeof tags.$inferSelect;
 type TransactionRow = typeof transactions.$inferSelect;
 type BudgetRow = typeof budgets.$inferSelect;
 type GoalRow = typeof goals.$inferSelect;
+type RuleRow = typeof categorizationRules.$inferSelect;
 
 // ── row -> domain (drop userId, null -> undefined for optional fields) ──
 
@@ -109,5 +110,24 @@ export function goalToRow(g: Goal, userId: string): GoalRow {
     baseline: String(g.baseline),
     deadline: g.deadline,
     accountId: g.accountId,
+  };
+}
+
+export function rowToRule(r: RuleRow): CategorizationRule {
+  return {
+    id: r.id, priority: Number(r.priority), enabled: r.enabled,
+    matchText: r.matchText, matchMode: r.matchMode,
+    setCategoryId: r.setCategoryId, setKind: r.setKind,
+    addTagIds: r.addTagIds ?? [], origin: r.origin,
+  };
+}
+
+export function ruleToRow(rule: CategorizationRule, userId: string): RuleRow {
+  return {
+    id: rule.id, userId, priority: rule.priority, enabled: rule.enabled,
+    matchText: rule.matchText, matchMode: rule.matchMode,
+    setCategoryId: rule.setCategoryId, setKind: rule.setKind,
+    addTagIds: rule.addTagIds, origin: rule.origin,
+    createdAt: new Date().toISOString(),
   };
 }
