@@ -42,7 +42,7 @@ export function matchesOwnAccount(description: string, ownNumbers: string[]): bo
 
 const RULES: { keywords: string[]; categoryId: string; confidence: number }[] = [
   { keywords: ["ica", "hemköp", "coop", "willys", "lidl", "konsum"], categoryId: "cat-groceries", confidence: 0.93 },
-  { keywords: ["spotify", "netflix", "hbo", "disney", "icloud", "youtube", "prenumeration"], categoryId: "cat-subscriptions", confidence: 0.96 },
+  { keywords: ["spotify", "netflix", "hbo", "disney", "icloud", "youtube", "prenumeration"], categoryId: "cat-entertainment", confidence: 0.96 },
   { keywords: ["sl ", "månadskort", "sl månadskort"], categoryId: "cat-transit", confidence: 0.97 },
   { keywords: ["hyra"], categoryId: "cat-rent", confidence: 0.97 },
   { keywords: ["vattenfall", "elräkning", "ellevio", "fortum"], categoryId: "cat-electricity", confidence: 0.95 },

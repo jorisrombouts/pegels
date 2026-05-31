@@ -46,11 +46,7 @@ export const categories: Category[] = [
   { id: "cat-beauty", name: "Beauty & Care", icon: "💅", color: "340 70% 58%", parentId: "cat-health" },
   { id: "cat-fitness", name: "Gym & Fitness", icon: "🏋️", color: "184 62% 46%", parentId: "cat-health" },
   { id: "cat-entertainment", name: "Entertainment", icon: "🎬", color: "276 72% 65%", parentId: null },
-  { id: "cat-subscriptions", name: "Subscriptions", icon: "📦", color: "255 78% 67%", parentId: null },
-  { id: "cat-insurance", name: "Insurance", icon: "🛡️", color: "230 60% 58%", parentId: null },
   { id: "cat-travel", name: "Travel", icon: "✈️", color: "190 75% 52%", parentId: null },
-  { id: "cat-gifts", name: "Gifts & Donations", icon: "🎁", color: "0 72% 62%", parentId: null },
-  { id: "cat-fees", name: "Bank & Fees", icon: "💸", color: "8 72% 56%", parentId: null },
   { id: "cat-other", name: "Other", icon: "📎", color: "220 10% 55%", parentId: null },
 ];
 
@@ -95,10 +91,10 @@ export const transactions: Transaction[] = [
   t("2025-03-01", "Hyra Mars", -12500, "cat-rent", { tagIds: ["tag-fixed"], categoryConfidence: 0.97 }),
   t("2025-03-01", "Lön Företaget AB", 38500, null, { needsReview: true, categoryConfidence: null, kind: "income" }),
   t("2025-03-02", "ICA Maxi Haninge", -487, "cat-groceries"),
-  t("2025-03-03", "Spotify AB", -119, "cat-subscriptions", { tagIds: ["tag-subscription"] }),
+  t("2025-03-03", "Spotify AB", -119, "cat-entertainment", { tagIds: ["tag-subscription"] }),
   t("2025-03-04", "SL Månadskort", -970, "cat-transit", { tagIds: ["tag-fixed"] }),
   t("2025-03-05", "Hemköp Södermalm", -326, "cat-groceries"),
-  t("2025-03-05", "Netflix", -169, "cat-subscriptions", { tagIds: ["tag-subscription"] }),
+  t("2025-03-05", "Netflix", -169, "cat-entertainment", { tagIds: ["tag-subscription"] }),
   t("2025-03-06", "Coop Konsum Kungsholmen", -215, "cat-groceries"),
   t("2025-03-07", "Restaurang Pelikan", -890, "cat-restaurants", {
     tagIds: ["tag-partner"],
@@ -120,7 +116,7 @@ export const transactions: Transaction[] = [
   t("2025-03-15", "Systembolaget", -349, "cat-food", { tagIds: ["tag-partner"] }),
   t("2025-03-16", "ICA Nära", -268, "cat-groceries"),
   t("2025-03-17", "Klarna - Zalando", -1290, "cat-clothing"),
-  t("2025-03-18", "HBO Max", -109, "cat-subscriptions", { tagIds: ["tag-subscription"] }),
+  t("2025-03-18", "HBO Max", -109, "cat-entertainment", { tagIds: ["tag-subscription"] }),
   t("2025-03-19", "Pressbyrån", -64, "cat-other", { needsReview: true, categoryConfidence: 0.44 }),
   t("2025-03-20", "Espresso House", -58, "cat-restaurants"),
   t("2025-03-21", "SF Bio popcorn", -95, "cat-entertainment", { accountId: "acc-rev" }),
@@ -128,7 +124,7 @@ export const transactions: Transaction[] = [
   t("2025-03-23", "Apoteket", -240, "cat-health"),
   t("2025-03-24", "Uber", -156, "cat-transport", { accountId: "acc-rev" }),
   t("2025-03-25", "ICA Maxi Haninge", -524, "cat-groceries"),
-  t("2025-03-26", "iCloud+", -39, "cat-subscriptions", { tagIds: ["tag-subscription"] }),
+  t("2025-03-26", "iCloud+", -39, "cat-entertainment", { tagIds: ["tag-subscription"] }),
   t("2025-03-27", "Restaurang Pelikan", -680, "cat-restaurants", { tagIds: ["tag-partner"] }),
   t("2025-03-28", "Coop Konsum", -198, "cat-groceries"),
   t("2025-03-29", "Bauhaus", -845, "cat-other"),
@@ -141,7 +137,7 @@ export const transactions: Transaction[] = [
   t("2025-02-05", "ICA Maxi", -612, "cat-groceries"),
   t("2025-02-09", "SL Månadskort", -970, "cat-transit"),
   t("2025-02-14", "Restaurang Operakällaren", -1450, "cat-restaurants", { tagIds: ["tag-partner"] }),
-  t("2025-02-18", "Spotify AB", -119, "cat-subscriptions", { tagIds: ["tag-subscription"] }),
+  t("2025-02-18", "Spotify AB", -119, "cat-entertainment", { tagIds: ["tag-subscription"] }),
   t("2025-02-22", "Elräkning Vattenfall", -910, "cat-electricity"),
   t("2025-02-25", "Hemköp", -388, "cat-groceries"),
 
@@ -149,7 +145,7 @@ export const transactions: Transaction[] = [
   t("2025-01-01", "Hyra Januari", -12500, "cat-rent", { tagIds: ["tag-fixed"] }),
   t("2025-01-03", "ICA Maxi", -540, "cat-groceries"),
   t("2025-01-12", "SL Månadskort", -970, "cat-transit"),
-  t("2025-01-20", "Netflix", -169, "cat-subscriptions", { tagIds: ["tag-subscription"] }),
+  t("2025-01-20", "Netflix", -169, "cat-entertainment", { tagIds: ["tag-subscription"] }),
   t("2025-01-28", "Elräkning Vattenfall", -1020, "cat-electricity"),
 
   // ── Goal-funding transfers (outflow from Lönekonto into savings goals) ──
