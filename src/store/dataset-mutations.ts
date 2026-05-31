@@ -11,6 +11,7 @@ export const emptyDataset: Dataset = {
   transactions: [],
   budgets: [],
   goals: [],
+  rules: [],
 };
 
 function upsertById<T extends { id: string }>(list: T[], item: T): T[] {

@@ -29,6 +29,7 @@ export async function getDataset(userId: string): Promise<Dataset> {
     transactions: txRows.map(rowToTransaction),
     budgets: budRows.map(rowToBudget),
     goals: goalRows.map(rowToGoal),
+    rules: [],
   };
 }
 

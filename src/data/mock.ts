@@ -2,6 +2,7 @@ import type {
   Account,
   Budget,
   Category,
+  CategorizationRule,
   Goal,
   Tag,
   Transaction,
@@ -14,6 +15,7 @@ export interface Dataset {
   transactions: Transaction[];
   budgets: Budget[];
   goals: Goal[];
+  rules: CategorizationRule[];
 }
 
 export const accounts: Account[] = [
@@ -56,6 +58,16 @@ export const tags: Tag[] = [
   { id: "tag-partner", name: "Partner night out", color: "0 75% 60%" },
   { id: "tag-swish", name: "Swish group", color: "150 65% 50%" },
   { id: "tag-other", name: "Other", color: "35 85% 55%" },
+];
+
+export const rules: CategorizationRule[] = [
+  { id: "rule-revolut", priority: 10, enabled: true, matchText: "revolut", matchMode: "contains", setCategoryId: null, setKind: "transfer", addTagIds: [], origin: "seed" },
+  { id: "rule-sebkort", priority: 20, enabled: true, matchText: "seb kort", matchMode: "contains", setCategoryId: null, setKind: "transfer", addTagIds: [], origin: "seed" },
+  { id: "rule-amex-1", priority: 30, enabled: true, matchText: "american express", matchMode: "contains", setCategoryId: null, setKind: "transfer", addTagIds: [], origin: "seed" },
+  { id: "rule-amex-2", priority: 40, enabled: true, matchText: "amex", matchMode: "contains", setCategoryId: null, setKind: "transfer", addTagIds: [], origin: "seed" },
+  { id: "rule-avanza", priority: 50, enabled: true, matchText: "avanza", matchMode: "contains", setCategoryId: null, setKind: "transfer", addTagIds: [], origin: "seed" },
+  { id: "rule-lon", priority: 60, enabled: true, matchText: "lön", matchMode: "contains", setCategoryId: null, setKind: "income", addTagIds: [], origin: "seed" },
+  { id: "rule-lan", priority: 70, enabled: true, matchText: "lån", matchMode: "contains", setCategoryId: "cat-mortgage", setKind: "expense", addTagIds: ["tag-fixed"], origin: "seed" },
 ];
 
 // Helper to build a transaction with sensible defaults.
@@ -184,4 +196,4 @@ export const goals: Goal[] = [
   },
 ];
 
-export const seedDataset: Dataset = { accounts, categories, tags, transactions, budgets, goals };
+export const seedDataset: Dataset = { accounts, categories, tags, transactions, budgets, goals, rules };
