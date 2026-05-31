@@ -1,11 +1,11 @@
 import { and, desc, eq } from "drizzle-orm";
 import { db } from "./index";
-import { accounts, categories, tags, transactions, budgets, goals, categorizationExamples } from "./schema";
+import { accounts, categories, tags, transactions, budgets, goals, categorizationExamples, categorizationRules } from "./schema";
 import {
-  rowToAccount, rowToCategory, rowToTag, rowToTransaction, rowToBudget, rowToGoal,
-  accountToRow, categoryToRow, tagToRow, transactionToRow, budgetToRow, goalToRow,
+  rowToAccount, rowToCategory, rowToTag, rowToTransaction, rowToBudget, rowToGoal, rowToRule,
+  accountToRow, categoryToRow, tagToRow, transactionToRow, budgetToRow, goalToRow, ruleToRow,
 } from "./map";
-import type { Account, Category, Tag, Transaction, Budget, Goal } from "../domain/types";
+import type { Account, Category, Tag, Transaction, Budget, Goal, CategorizationRule } from "../domain/types";
 import type { Dataset } from "../../data/mock";
 
 type Batchable = Parameters<typeof db.batch>[0][number];
@@ -14,13 +14,14 @@ const batch = (ops: Batchable[]) => db.batch(ops as [Batchable, ...Batchable[]])
 // ── Reads ──
 
 export async function getDataset(userId: string): Promise<Dataset> {
-  const [accRows, catRows, tagRows, txRows, budRows, goalRows] = await Promise.all([
+  const [accRows, catRows, tagRows, txRows, budRows, goalRows, ruleRows] = await Promise.all([
     db.select().from(accounts).where(eq(accounts.userId, userId)),
     db.select().from(categories).where(eq(categories.userId, userId)),
     db.select().from(tags).where(eq(tags.userId, userId)),
     db.select().from(transactions).where(eq(transactions.userId, userId)),
     db.select().from(budgets).where(eq(budgets.userId, userId)),
     db.select().from(goals).where(eq(goals.userId, userId)),
+    db.select().from(categorizationRules).where(eq(categorizationRules.userId, userId)),
   ]);
   return {
     accounts: accRows.map(rowToAccount),
@@ -29,7 +30,7 @@ export async function getDataset(userId: string): Promise<Dataset> {
     transactions: txRows.map(rowToTransaction),
     budgets: budRows.map(rowToBudget),
     goals: goalRows.map(rowToGoal),
-    rules: [],
+    rules: ruleRows.map(rowToRule),
   };
 }
 
@@ -68,6 +69,24 @@ export async function upsertBudget(userId: string, b: Budget): Promise<void> {
 export async function upsertGoal(userId: string, g: Goal): Promise<void> {
   const row = goalToRow(g, userId);
   await db.insert(goals).values(row).onConflictDoUpdate({ target: goals.id, set: row });
+}
+
+export async function upsertRule(userId: string, r: CategorizationRule): Promise<void> {
+  const row = ruleToRow(r, userId);
+  await db.insert(categorizationRules).values(row).onConflictDoUpdate({ target: categorizationRules.id, set: row });
+}
+
+export async function removeRule(userId: string, id: string): Promise<void> {
+  await db.delete(categorizationRules).where(and(eq(categorizationRules.userId, userId), eq(categorizationRules.id, id)));
+}
+
+export async function reorderRules(userId: string, orderedIds: string[]): Promise<void> {
+  if (!orderedIds.length) return;
+  await batch(
+    orderedIds.map((id, i) =>
+      db.update(categorizationRules).set({ priority: (i + 1) * 10 }).where(and(eq(categorizationRules.userId, userId), eq(categorizationRules.id, id))),
+    ),
+  );
 }
 
 // ── Removes (cascades mirror the old store semantics) ──
@@ -137,6 +156,7 @@ export async function clearAll(userId: string): Promise<void> {
     db.delete(categories).where(eq(categories.userId, userId)),
     db.delete(tags).where(eq(tags.userId, userId)),
     db.delete(accounts).where(eq(accounts.userId, userId)),
+    db.delete(categorizationRules).where(eq(categorizationRules.userId, userId)),
   ]);
 }
 
@@ -149,6 +169,7 @@ export async function replaceAll(userId: string, data: Dataset): Promise<void> {
     db.delete(categories).where(eq(categories.userId, userId)),
     db.delete(tags).where(eq(tags.userId, userId)),
     db.delete(accounts).where(eq(accounts.userId, userId)),
+    db.delete(categorizationRules).where(eq(categorizationRules.userId, userId)),
   ];
   if (data.accounts.length) ops.push(db.insert(accounts).values(data.accounts.map((a) => accountToRow(a, userId))));
   if (data.categories.length) ops.push(db.insert(categories).values(data.categories.map((c) => categoryToRow(c, userId))));
@@ -156,5 +177,6 @@ export async function replaceAll(userId: string, data: Dataset): Promise<void> {
   if (data.transactions.length) ops.push(db.insert(transactions).values(data.transactions.map((t) => transactionToRow(t, userId))));
   if (data.budgets.length) ops.push(db.insert(budgets).values(data.budgets.map((b) => budgetToRow(b, userId))));
   if (data.goals.length) ops.push(db.insert(goals).values(data.goals.map((g) => goalToRow(g, userId))));
+  if (data.rules.length) ops.push(db.insert(categorizationRules).values(data.rules.map((r) => ruleToRow(r, userId))));
   await batch(ops);
 }

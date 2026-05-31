@@ -6,7 +6,7 @@ import { seedDataset } from "@/data/mock";
 import type { Dataset } from "@/data/mock";
 import * as api from "@/app/actions/data";
 import * as M from "./dataset-mutations";
-import type { Account, Budget, Category, Goal, Tag, Transaction } from "@/lib/domain/types";
+import type { Account, Budget, Category, CategorizationRule, Goal, Tag, Transaction } from "@/lib/domain/types";
 
 export const DATASET_KEY = ["dataset"] as const;
 
@@ -54,6 +54,9 @@ export function useData() {
       removeBudget: (id: string) => run((d) => M.applyRemoveBudget(d, id), () => api.removeBudget(id)),
       upsertGoal: (g: Goal) => run((d) => M.applyUpsertGoal(d, g), () => api.upsertGoal(g)),
       removeGoal: (id: string) => run((d) => M.applyRemoveGoal(d, id), () => api.removeGoal(id)),
+      upsertRule: (r: CategorizationRule) => run((d) => M.applyUpsertRule(d, r), () => api.upsertRule(r)),
+      removeRule: (id: string) => run((d) => M.applyRemoveRule(d, id), () => api.removeRule(id)),
+      reorderRules: (orderedIds: string[]) => run((d) => M.applyReorderRules(d, orderedIds), () => api.reorderRules(orderedIds)),
 
       clearData: () => run(() => M.emptyDataset, () => api.clearData()),
       resetData: () => run(() => seedDataset, () => api.resetData()),
