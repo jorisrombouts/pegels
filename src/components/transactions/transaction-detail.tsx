@@ -9,6 +9,7 @@ import { logDetailCorrection } from "@/app/actions/ai";
 import { useData } from "@/store/data";
 import { useUI } from "@/store/ui";
 import { formatSEK, dayLabel } from "@/lib/format";
+import { orderCategories } from "@/lib/domain/selectors";
 import { cn } from "@/lib/utils";
 
 function Label({ children }: { children: React.ReactNode }) {
@@ -99,7 +100,7 @@ export function TransactionDetail({ txId }: { txId: string }) {
             <SelectValue placeholder="Uncategorized" />
           </SelectTrigger>
           <SelectContent>
-            {categories.map((c) => (
+            {orderCategories(categories).map((c) => (
               <SelectItem key={c.id} value={c.id}>
                 {c.parentId ? "↳ " : ""}
                 {c.icon} {c.name}

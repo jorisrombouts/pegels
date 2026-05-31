@@ -16,7 +16,7 @@ import { useUI } from "@/store/ui";
 import { useMediaQuery } from "@/lib/use-media-query";
 import { spring } from "@/lib/motion";
 import { MonthSwitcher } from "@/components/month-switcher";
-import { buildMaps, inMonth, isInCategory, monthSpend } from "@/lib/domain/selectors";
+import { buildMaps, inMonth, isInCategory, monthSpend, orderCategories } from "@/lib/domain/selectors";
 import { formatSEKAbs } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
@@ -102,7 +102,7 @@ function TransactionsView({ initial }: { initial: InitialFilters }) {
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <PillSelect value={categoryFilter} onChange={setCategoryFilter} placeholder="All categories">
           <SelectItem value="all">All categories</SelectItem>
-          {categories.map((c) => (
+          {orderCategories(categories).map((c) => (
             <SelectItem key={c.id} value={c.id}>
               {c.parentId ? "↳ " : ""}
               {c.icon} {c.name}

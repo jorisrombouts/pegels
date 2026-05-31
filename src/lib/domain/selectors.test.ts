@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { budgetForecasts, budgetStatuses, buildMaps, categorySpendInMonth, detectTransfersOnImport, earliestDataMonth, goalProgress, goalSaved, latestDataMonth, monthNet, monthProgress } from "./selectors";
+import { budgetForecasts, budgetStatuses, buildMaps, categorySpendInMonth, detectTransfersOnImport, earliestDataMonth, goalProgress, goalSaved, latestDataMonth, monthNet, monthProgress, orderCategories } from "./selectors";
 import type { Budget, Category, Goal, Transaction } from "./types";
 
 const food: Category = { id: "food", name: "Food", icon: "🍔", color: "150 60% 45%", parentId: null };
@@ -13,6 +13,25 @@ function tx(amount: number, o: Partial<Transaction> = {}): Transaction {
     kind: amount < 0 ? "expense" : "income", goalId: null, ...o,
   };
 }
+
+describe("orderCategories", () => {
+  const cats: Category[] = [
+    { id: "child", name: "Child", icon: "👕", color: "0 0% 0%", parentId: "parent" }, // appears BEFORE its parent
+    { id: "other", name: "Other", icon: "📎", color: "0 0% 0%", parentId: null },
+    { id: "parent", name: "Parent", icon: "🏬", color: "0 0% 0%", parentId: null },
+  ];
+
+  it("orders each parent immediately followed by its children, regardless of source order", () => {
+    expect(orderCategories(cats).map((c) => c.id)).toEqual(["other", "parent", "child"]);
+  });
+
+  it("appends orphans (missing parent) at the end without dropping them", () => {
+    const withOrphan: Category[] = [...cats, { id: "orphan", name: "Orphan", icon: "❓", color: "0 0% 0%", parentId: "gone" }];
+    const ordered = orderCategories(withOrphan).map((c) => c.id);
+    expect(ordered).toContain("orphan");
+    expect(ordered).toHaveLength(4);
+  });
+});
 
 describe("budgetStatuses", () => {
   const budget: Budget = { id: "b", categoryId: "food", limit: 5000, month: null };
