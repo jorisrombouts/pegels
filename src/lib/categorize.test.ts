@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { categorize, classifyRules, matchesOwnAccount, needsReview } from "./categorize";
+import { categorize, matchesOwnAccount, needsReview } from "./categorize";
 
 describe("categorize", () => {
   it("matches known merchants with high confidence", () => {
@@ -13,25 +13,6 @@ describe("categorize", () => {
     const g = categorize("Lön Företaget AB");
     expect(g.categoryId).toBe("cat-other");
     expect(g.confidence).toBeLessThan(0.6);
-  });
-});
-
-describe("classifyRules", () => {
-  it("maps card/transfer providers to transfer", () => {
-    expect(classifyRules("REVOLUT 629")).toEqual({ kind: "transfer", categoryId: null });
-    expect(classifyRules("SEB Kort Bank")).toEqual({ kind: "transfer", categoryId: null });
-    expect(classifyRules("American Express")).toEqual({ kind: "transfer", categoryId: null });
-    expect(classifyRules("AMEX payment")).toEqual({ kind: "transfer", categoryId: null });
-    expect(classifyRules("Avanza Bank")).toEqual({ kind: "transfer", categoryId: null });
-  });
-
-  it("maps LÖN to income and LÅN to mortgage expense", () => {
-    expect(classifyRules("LÖN")).toEqual({ kind: "income", categoryId: null });
-    expect(classifyRules("Bolån SEB")).toEqual({ kind: "expense", categoryId: "cat-mortgage" });
-  });
-
-  it("returns null when no rule applies", () => {
-    expect(classifyRules("ICA SUPERMAR")).toBeNull();
   });
 });
 

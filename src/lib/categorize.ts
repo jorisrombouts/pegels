@@ -3,28 +3,9 @@
  * transaction description to a category id + a confidence 0..1 by keyword match.
  */
 
-import type { TransactionKind } from "@/lib/domain/types";
-
 export interface CategoryGuess {
   categoryId: string | null;
   confidence: number;
-}
-
-export interface RuleClassification {
-  kind: TransactionKind;
-  categoryId: string | null;
-}
-
-/** High-certainty Swedish-bank rules; returns null if no rule applies. Case-insensitive. */
-export function classifyRules(description: string): RuleClassification | null {
-  const d = description.toUpperCase();
-  if (d.includes("REVOLUT")) return { kind: "transfer", categoryId: null };
-  if (d.includes("SEB KORT")) return { kind: "transfer", categoryId: null };
-  if (d.includes("AMERICAN EXPRESS") || d.includes("AMEX")) return { kind: "transfer", categoryId: null };
-  if (d.includes("AVANZA")) return { kind: "transfer", categoryId: null }; // savings/investments
-  if (/\bLÖN\b/.test(d)) return { kind: "income", categoryId: null }; // salary
-  if (d.includes("LÅN")) return { kind: "expense", categoryId: "cat-mortgage" }; // bolån
-  return null;
 }
 
 /**
