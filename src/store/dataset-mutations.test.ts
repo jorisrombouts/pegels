@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import * as M from "./dataset-mutations";
 import { seedDataset } from "@/data/mock";
 import type { Dataset } from "@/data/mock";
+import type { CategorizationRule } from "@/lib/domain/types";
 
 const base = (): Dataset => structuredClone(seedDataset);
 
@@ -51,5 +52,23 @@ describe("dataset-mutations", () => {
     const out = M.applyAddTransaction(d, tx);
     expect(out.transactions[0].id).toBe("tx-zzz");
     expect(out.transactions).toHaveLength(d.transactions.length + 1);
+  });
+});
+
+const r = (id: string, priority: number): CategorizationRule => ({
+  id, priority, enabled: true, matchText: id, matchMode: "contains",
+  setCategoryId: "cat-x", setKind: null, addTagIds: [], origin: "manual",
+});
+
+describe("rule reducers", () => {
+  it("upserts, removes, and reorders with new priorities", () => {
+    let d = M.applyUpsertRule(M.emptyDataset, r("a", 10));
+    d = M.applyUpsertRule(d, r("b", 20));
+    expect(d.rules.map((x) => x.id)).toEqual(["a", "b"]);
+    d = M.applyReorderRules(d, ["b", "a"]);
+    expect(d.rules.map((x) => x.id)).toEqual(["b", "a"]);
+    expect(d.rules.map((x) => x.priority)).toEqual([10, 20]);
+    d = M.applyRemoveRule(d, "b");
+    expect(d.rules.map((x) => x.id)).toEqual(["a"]);
   });
 });

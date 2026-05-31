@@ -3,7 +3,7 @@
 import { getUserId } from "@/lib/auth";
 import { seedDataset } from "@/data/mock";
 import * as q from "@/lib/db/queries";
-import type { Account, Category, Tag, Transaction, Budget, Goal } from "@/lib/domain/types";
+import type { Account, Category, Tag, Transaction, Budget, Goal, CategorizationRule } from "@/lib/domain/types";
 import type { Dataset } from "@/data/mock";
 
 // Read path: the TanStack Query `queryFn`.
@@ -59,6 +59,18 @@ export async function upsertGoal(g: Goal): Promise<void> {
 
 export async function removeGoal(id: string): Promise<void> {
   return q.removeGoal(await getUserId(), id);
+}
+
+export async function upsertRule(r: CategorizationRule): Promise<void> {
+  return q.upsertRule(await getUserId(), r);
+}
+
+export async function removeRule(id: string): Promise<void> {
+  return q.removeRule(await getUserId(), id);
+}
+
+export async function reorderRules(orderedIds: string[]): Promise<void> {
+  return q.reorderRules(await getUserId(), orderedIds);
 }
 
 export async function clearData(): Promise<void> {
