@@ -43,6 +43,7 @@ export const defaultNavConfig: NavConfigItem[] = [
   { key: "categories", primary: false },
   { key: "accounts", primary: false },
   { key: "tags", primary: false },
+  { key: "rules", primary: false },
   { key: "settings", primary: false },
 ];
 

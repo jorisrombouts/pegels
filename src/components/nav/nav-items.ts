@@ -6,6 +6,7 @@ import {
   Target,
   Landmark,
   Tag,
+  Wand2,
   Settings,
   type LucideIcon,
 } from "lucide-react";
@@ -26,6 +27,7 @@ export const NAV_REGISTRY: NavItem[] = [
   { key: "categories", href: "/categories", label: "Categories", icon: Layers },
   { key: "accounts", href: "/accounts", label: "Accounts", icon: Landmark },
   { key: "tags", href: "/tags", label: "Tags", icon: Tag },
+  { key: "rules", href: "/rules", label: "Rules", icon: Wand2 },
   { key: "settings", href: "/settings", label: "Settings", icon: Settings },
 ];
 
