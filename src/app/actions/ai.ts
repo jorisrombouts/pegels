@@ -105,7 +105,7 @@ export async function applyRuleBackfill(): Promise<number> {
   const byId = new Map(data.transactions.map((t) => [t.id, t]));
   for (const change of plan) {
     const tx = byId.get(change.id)!;
-    await upsertTransaction(userId, { ...tx, ...change.patch });
+    await upsertTransaction(userId, { ...tx, ...change.patch, categorySource: "model" });
   }
   return plan.length;
 }
