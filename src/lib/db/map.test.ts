@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { rowToTransaction, transactionToRow, rowToGoal, goalToRow, rowToAccount, accountToRow } from "./map";
-import type { Account, Goal, Transaction } from "../domain/types";
+import { rowToTransaction, transactionToRow, rowToGoal, goalToRow, rowToAccount, accountToRow, rowToRule, ruleToRow } from "./map";
+import type { Account, Goal, Transaction, CategorizationRule } from "../domain/types";
 
 describe("db mappers", () => {
   it("transaction: injects userId, maps undefined splits/notes -> null, round-trips", () => {
@@ -56,5 +56,14 @@ describe("db mappers", () => {
   it("account: round-trips", () => {
     const a: Account = { id: "a", name: "n", type: "Checking", kind: "spending", icon: "🏦", color: "0 0% 0%", balance: 100, accountNumber: null, archived: false };
     expect(rowToAccount(accountToRow(a, "u"))).toEqual(a);
+  });
+
+  it("rule: round-trips", () => {
+    const r: CategorizationRule = {
+      id: "r1", priority: 10, enabled: true, matchText: "ica", matchMode: "contains",
+      setCategoryId: "cat-groceries", setKind: null, addTagIds: ["tag-fixed"], origin: "seed",
+    };
+    const back = rowToRule(ruleToRow(r, "u"));
+    expect(back).toEqual(r);
   });
 });
