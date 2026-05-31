@@ -90,3 +90,28 @@ export function suggestRulesFromMonth(
   }
   return out.sort((a, b) => b.count - a.count);
 }
+
+export interface RuleBackfillChange {
+  id: string;
+  description: string;
+  patch: Partial<Pick<Transaction, "categoryId" | "kind" | "tagIds">>;
+}
+
+/** Compute the changes a rule backfill would make. Skips categorySource === "user". */
+export function planRuleBackfill(transactions: Transaction[], rules: CategorizationRule[]): RuleBackfillChange[] {
+  const out: RuleBackfillChange[] = [];
+  for (const t of transactions) {
+    if (t.categorySource === "user") continue;
+    const outcome = applyRules(t.description, rules);
+    if (!outcome) continue;
+    const patch: RuleBackfillChange["patch"] = {};
+    if (outcome.categoryId) patch.categoryId = outcome.categoryId;
+    if (outcome.kind) patch.kind = outcome.kind;
+    if (outcome.addTagIds.length) {
+      const merged = Array.from(new Set([...t.tagIds, ...outcome.addTagIds]));
+      if (merged.length !== t.tagIds.length) patch.tagIds = merged;
+    }
+    if (Object.keys(patch).length) out.push({ id: t.id, description: t.description, patch });
+  }
+  return out;
+}
