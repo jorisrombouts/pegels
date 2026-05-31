@@ -1,4 +1,4 @@
-import type { CategorizationRule, MatchMode, TransactionKind } from "@/lib/domain/types";
+import type { CategorizationRule, MatchMode, TransactionKind, Transaction } from "@/lib/domain/types";
 
 export interface RuleOutcome {
   categoryId?: string;
@@ -33,4 +33,60 @@ export function applyRules(description: string, rules: CategorizationRule[]): Ru
 /** A "contains" match on a very short string over-matches; flag it for the user. */
 export function isRiskyMatch(matchText: string, matchMode: MatchMode): boolean {
   return matchMode === "contains" && matchText.trim().length <= 2;
+}
+
+export interface SuggestedRule {
+  matchText: string;
+  matchMode: "contains";
+  setCategoryId: string | null;
+  setKind: TransactionKind | null;
+  addTagIds: string[];
+  count: number;
+  risky: boolean;
+}
+
+/** The kind a transaction would get from its amount sign alone (no rule/LLM). */
+function signKind(amount: number): TransactionKind {
+  return amount < 0 ? "expense" : "income";
+}
+
+/**
+ * Mine one month's transactions for rule candidates: descriptions that appear >=2x
+ * and map to a single (kind, categoryId, tags) signature, not already covered by a rule.
+ */
+export function suggestRulesFromMonth(
+  transactions: Transaction[],
+  monthKey: string,
+  existingRules: CategorizationRule[],
+): SuggestedRule[] {
+  const groups = new Map<string, Transaction[]>();
+  for (const t of transactions) {
+    if (!t.date.startsWith(monthKey)) continue;
+    const key = t.description.toLowerCase().trim();
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key)!.push(t);
+  }
+
+  const out: SuggestedRule[] = [];
+  for (const txs of groups.values()) {
+    if (txs.length < 2) continue;
+    const sig = (t: Transaction) => `${t.kind}|${t.categoryId ?? "-"}|${[...t.tagIds].sort().join(",")}`;
+    const first = sig(txs[0]);
+    if (!txs.every((t) => sig(t) === first)) continue;
+
+    const sample = txs[0];
+    const matchText = sample.description;
+    if (existingRules.some((r) => r.enabled && matchesRule(sample.description, r))) continue;
+
+    out.push({
+      matchText,
+      matchMode: "contains",
+      setCategoryId: sample.categoryId,
+      setKind: sample.kind === signKind(sample.amount) ? null : sample.kind,
+      addTagIds: [...sample.tagIds],
+      count: txs.length,
+      risky: isRiskyMatch(matchText, "contains"),
+    });
+  }
+  return out.sort((a, b) => b.count - a.count);
 }
