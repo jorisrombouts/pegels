@@ -33,6 +33,13 @@ beforeEach(() => {
       { id: "cat-groceries", name: "Groceries" },
       { id: "cat-mortgage", name: "Mortgage" },
     ],
+    rules: [
+      { id: "r-ica", priority: 10, enabled: true, matchText: "ica", matchMode: "contains", setCategoryId: "cat-groceries", setKind: null, addTagIds: ["tag-fixed"], origin: "manual" },
+      { id: "r-revolut", priority: 20, enabled: true, matchText: "revolut", matchMode: "contains", setCategoryId: null, setKind: "transfer", addTagIds: [], origin: "manual" },
+      { id: "r-avanza", priority: 21, enabled: true, matchText: "avanza", matchMode: "contains", setCategoryId: null, setKind: "transfer", addTagIds: [], origin: "manual" },
+      { id: "r-lon", priority: 22, enabled: true, matchText: "lön", matchMode: "contains", setCategoryId: null, setKind: "income", addTagIds: [], origin: "manual" },
+      { id: "r-bolan", priority: 23, enabled: true, matchText: "bolån", matchMode: "contains", setCategoryId: "cat-mortgage", setKind: null, addTagIds: [], origin: "manual" },
+    ],
   });
 });
 
@@ -65,7 +72,7 @@ describe("categorizeTransactions", () => {
     ]);
     const out = await categorizeTransactions([
       { index: 0, description: "AVANZA", amount: -1000 },
-      { index: 1, description: "ICA KVANTUM", amount: -350 },
+      { index: 1, description: "KVANTUM", amount: -350 },
     ]);
     expect(categorizeWithOpenAIMock).toHaveBeenCalledOnce();
     expect(out[0]).toMatchObject({ kind: "transfer", categoryId: null }); // rule
@@ -75,7 +82,7 @@ describe("categorizeTransactions", () => {
   it("falls back to keyword categorize when OpenAI throws", async () => {
     categorizeWithOpenAIMock.mockRejectedValue(new Error("no key"));
     const out = await categorizeTransactions([
-      { index: 0, description: "ICA SUPERMARKET", amount: -200 },
+      { index: 0, description: "HEMKÖP SUPERMARKET", amount: -200 },
       { index: 1, description: "MYSTERY DEPOSIT", amount: 500 },
     ]);
     expect(out[0]).toMatchObject({ kind: "expense", categoryId: "cat-groceries" });
@@ -94,6 +101,13 @@ describe("categorizeTransactions", () => {
     categorizeWithOpenAIMock.mockResolvedValue([]); // AI returns nothing for the remaining row
     const out = await categorizeTransactions([{ index: 0, description: "UNMATCHED", amount: -42 }]);
     expect(out[0]).toMatchObject({ kind: "expense", categoryId: null, confidence: 0.4 });
+  });
+
+  it("applies a matching rule deterministically and skips the LLM, carrying tags", async () => {
+    categorizeWithOpenAIMock.mockResolvedValue([]);
+    const out = await categorizeTransactions([{ index: 0, description: "ICA Maxi", amount: -200 }]);
+    expect(categorizeWithOpenAIMock).not.toHaveBeenCalled();
+    expect(out[0]).toMatchObject({ index: 0, kind: "expense", categoryId: "cat-groceries", confidence: 1, addTagIds: ["tag-fixed"] });
   });
 
   it("feeds recent corrections back to OpenAI as few-shot examples", async () => {
