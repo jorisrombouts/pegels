@@ -109,7 +109,7 @@ export function ImportModal() {
         accountId,
         categoryId: res?.categoryId ?? null,
         confidence: res?.confidence ?? 0.4,
-        tagIds: [],
+        tagIds: res?.addTagIds ?? [],
         include: !isDup,
         kind: (res?.kind ?? (b.amount < 0 ? "expense" : "income")) as TransactionKind,
         goalId: null as string | null,
