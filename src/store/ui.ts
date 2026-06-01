@@ -16,16 +16,23 @@ export interface WidgetLayout {
 // Curated for a focused first screen: hero + most useful widgets up top, supporting
 // widgets below. All widgets stay present (reorder/resize via Edit layout).
 export const defaultLayout: WidgetLayout[] = [
-  { id: "total", size: "large" }, // hero "This month"
+  { id: "total", size: "large" },
+  { id: "breakdown", size: "large" },
   { id: "budgets", size: "medium" },
-  { id: "category", size: "medium" },
+  { id: "goals", size: "medium" },
   { id: "trend", size: "large" },
   { id: "recent", size: "medium" },
-  { id: "goals", size: "medium" },
-  { id: "byaccount", size: "medium" },
   { id: "calendar", size: "medium" },
-  { id: "pace", size: "medium" },
 ];
+
+/** v3: rename the donut slot to breakdown, drop the removed byaccount/pace tiles, append new defaults. */
+export function migrateLayoutToV3(layout: WidgetLayout[]): WidgetLayout[] {
+  const moved = layout
+    .map((w) => (w.id === "category" ? { ...w, id: "breakdown" } : w))
+    .filter((w) => w.id !== "byaccount" && w.id !== "pace");
+  const known = new Set(moved.map((w) => w.id));
+  return [...moved, ...defaultLayout.filter((w) => !known.has(w.id))];
+}
 
 /** Max destinations allowed directly in the bottom pill (keeps it roomy). */
 export const MAX_PRIMARY_NAV = 4;
@@ -124,16 +131,14 @@ export const useUI = create<UIState>()(
     }),
     {
       name: "pegels-ui",
-      version: 2,
+      version: 3,
       // Persist only durable preferences — transient flags (importOpen) stay out.
       partialize: (s) => ({ masked: s.masked, month: s.month, accountFilter: s.accountFilter, layout: s.layout, navConfig: s.navConfig }),
       // Ensure new widgets appear for users with a persisted older layout.
       migrate: (persisted) => {
         const state = persisted as Partial<UIState> | undefined;
         if (!state?.layout) return state as UIState;
-        const known = new Set(state.layout.map((w) => w.id));
-        const merged = [...state.layout, ...defaultLayout.filter((w) => !known.has(w.id))];
-        return { ...state, layout: merged } as UIState;
+        return { ...state, layout: migrateLayoutToV3(state.layout) } as UIState;
       },
     },
   ),
