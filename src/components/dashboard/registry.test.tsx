@@ -20,10 +20,11 @@ describe("dashboard registry", () => {
     }
   });
 
-  it("does not define orphan renderers without a layout slot", () => {
+  it("only registers renderers in the default layout (except intentionally-parked widgets)", () => {
     const layoutIds = new Set(defaultLayout.map((w) => w.id));
+    const parked = new Set(["pace"]); // kept registered, re-addable via Edit layout
     for (const id of Object.keys(widgets)) {
-      expect(layoutIds.has(id), `renderer "${id}" not in default layout`).toBe(true);
+      expect(layoutIds.has(id) || parked.has(id), `renderer "${id}" not in default layout`).toBe(true);
     }
   });
 });

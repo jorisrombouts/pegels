@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { MAX_PRIMARY_NAV, useUI } from "./ui";
+import { MAX_PRIMARY_NAV, useUI, migrateLayoutToV3, defaultLayout } from "./ui";
 
 beforeEach(() => useUI.getState().resetNav());
 
@@ -36,5 +36,24 @@ describe("nav config store", () => {
     const first = useUI.getState().navConfig[0].key;
     useUI.getState().moveNavItem(first, -1);
     expect(useUI.getState().navConfig[0].key).toBe(first);
+  });
+});
+
+describe("migrateLayoutToV3", () => {
+  it("renames category->breakdown, drops byaccount & pace, appends new defaults", () => {
+    const old = [
+      { id: "total", size: "large" as const },
+      { id: "category", size: "medium" as const },
+      { id: "byaccount", size: "medium" as const },
+      { id: "pace", size: "medium" as const },
+    ];
+    const out = migrateLayoutToV3(old);
+    const ids = out.map((w) => w.id);
+    expect(ids).toContain("breakdown");
+    expect(ids).not.toContain("category");
+    expect(ids).not.toContain("byaccount");
+    expect(ids).not.toContain("pace");
+    expect(out.find((w) => w.id === "breakdown")?.size).toBe("medium");
+    for (const w of defaultLayout) expect(ids).toContain(w.id);
   });
 });

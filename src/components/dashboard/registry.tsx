@@ -1,11 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import dynamic from "next/dynamic";
 import { ArrowDownRight, ArrowUpRight } from "lucide-react";
 import { Card, CardHeader } from "@/components/ui/card";
-import { ProgressBar } from "@/components/ui/progress";
 import { Ring } from "@/components/ui/ring";
+import { BreakdownWidget } from "./breakdown-widget";
 import { SafeToSpendWidget } from "./safe-to-spend-widget";
 import { TrendWidget } from "./trend-widget";
 import { CalendarHeatmap, type DaySpend } from "./calendar-heatmap";
@@ -15,12 +14,6 @@ import { formatSEK, formatSEKAbs, formatSignedPct, monthLabel } from "@/lib/form
 import type { TrendSeries } from "@/lib/domain/selectors";
 import type { Category, Transaction } from "@/lib/domain/types";
 import type { WidgetSize } from "@/store/ui";
-
-// Recharts in its own chunk (PRD perf budget §7.5) — not in the initial route JS.
-const CategoryDonut = dynamic(() => import("./category-donut").then((m) => m.CategoryDonut), {
-  ssr: false,
-  loading: () => <div className="grid h-[200px] place-items-center text-xs text-muted-foreground">Loading chart…</div>,
-});
 
 export interface DashCtx {
   d: ReturnType<typeof computeDashboard>;
@@ -37,13 +30,12 @@ export interface DashCtx {
 export const widgetTitles: Record<string, string> = {
   total: "This month",
   pace: "Daily pace",
-  category: "Spending by category",
+  breakdown: "Spending breakdown",
   trend: "Trend",
   budgets: "Budgets",
   goals: "Savings goals",
   calendar: "Daily spend",
   recent: "Recent activity",
-  byaccount: "Spend by account",
 };
 
 /**
@@ -67,10 +59,6 @@ function AllLink({ href }: { href: string }) {
 
 function EmptyHint({ children }: { children: React.ReactNode }) {
   return <p className="py-6 text-center text-sm text-muted-foreground">{children}</p>;
-}
-
-function Dot({ color }: { color: string }) {
-  return <span className="inline-block size-2 shrink-0 rounded-full" style={{ backgroundColor: color }} />;
 }
 
 /** A labelled stat in the hero's supporting row. */
@@ -141,53 +129,7 @@ export const widgets: Record<string, (ctx: DashCtx, size: WidgetSize) => React.R
     />
   ),
 
-  category: ({ d, masked, onNavigate }, size) => {
-    const go = (id: string) => onNavigate(`/transactions?category=${id}`);
-    return (
-      <Card className="h-full">
-        <CardHeader label="Spending by category" />
-        {d.byCategory.length === 0 ? (
-          <EmptyHint>No spending this month.</EmptyHint>
-        ) : size === "small" ? (
-          // Compact: bar list, no chart chunk.
-          <ul className="space-y-3">
-            {d.byCategory.slice(0, 4).map(({ category, amount }) => (
-              <li key={category.id}>
-                <button onClick={() => go(category.id)} className="pressable block w-full text-left">
-                  <div className="mb-1 flex items-center justify-between gap-2 text-sm">
-                    <span className="flex min-w-0 items-center gap-2">
-                      <span className="shrink-0">{category.icon}</span>
-                      <span className="truncate">{category.name}</span>
-                    </span>
-                    <span className="tnum shrink-0 text-muted-foreground">{formatSEKAbs(amount, masked)}</span>
-                  </div>
-                  <ProgressBar pct={amount / d.byCategory[0].amount} color={`hsl(${category.color})`} height={6} />
-                </button>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          // Medium/large: donut + legend.
-          <>
-            <CategoryDonut data={d.byCategory} total={d.spent} masked={masked} onSlice={go} />
-            <ul className="mt-4 space-y-1">
-              {d.byCategory.slice(0, 5).map(({ category, amount }) => (
-                <li key={category.id}>
-                  <button onClick={() => go(category.id)} className="pressable -mx-2 flex w-[calc(100%+1rem)] items-center justify-between gap-2 rounded-lg px-2 py-1 text-sm hover:bg-[hsl(var(--muted)/0.45)]">
-                    <span className="flex min-w-0 items-center gap-2">
-                      <Dot color={`hsl(${category.color})`} />
-                      <span className="truncate">{category.icon} {category.name}</span>
-                    </span>
-                    <span className="tnum shrink-0 text-muted-foreground">{formatSEKAbs(amount, masked)}</span>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </>
-        )}
-      </Card>
-    );
-  },
+  breakdown: (ctx, size) => <BreakdownWidget ctx={ctx} size={size} />,
 
   trend: ({ trend, masked }, size) => <TrendWidget series={trend} size={size} masked={masked} />,
 
@@ -262,30 +204,5 @@ export const widgets: Record<string, (ctx: DashCtx, size: WidgetSize) => React.R
       masked={masked}
       onSelect={(id) => onNavigate(`/transactions?tx=${id}`)}
     />
-  ),
-
-  byaccount: ({ d, masked, onNavigate }) => (
-    <Card className="h-full">
-      <CardHeader label="Spend by account" action={<AllLink href="/accounts" />} />
-      <ul className="space-y-2">
-        {d.byAccount.map(({ account, amount }) => {
-          const top = d.byAccount[0]?.amount || 1;
-          return (
-            <li key={account.id}>
-              <button onClick={() => onNavigate(`/transactions?account=${account.id}`)} className="pressable block w-full text-left">
-                <div className="mb-1 flex items-center justify-between gap-2 text-sm">
-                  <span className="flex min-w-0 items-center gap-2">
-                    <span className="shrink-0">{account.icon}</span>
-                    <span className="truncate">{account.name}</span>
-                  </span>
-                  <span className="tnum shrink-0 text-muted-foreground">{formatSEKAbs(amount, masked)}</span>
-                </div>
-                <ProgressBar pct={amount / top} color={`hsl(${account.color})`} height={6} />
-              </button>
-            </li>
-          );
-        })}
-      </ul>
-    </Card>
   ),
 };
