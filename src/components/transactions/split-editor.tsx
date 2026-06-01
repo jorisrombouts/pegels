@@ -1,6 +1,7 @@
 "use client";
 
-import { X } from "lucide-react";
+import { useState } from "react";
+import { Minus, Plus, X } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -9,6 +10,9 @@ import type { Split } from "@/lib/domain/types";
 
 let splitSeq = 0;
 const newId = () => `sp-${Date.now()}-${splitSeq++}`;
+
+/** Round to 2-decimal kronor. */
+const round2 = (n: number) => Math.round(n * 100) / 100;
 
 /** Edit how a payment is split; only `mine` portions count toward expenses. */
 export function SplitEditor({
@@ -21,6 +25,25 @@ export function SplitEditor({
   onChange: (splits: Split[] | undefined) => void;
 }) {
   const abs = Math.abs(amount);
+  const [people, setPeople] = useState(2);
+
+  // Even split: your share is total ÷ people; the rest is one "Shared" row for everyone else.
+  function splitEvenly(n: number) {
+    const mine = round2(abs / n);
+    onChange([
+      { id: newId(), label: "Mine", amount: mine, mine: true },
+      { id: newId(), label: "Shared", amount: round2(abs - mine), mine: false },
+    ]);
+  }
+
+  const evenControls = (
+    <>
+      <PeopleStepper people={people} setPeople={setPeople} />
+      <Button variant="glass" size="sm" onClick={() => splitEvenly(people)}>
+        Split evenly
+      </Button>
+    </>
+  );
 
   if (!splits || splits.length === 0) {
     return (
@@ -28,23 +51,15 @@ export function SplitEditor({
         <p className="text-xs text-muted-foreground">
           Splitting only counts the share you mark as <span className="font-semibold text-foreground">mine</span> toward your expenses.
         </p>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Button variant="glass" size="sm" onClick={() => onChange([{ id: newId(), label: "Mine", amount: abs, mine: true }])}>
             + Add split
           </Button>
-          <Button
-            variant="glass"
-            size="sm"
-            onClick={() =>
-              onChange([
-                { id: newId(), label: "Mine", amount: Math.round(abs / 2), mine: true },
-                { id: newId(), label: "Shared", amount: abs - Math.round(abs / 2), mine: false },
-              ])
-            }
-          >
-            Equal split
-          </Button>
+          {evenControls}
         </div>
+        <p className="tnum text-xs text-muted-foreground">
+          You’d pay {formatSEKAbs(round2(abs / people))} · split {people} ways
+        </p>
       </div>
     );
   }
@@ -81,17 +96,46 @@ export function SplitEditor({
         </div>
       ))}
 
-      <div className="flex items-center justify-between">
-        <div className="flex gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Button variant="glass" size="sm" onClick={() => onChange([...splits, { id: newId(), amount: 0, mine: false }])}>
             + Add
           </Button>
           <Button variant="ghost" size="sm" onClick={() => onChange(undefined)}>
             Clear
           </Button>
+          {evenControls}
         </div>
         <p className="tnum text-xs text-muted-foreground">You pay: {formatSEKAbs(mineTotal)}</p>
       </div>
+    </div>
+  );
+}
+
+/** Stepper for the number of people to split among (minimum 2). */
+function PeopleStepper({ people, setPeople }: { people: number; setPeople: (n: number) => void }) {
+  return (
+    <div className="flex items-center gap-1 rounded-full glass-inset px-1 py-0.5">
+      <button
+        type="button"
+        aria-label="Fewer people"
+        disabled={people <= 2}
+        onClick={() => setPeople(people - 1)}
+        className="pressable grid size-6 place-items-center rounded-full text-muted-foreground disabled:opacity-30"
+      >
+        <Minus className="size-3.5" />
+      </button>
+      <span className="tnum w-12 text-center text-xs">
+        <span className="font-semibold text-foreground">{people}</span> ppl
+      </span>
+      <button
+        type="button"
+        aria-label="More people"
+        onClick={() => setPeople(people + 1)}
+        className="pressable grid size-6 place-items-center rounded-full text-muted-foreground"
+      >
+        <Plus className="size-3.5" />
+      </button>
     </div>
   );
 }
