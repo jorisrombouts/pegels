@@ -8,8 +8,12 @@ import {
   prevMonthKey,
   spendByAccount,
   spendByRootCategory,
+  spendBySubcategory,
+  spendByTag,
+  withDelta,
 } from "@/lib/domain/selectors";
 import type { Dataset } from "@/data/mock";
+import type { Account, Category, Tag } from "@/lib/domain/types";
 
 export function computeDashboard(data: Dataset, month: string, accountFilter: string, today = new Date()) {
   const maps = buildMaps(data.categories);
@@ -29,6 +33,28 @@ export function computeDashboard(data: Dataset, month: string, accountFilter: st
   const safePerDay = isCurrentMonth && daysLeft > 0 ? Math.max(budgetRemaining, 0) / daysLeft : null;
   const avgPerDay = daysElapsed > 0 ? spent / daysElapsed : 0;
 
+  const byCategoryDelta = withDelta<Category>(
+    spendByRootCategory(data.transactions, maps, data.categories, month, accountFilter).map((r) => ({ item: r.category, amount: r.amount })),
+    spendByRootCategory(data.transactions, maps, data.categories, prevKey, accountFilter).map((r) => ({ item: r.category, amount: r.amount })),
+    (c) => c.id,
+  );
+  const byTagDelta = withDelta<Tag>(
+    spendByTag(data.transactions, data.tags, month, accountFilter).map((r) => ({ item: r.tag, amount: r.amount })),
+    spendByTag(data.transactions, data.tags, prevKey, accountFilter).map((r) => ({ item: r.tag, amount: r.amount })),
+    (t) => t.id,
+  );
+  const byAccountDelta = withDelta<Account>(
+    spendByAccount(data.transactions, maps, data.accounts, month).map((r) => ({ item: r.account, amount: r.amount })),
+    spendByAccount(data.transactions, maps, data.accounts, prevKey).map((r) => ({ item: r.account, amount: r.amount })),
+    (a) => a.id,
+  );
+  const subcategoryDeltas = (parentId: string) =>
+    withDelta<Category>(
+      spendBySubcategory(data.transactions, maps, parentId, month, accountFilter).map((r) => ({ item: r.category, amount: r.amount })),
+      spendBySubcategory(data.transactions, maps, parentId, prevKey, accountFilter).map((r) => ({ item: r.category, amount: r.amount })),
+      (c) => c.id,
+    );
+
   return {
     spent,
     prevKey,
@@ -43,6 +69,10 @@ export function computeDashboard(data: Dataset, month: string, accountFilter: st
     avgPerDay,
     byCategory: spendByRootCategory(data.transactions, maps, data.categories, month, accountFilter),
     byAccount: spendByAccount(data.transactions, maps, data.accounts, month),
+    byCategoryDelta,
+    byTagDelta,
+    byAccountDelta,
+    subcategoryDeltas,
     budgets,
     budgetLimitTotal,
     goals: data.goals.map((g) => goalProgress(g, data.transactions, today)),
