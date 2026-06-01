@@ -19,8 +19,13 @@ export function PreferencesSync() {
   const lastSaved = useRef<UserPrefs | null>(null);
   const hydrated = useRef(false);
 
+  // staleTime: Infinity is load-bearing — it stops a post-restore refetch from overwriting
+  // the just-hydrated store and triggering a spurious resave.
   const { data } = useQuery({ queryKey: ["preferences"], queryFn: loadPreferences, staleTime: Infinity });
-  const { mutate } = useMutation({ mutationFn: savePreferences });
+  const { mutate } = useMutation({
+    mutationFn: savePreferences,
+    onError: (e) => console.error("Failed to save UI preferences", e),
+  });
 
   // Hydrate the store from the server row once, when the query resolves.
   useEffect(() => {
@@ -39,8 +44,9 @@ export function PreferencesSync() {
     const next: UserPrefs = { layout, navConfig };
     if (!shouldSave(lastSaved.current, next)) return;
     const t = setTimeout(() => {
-      lastSaved.current = next;
-      mutate(next);
+      // Stamp lastSaved only on success, so a failed write stays eligible to retry on the
+      // next change instead of being silently suppressed by shouldSave.
+      mutate(next, { onSuccess: () => { lastSaved.current = next; } });
     }, SAVE_DEBOUNCE_MS);
     return () => clearTimeout(t);
   }, [layout, navConfig, mutate]);
