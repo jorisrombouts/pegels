@@ -2,7 +2,7 @@
 // `./env` MUST be imported first so DATABASE_URL is loaded before ./index reads it.
 import "./env";
 import { replaceAll } from "./queries";
-import { STUB_USER_ID } from "../auth";
+import { STUB_USER_ID } from "./claim";
 import { seedDataset } from "../../data/mock";
 
 async function main() {
