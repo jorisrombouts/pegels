@@ -8,6 +8,7 @@ import { Card, SectionLabel } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogClose, DialogContent, DialogTrigger } from "@/components/ui/dialog";
+import { AccountCard } from "@/components/settings/account-card";
 import { navByKey } from "@/components/nav/nav-items";
 import { MAX_PRIMARY_NAV, useUI } from "@/store/ui";
 import { useData } from "@/store/data";
@@ -27,6 +28,7 @@ export default function SettingsPage() {
     <>
       <PageHeader title="Settings" showPrivacy={false} />
       <div className="mx-auto max-w-xl space-y-4">
+        <AccountCard />
         <AppearanceSection />
         <NavigationSection />
         <RulesSection />
