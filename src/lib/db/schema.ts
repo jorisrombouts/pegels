@@ -1,5 +1,6 @@
 import { pgTable, text, numeric, real, boolean, jsonb, index, timestamp, integer, primaryKey } from "drizzle-orm/pg-core";
 import type { AccountKind, CategorySource, MatchMode, RuleOrigin, Split, TransactionKind } from "../domain/types";
+import type { WidgetLayout, NavConfigItem } from "../../store/ui";
 
 // Every table is scoped by userId (stub today; real auth later). Embedded arrays
 // (tagIds, splits) are JSONB — document-scoped, never queried alone.
@@ -176,3 +177,11 @@ export const authVerificationTokens = pgTable(
   },
   (t) => [primaryKey({ columns: [t.identifier, t.token] })],
 );
+
+// --- Per-user UI preferences (dashboard layout + bottom-nav config). One row per user. ---
+export const userPreferences = pgTable("user_preferences", {
+  userId: text("user_id").primaryKey(),
+  layout: jsonb("layout").$type<WidgetLayout[]>().notNull(),
+  navConfig: jsonb("nav_config").$type<NavConfigItem[]>().notNull(),
+  updatedAt: text("updated_at").notNull(),
+});
