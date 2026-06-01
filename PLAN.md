@@ -5,7 +5,7 @@
 > project is now **pegels**. Several items it marks TODO/PLANNED have since shipped, and the
 > core spending invariant in the Context below has since **changed** — see the ⚠️ note.)
 >
-> **All UI-first work is complete** — 220 tests passing, build + lint clean, deployed against
+> **All UI-first work is complete** — 223 tests passing, build + lint clean, deployed against
 > Neon (migrated + seeded). Built since the log was last written:
 > - Dashboard polish batch #3–#6 (trend line morph, "This month" button via
 >   `month-switcher.tsx`, hero "This month" widget, recurated default layout).
@@ -98,6 +98,12 @@
 >   every page header opens a popover with name/email + **Sign out**, so login status is visible
 >   app-wide and logout is one tap from anywhere (previously only in Settings → Account, under the
 >   "More" menu). `src/components/nav/account-menu.tsx` + a `currentUser()` action.
+> - **✅ Apply a single rule to existing transactions** — each rule row in `/rules` gained a
+>   per-row ⚡ **Apply** action that previews then backfills just that one rule across all
+>   transactions (hand-corrected rows skipped), **forced-enabled** so an explicit apply runs even
+>   when the rule's auto-toggle is off. `previewRuleBackfill`/`applyRuleBackfill` take an optional
+>   `ruleId` routed through a new pure `selectRulesForBackfill` helper; no `ruleId` preserves the
+>   existing apply-all behavior. Both share one preview-then-confirm dialog.
 > - **Env (not app code):** the corporate **Cloudflare Zero Trust** TLS inspection re-signs HTTPS
 >   with a CA Node doesn't trust, breaking `fetch` to Neon/OpenAI with `SELF_SIGNED_CERT_IN_CHAIN`
 >   ("fetch failed"). Fixed with **`NODE_OPTIONS=--use-system-ca`** (added to `~/.zshrc`). See
