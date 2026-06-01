@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { budgetForecasts, budgetStatuses, buildMaps, categorySpendInMonth, detectTransfersOnImport, earliestDataMonth, goalProgress, goalSaved, latestDataMonth, monthNet, monthProgress, orderCategories, withDelta } from "./selectors";
-import type { Budget, Category, Goal, Transaction } from "./types";
+import { budgetForecasts, budgetStatuses, buildMaps, categorySpendInMonth, detectTransfersOnImport, earliestDataMonth, goalProgress, goalSaved, latestDataMonth, monthNet, monthProgress, orderCategories, spendBySubcategory, spendByTag, withDelta } from "./selectors";
+import type { Budget, Category, Goal, Tag, Transaction } from "./types";
 
 const food: Category = { id: "food", name: "Food", icon: "🍔", color: "150 60% 45%", parentId: null };
 const maps = buildMaps([food]);
@@ -245,5 +245,49 @@ describe("budgetForecasts", () => {
     const f = budgetForecasts([budget], [tx(-4000)], maps, "2025-03", new Date(2025, 5, 1))[0];
     expect(f.isProjected).toBe(false);
     expect(f.projected).toBe(f.spent);
+  });
+});
+
+describe("spendBySubcategory", () => {
+  const cats: Category[] = [
+    { id: "food", name: "Food", icon: "🍔", color: "0 0% 0%", parentId: null },
+    { id: "grocery", name: "Groceries", icon: "🛒", color: "0 0% 0%", parentId: "food" },
+    { id: "resto", name: "Restaurants", icon: "🍽️", color: "0 0% 0%", parentId: "food" },
+  ];
+  const m = buildMaps(cats);
+  const t = (id: string | null, amount: number): Transaction => ({
+    id: `t${Math.random()}`, date: "2025-03-10", description: "x", amount, accountId: "a",
+    categoryId: id, predictedCategoryId: null, categoryConfidence: null, categorySource: "user",
+    needsReview: false, tagIds: [], kind: "expense", goalId: null,
+  });
+  it("groups a parent's spend by immediate subcategory, sorted desc", () => {
+    const txs = [t("grocery", -100), t("grocery", -50), t("resto", -200), t("food", -10)];
+    const out = spendBySubcategory(txs, m, "food", "2025-03");
+    expect(out.map((r) => [r.category.id, r.amount])).toEqual([["resto", 200], ["grocery", 150], ["food", 10]]);
+  });
+  it("excludes other months and other parents", () => {
+    const txs = [t("grocery", -100), { ...t("grocery", -999), date: "2025-02-01" }];
+    const out = spendBySubcategory(txs, m, "food", "2025-03");
+    expect(out).toEqual([{ category: cats[1], amount: 100 }]);
+  });
+});
+
+describe("spendByTag", () => {
+  const tags: Tag[] = [
+    { id: "fix", name: "Fixed", color: "0 0% 0%" },
+    { id: "fun", name: "Fun", color: "0 0% 0%" },
+  ];
+  const t = (amount: number, tagIds: string[]): Transaction => ({
+    id: `t${Math.random()}`, date: "2025-03-10", description: "x", amount, accountId: "a",
+    categoryId: "c", predictedCategoryId: null, categoryConfidence: null, categorySource: "user",
+    needsReview: false, tagIds, kind: "expense", goalId: null,
+  });
+  it("adds a transaction's spend to every tag it carries (overlap)", () => {
+    const txs = [t(-100, ["fix", "fun"]), t(-40, ["fun"]), t(-10, [])];
+    const out = spendByTag(txs, tags, "2025-03");
+    expect(out).toEqual([{ tag: tags[1], amount: 140 }, { tag: tags[0], amount: 100 }]); // fun 140, fix 100
+  });
+  it("omits tags with no spend this month", () => {
+    expect(spendByTag([t(-100, ["fix"])], tags, "2025-03").map((r) => r.tag.id)).toEqual(["fix"]);
   });
 });
