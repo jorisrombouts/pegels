@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { budgetForecasts, budgetStatuses, buildMaps, categorySpendInMonth, detectTransfersOnImport, earliestDataMonth, goalProgress, goalSaved, latestDataMonth, monthNet, monthProgress, orderCategories, spendBySubcategory, spendByTag, withDelta } from "./selectors";
+import { budgetForecasts, budgetStatuses, buildMaps, categorySpendInMonth, categoryTrends, detectTransfersOnImport, earliestDataMonth, goalProgress, goalSaved, latestDataMonth, monthNet, monthProgress, orderCategories, spendBySubcategory, spendByTag, withDelta } from "./selectors";
 import type { Budget, Category, Goal, Tag, Transaction } from "./types";
 
 const food: Category = { id: "food", name: "Food", icon: "🍔", color: "150 60% 45%", parentId: null };
@@ -30,6 +30,34 @@ describe("orderCategories", () => {
     const ordered = orderCategories(withOrphan).map((c) => c.id);
     expect(ordered).toContain("orphan");
     expect(ordered).toHaveLength(4);
+  });
+});
+
+describe("categoryTrends subcategories", () => {
+  const cats: Category[] = [
+    { id: "food", name: "Food", icon: "🍔", color: "0 0% 0%", parentId: null },
+    { id: "grocery", name: "Groceries", icon: "🛒", color: "0 0% 0%", parentId: "food" },
+  ];
+  const m2 = buildMaps(cats);
+  const t2 = (catId: string, amount: number, date: string): Transaction => ({
+    id: `t${Math.random()}`, date, description: "x", amount, accountId: "a",
+    categoryId: catId, predictedCategoryId: null, categoryConfidence: null, categorySource: "user",
+    needsReview: false, tagIds: [], kind: "expense", goalId: null,
+  });
+
+  it("emits subcategory series tagged with parentId; total/top-level have none", () => {
+    const txs = [t2("grocery", -100, "2025-03-10"), t2("grocery", -50, "2025-02-10")];
+    const out = categoryTrends(txs, m2, cats, "2025-03", 6);
+    const grocery = out.find((s) => s.id === "grocery");
+    expect(grocery?.parentId).toBe("food");
+    expect(out.find((s) => s.id === "total")?.parentId == null).toBe(true);
+    expect(out.find((s) => s.id === "food")?.parentId == null).toBe(true);
+  });
+
+  it("omits subcategories with no spend in the window", () => {
+    const txs = [t2("food", -100, "2025-03-10")]; // spend on the parent only
+    const out = categoryTrends(txs, m2, cats, "2025-03", 6);
+    expect(out.find((s) => s.id === "grocery")).toBeUndefined();
   });
 });
 

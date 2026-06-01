@@ -375,6 +375,8 @@ export interface TrendSeries {
   /** "primary" for the total, else an HSL triplet for a category. */
   color: string;
   points: { key: string; amount: number }[];
+  /** Set on subcategory series (the id of their top-level parent); absent on Total/top-levels. */
+  parentId?: string | null;
 }
 
 /** Trailing `count` month keys ending at `key` (oldest first). */
@@ -423,7 +425,18 @@ export function categoryTrends(
     .slice(0, maxCategories)
     .map(({ id, label, icon, color, points }) => ({ id, label, icon, color, points }));
 
-  return [total, ...perCategory];
+  // Subcategory series for each included top-level, for drill-down (only those with spend).
+  const subSeries: TrendSeries[] = [];
+  for (const parent of perCategory) {
+    for (const child of categories.filter((c) => c.parentId === parent.id)) {
+      const points = keys.map((mk) => ({ key: mk, amount: categorySpendInMonth(transactions, maps, child.id, mk) }));
+      if (points.some((p) => p.amount > 0)) {
+        subSeries.push({ id: child.id, label: child.name, icon: child.icon, color: child.color, points, parentId: parent.id });
+      }
+    }
+  }
+
+  return [total, ...perCategory, ...subSeries];
 }
 
 /** Per-day spend totals for a month (calendar heatmap). day is 1-based. */
