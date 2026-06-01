@@ -5,7 +5,7 @@
 > project is now **pegels**. Several items it marks TODO/PLANNED have since shipped, and the
 > core spending invariant in the Context below has since **changed** — see the ⚠️ note.)
 >
-> **All UI-first work is complete** — 223 tests passing, build + lint clean, deployed against
+> **All UI-first work is complete** — 226 tests passing, build + lint clean, deployed against
 > Neon (migrated + seeded). Built since the log was last written:
 > - Dashboard polish batch #3–#6 (trend line morph, "This month" button via
 >   `month-switcher.tsx`, hero "This month" widget, recurated default layout).
@@ -104,6 +104,16 @@
 >   when the rule's auto-toggle is off. `previewRuleBackfill`/`applyRuleBackfill` take an optional
 >   `ruleId` routed through a new pure `selectRulesForBackfill` helper; no `ruleId` preserves the
 >   existing apply-all behavior. Both share one preview-then-confirm dialog.
+> - **✅ Hand-corrected categories show 100%** — when you pick a category by hand in the detail
+>   panel (`categorySource: "user"`), the confidence indicator now reads a green **100%** instead
+>   of the stale model score. The stored `categoryConfidence` is deliberately left untouched so the
+>   model's original prediction is still captured in the `categorization_examples` training log
+>   (corrected=true, predicted vs final); only the display changed.
+> - **✅ Split among N people** — the split editor's empty state is now a single action: a people
+>   stepper (min 2) + one "Split among N people" button that sets *your* share to total ÷ N and
+>   puts the remainder in one "Shared" row (only the `mine` portion counts as spending). The earlier
+>   confusing "+ Add split" / "Split evenly" pair was removed; the populated view keeps a clean
+>   + Add / Clear / You pay footer (re-split via Clear).
 > - **Env (not app code):** the corporate **Cloudflare Zero Trust** TLS inspection re-signs HTTPS
 >   with a CA Node doesn't trust, breaking `fetch` to Neon/OpenAI with `SELF_SIGNED_CERT_IN_CHAIN`
 >   ("fetch failed"). Fixed with **`NODE_OPTIONS=--use-system-ca`** (added to `~/.zshrc`). See
