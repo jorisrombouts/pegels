@@ -1,11 +1,12 @@
 import { and, desc, eq } from "drizzle-orm";
 import { db } from "./index";
-import { accounts, categories, tags, transactions, budgets, goals, categorizationExamples, categorizationRules } from "./schema";
+import { accounts, categories, tags, transactions, budgets, goals, categorizationExamples, categorizationRules, userPreferences } from "./schema";
 import {
   rowToAccount, rowToCategory, rowToTag, rowToTransaction, rowToBudget, rowToGoal, rowToRule,
   accountToRow, categoryToRow, tagToRow, transactionToRow, budgetToRow, goalToRow, ruleToRow,
 } from "./map";
 import type { Account, Category, Tag, Transaction, Budget, Goal, CategorizationRule } from "../domain/types";
+import type { WidgetLayout, NavConfigItem } from "../../store/ui";
 import type { Dataset } from "../../data/mock";
 
 type Batchable = Parameters<typeof db.batch>[0][number];
@@ -158,6 +159,33 @@ export async function clearAll(userId: string): Promise<void> {
     db.delete(accounts).where(eq(accounts.userId, userId)),
     db.delete(categorizationRules).where(eq(categorizationRules.userId, userId)),
   ]);
+}
+
+export async function getPreferences(
+  userId: string,
+): Promise<{ layout: WidgetLayout[]; navConfig: NavConfigItem[] } | null> {
+  const rows = await db.select().from(userPreferences).where(eq(userPreferences.userId, userId));
+  const r = rows[0];
+  return r ? { layout: r.layout, navConfig: r.navConfig } : null;
+}
+
+export async function upsertPreferences(
+  userId: string,
+  prefs: { layout: WidgetLayout[]; navConfig: NavConfigItem[] },
+): Promise<void> {
+  const row = {
+    userId,
+    layout: prefs.layout,
+    navConfig: prefs.navConfig,
+    updatedAt: new Date().toISOString(),
+  };
+  await db
+    .insert(userPreferences)
+    .values(row)
+    .onConflictDoUpdate({
+      target: userPreferences.userId,
+      set: { layout: row.layout, navConfig: row.navConfig, updatedAt: row.updatedAt },
+    });
 }
 
 /** Replace the whole dataset for a user (used by reset-to-sample and the seed script). */
