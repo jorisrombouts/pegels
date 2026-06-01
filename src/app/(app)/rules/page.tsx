@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronDown, ChevronUp, Pencil, Plus, Wand2 } from "lucide-react";
+import { ChevronDown, ChevronUp, Pencil, Plus, Wand2, Zap } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { PageHeader } from "@/components/page-header";
 import { Card } from "@/components/ui/card";
@@ -24,7 +24,7 @@ export default function RulesPage() {
 
   const [editing, setEditing] = useState<CategorizationRule | null | "new">(null);
   const [showSuggest, setShowSuggest] = useState(false);
-  const [backfill, setBackfill] = useState<{ count: number; samples: { description: string }[] } | null>(null);
+  const [backfill, setBackfill] = useState<{ count: number; samples: { description: string }[]; ruleId?: string } | null>(null);
 
   function move(i: number, dir: -1 | 1) {
     const next = [...ordered];
@@ -36,6 +36,10 @@ export default function RulesPage() {
 
   async function openBackfill() {
     setBackfill(await previewRuleBackfill());
+  }
+
+  async function openSingle(rule: CategorizationRule) {
+    setBackfill({ ...(await previewRuleBackfill(rule.id)), ruleId: rule.id });
   }
 
   return (
@@ -67,6 +71,7 @@ export default function RulesPage() {
                 {r.addTagIds.map((id) => <span key={id} className="ml-1 text-xs text-muted-foreground">#{tagById.get(id)?.name ?? id}</span>)}
               </span>
               <Switch checked={r.enabled} onCheckedChange={(v) => upsertRule({ ...r, enabled: v })} aria-label="Enable rule" />
+              <button aria-label="Apply rule" title="Apply this rule to existing transactions" onClick={() => openSingle(r)} className="pressable text-muted-foreground"><Zap className="size-4" /></button>
               <button aria-label="Edit rule" onClick={() => setEditing(r)} className="pressable text-muted-foreground"><Pencil className="size-4" /></button>
             </div>
           );
@@ -87,7 +92,7 @@ export default function RulesPage() {
       </Dialog>
 
       <Dialog open={backfill !== null} onOpenChange={(o) => !o && setBackfill(null)}>
-        <DialogContent title="Apply rules to existing transactions">
+        <DialogContent title={backfill?.ruleId ? "Apply this rule to existing transactions" : "Apply rules to existing transactions"}>
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">
               {backfill?.count ?? 0} existing transaction(s) would change. Rows you corrected by hand are skipped.
@@ -100,7 +105,7 @@ export default function RulesPage() {
             <div className="flex justify-end gap-2">
               <DialogClose asChild><Button variant="ghost" size="sm">Cancel</Button></DialogClose>
               <DialogClose asChild>
-                <Button size="sm" disabled={!backfill?.count} onClick={async () => { await applyRuleBackfill(); await qc.invalidateQueries({ queryKey: DATASET_KEY }); setBackfill(null); }}>
+                <Button size="sm" disabled={!backfill?.count} onClick={async () => { await applyRuleBackfill(backfill?.ruleId); await qc.invalidateQueries({ queryKey: DATASET_KEY }); setBackfill(null); }}>
                   Apply to {backfill?.count ?? 0}
                 </Button>
               </DialogClose>

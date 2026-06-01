@@ -97,6 +97,16 @@ export interface RuleBackfillChange {
   patch: Partial<Pick<Transaction, "categoryId" | "kind" | "tagIds">>;
 }
 
+/**
+ * Pick the rules a backfill should run. No `ruleId` → the full set (auto-apply semantics,
+ * disabled rules skipped downstream). With a `ruleId` → just that rule, forced `enabled` so an
+ * explicit "Apply this rule" runs even when its auto-toggle is off. Unknown id → empty.
+ */
+export function selectRulesForBackfill(rules: CategorizationRule[], ruleId?: string): CategorizationRule[] {
+  if (!ruleId) return rules;
+  return rules.filter((r) => r.id === ruleId).map((r) => ({ ...r, enabled: true }));
+}
+
 /** Compute the changes a rule backfill would make. Skips categorySource === "user". */
 export function planRuleBackfill(transactions: Transaction[], rules: CategorizationRule[]): RuleBackfillChange[] {
   const out: RuleBackfillChange[] = [];

@@ -8,7 +8,7 @@ import {
   upsertTransaction,
 } from "@/lib/db/queries";
 import { categorize, matchesOwnAccount } from "@/lib/categorize";
-import { applyRules, planRuleBackfill } from "@/lib/rules";
+import { applyRules, planRuleBackfill, selectRulesForBackfill } from "@/lib/rules";
 import { categorizeWithOpenAI, type AiExample, type AiResult, type AiRow } from "@/lib/ai/categorize-openai";
 import type { TransactionKind } from "@/lib/domain/types";
 
@@ -91,17 +91,17 @@ export async function categorizeTransactions(rows: AiRow[]): Promise<AiResult[]>
   return out;
 }
 
-export async function previewRuleBackfill(): Promise<{ count: number; samples: { description: string }[] }> {
+export async function previewRuleBackfill(ruleId?: string): Promise<{ count: number; samples: { description: string }[] }> {
   const userId = await getUserId();
   const data = await getDataset(userId);
-  const plan = planRuleBackfill(data.transactions, data.rules);
+  const plan = planRuleBackfill(data.transactions, selectRulesForBackfill(data.rules, ruleId));
   return { count: plan.length, samples: plan.slice(0, 8).map((p) => ({ description: p.description })) };
 }
 
-export async function applyRuleBackfill(): Promise<number> {
+export async function applyRuleBackfill(ruleId?: string): Promise<number> {
   const userId = await getUserId();
   const data = await getDataset(userId);
-  const plan = planRuleBackfill(data.transactions, data.rules);
+  const plan = planRuleBackfill(data.transactions, selectRulesForBackfill(data.rules, ruleId));
   const byId = new Map(data.transactions.map((t) => [t.id, t]));
   for (const change of plan) {
     const tx = byId.get(change.id)!;
