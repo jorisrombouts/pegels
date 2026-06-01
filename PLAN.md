@@ -1,11 +1,11 @@
 # Saldo — Rebuild as PWA (Next.js + Neon + OpenAI)
 
-> **Current status — 2026-05-30** (header added after recovering this plan from session
+> **Current status — 2026-06-01** (header added after recovering this plan from session
 > history; the log below is the verbatim historical record and still says "Saldo" — the
 > project is now **pegels**. Several items it marks TODO/PLANNED have since shipped, and the
 > core spending invariant in the Context below has since **changed** — see the ⚠️ note.)
 >
-> **All UI-first work is complete** — 174 tests passing, build + lint clean, deployed against
+> **All UI-first work is complete** — 199 tests passing, build + lint clean, deployed against
 > Neon (migrated + seeded). Built since the log was last written:
 > - Dashboard polish batch #3–#6 (trend line morph, "This month" button via
 >   `month-switcher.tsx`, hero "This month" widget, recurated default layout).
@@ -47,16 +47,52 @@
 >     - **Income display** — rows stay visible with the **amount always masked**; the detail
 >       panel reveals it; changing Type un-masks (`getUserId()` still the single-user stub).
 >
+> **Shipped 2026-05-30 → 06-01 (this session):**
+> - **✅ User-defined categorization Rules** (spec + plan in `docs/superpowers/`, 2026-05-31):
+>   a `/rules` page (create / edit / reorder / enable / delete) where description rules
+>   (contains / starts-with / exact) set category and/or kind and/or tags, run **before the LLM**
+>   at import (a match skips inference) and can **backfill** existing transactions (skipping
+>   hand-corrected rows). Pure engine in `src/lib/rules.ts` (`applyRules` /
+>   `suggestRulesFromMonth` / `planRuleBackfill`); the hardcoded `classifyRules` keywords are
+>   retired into editable `categorization_rules` **seed rows**; per-month **suggestions** are
+>   mined from corrected data. Reachable via Settings → Categorization (+ nav registry).
+> - **✅ Own-account-number transfers** — accounts gained an optional `accountNumber`; import
+>   rows whose description references one are auto-classified **transfer** (savings→main no
+>   longer mis-read as income). Existing rows backfilled.
+> - **✅ Import review upgrades** — a per-row **kind** control (expense / transfer / income) +
+>   a Types summary, and a filter bar (kind chips · Needs review · Uncategorized · Hide
+>   duplicates · description search).
+> - **✅ Category taxonomy reworked** — a **Purchases** parent (Clothing / Electronics /
+>   Shopping / Home & Furniture / Hobbies), **Café & Fika**, **Services**; user pruned to 24.
+>   Every category dropdown now groups children under their parent via `orderCategories`,
+>   independent of array order (fixes re-parented categories rendering in the wrong place).
+> - **✅ Dashboard "Spending breakdown" widget** — horizontal bars with a **Categories | Tags |
+>   Accounts** toggle, **↑↓ % vs last month** (red up / green down / grey flat, hidden when last
+>   month was 0), and **tap-to-expand** a category into its subcategories (chevron). Replaces
+>   the donut; folds in the old "Spend by account" tile; **Daily Pace** dropped from the default
+>   layout (kept registered); layout re-ordered by value; a **v3** persisted-layout migration;
+>   **Recharts removed** (now CSS-width bars). Selectors `withDelta` / `spendBySubcategory` /
+>   `spendByTag` in `selectors.ts`.
+> - **✅ Trend widget subcategory drill-down** — pick a top-level category, its subcategory
+>   chips appear, the line redraws for the chosen sub (parent kept highlighted as context).
+> - **✅ Transactions filter total** — the month count + "Spent" figure now reflect the active
+>   filter, not just the whole month.
+> - **Env (not app code):** the corporate **Cloudflare Zero Trust** TLS inspection re-signs HTTPS
+>   with a CA Node doesn't trust, breaking `fetch` to Neon/OpenAI with `SELF_SIGNED_CERT_IN_CHAIN`
+>   ("fetch failed"). Fixed with **`NODE_OPTIONS=--use-system-ca`** (added to `~/.zshrc`). See
+>   memory `neon-corporate-tls-interception`.
+>
 > **Still left to implement (Phase 4b+):**
 > - **Auth.js Google sign-in** — make `getUserId()` (`src/lib/auth.ts`) read the real session.
+>   (Everything is already scoped by `getUserId()`, so this is the unlock for multi-user.)
 > - **Vercel deploy** (Neon + OpenAI env vars); **overspend alerts via PWA Web Push** (deferred).
 > - **Light-theme ("Silver Slate") polish** — deferred.
+> - **Persist dashboard layout + nav config per user** — `layout` + `navConfig` live in the
+>   Zustand UI store (localStorage, per-browser). Move them into Neon keyed by `getUserId()` so
+>   they follow the user across devices. (Recorded for later; do after auth.)
 > - Optional follow-ups: offline **write** queue/replay; dashboard "Budgets" widget forecast;
->   recurring-charge-aware forecasting; better classification of bare-number internal transfers.
-> - **Persist dashboard layout + nav config per user** (future) — the widget order/sizes
->   (`layout`) and `navConfig` currently live in the Zustand UI store (localStorage, per-browser).
->   Move them into Neon keyed by `getUserId()` so the layout follows the user across devices.
->   (Not to be implemented yet — recorded for later.)
+>   recurring-charge-aware forecasting. (Bare-number internal transfers are now largely handled
+>   by the own-account-number rule + user Rules.)
 
 ## Context
 
@@ -527,30 +563,22 @@ mode (noted DONE); the rest are to implement on approval.
   switch trend series → line morphs; navigate a month → "This month" button appears, returns.
 
 ## Open items / next
-- **Settings → customizable nav bar** (planned above) — next candidate.
-- Light-theme ("Silver Slate") polish — deferred.
-- Backend (Phase 4): Neon + Drizzle, OpenAI categorization + training set, Google auth.
+The authoritative, current list lives in the **status header** at the top of this file
+("Still left to implement"). In short, what remains is **Phase 4b+**: Auth.js Google sign-in,
+Vercel deploy + PWA push overspend alerts, light-theme polish, per-user persistence of the
+dashboard layout/nav, and a few optional forecasting/offline follow-ups. All feature screens,
+the rules engine, real-bank import + OpenAI categorization, and the dashboard rework are done.
 
-## Idea: user-defined categorization rules page (2026-05-30, not finalized)
-Captured for later — user will refine when they pick it up.
+## ✅ DONE: user-defined categorization rules page (shipped 2026-05-31)
+This idea was implemented. Design + plan: `docs/superpowers/specs/2026-05-31-categorization-rules-design.md`
+and `docs/superpowers/plans/2026-05-31-categorization-rules.md`. Outcome: a `/rules` page with
+description rules (contains/starts-with/exact) setting category/kind/tags, running before the
+LLM at import with on-demand backfill; the hardcoded `classifyRules` keywords were migrated into
+editable `categorization_rules` seed rows; per-month suggestions are mined from corrected data.
+See the status header for the full summary.
 
-**Problem.** LLM categorization struggles when the bank description is poor/cryptic,
-and some merchants are *always* the same category — paying the LLM to re-guess them
-every import is wasteful and occasionally wrong.
-
-**Idea.** A new **Rules** page where the user creates/customizes their own
-categorization rules. A matched transaction is classified deterministically and
-**skipped by LLM inference** (saves cost + guarantees consistency).
-
-**Rough shape (to refine):**
-- A rule = match condition → outcome. Match likely on description (contains / starts-with
-  / regex?), possibly also amount sign/range or account. Outcome sets `kind` and/or
-  `categoryId` (+ confidence 1).
-- Stored per-user in the DB (new `categorization_rules` table); editable in a Rules page
-  (list, add, edit, delete, reorder for precedence).
-- Runs in the categorize pipeline **before** the OpenAI call — generalizes today's
-  hardcoded `classifyRules` (REVOLUT/SEB KORT/AVANZA/LÖN/LÅN) and `matchesOwnAccount`
-  (own account numbers) into user-managed data. Those built-ins could seed the first rules.
-- Open questions: precedence/ordering, regex vs simple contains, whether rules also
-  retro-apply to existing transactions (like the savings-number backfill), and how this
-  interacts with the training-set feedback loop.
+## Future dashboard idea (not started): `/spending` explorer page
+Noted while building the breakdown widget (`docs/superpowers/specs/2026-06-01-dashboard-spending-breakdown-design.md`,
+"Out of scope"): a dedicated full page with cross-filtering chips and a month switcher for
+deeper "click around" exploration, beyond the single dashboard widget. Only build if the widget
+proves insufficient.
