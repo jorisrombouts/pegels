@@ -5,7 +5,7 @@
 > project is now **pegels**. Several items it marks TODO/PLANNED have since shipped, and the
 > core spending invariant in the Context below has since **changed** — see the ⚠️ note.)
 >
-> **All UI-first work is complete** — 208 tests passing, build + lint clean, deployed against
+> **All UI-first work is complete** — 220 tests passing, build + lint clean, deployed against
 > Neon (migrated + seeded). Built since the log was last written:
 > - Dashboard polish batch #3–#6 (trend line morph, "This month" button via
 >   `month-switcher.tsx`, hero "This month" widget, recurated default layout).
@@ -87,6 +87,17 @@
 >   sign-out. Pure logic in `src/lib/auth-helpers.ts` (unit-tested). **Owner setup before live
 >   use:** create a Google OAuth client and set `AUTH_GOOGLE_ID` / `AUTH_GOOGLE_SECRET` /
 >   `OWNER_EMAIL` / `AUTH_SECRET` in `.env.local` (redirect URI `…/api/auth/callback/google`).
+> - **✅ Per-user UI preferences sync** (spec + plan in `docs/superpowers/`, 2026-06-01):
+>   the dashboard **layout** (widget order + size) and **bottom-nav config** now persist in a
+>   `user_preferences` table in Neon, keyed by `getUserId()`, so they follow the user across
+>   devices. A `<PreferencesSync />` client component (mounted in the `(app)` layout) hydrates the
+>   Zustand store from the server on load and debounce-saves edits back (server is source of truth;
+>   `localStorage` stays the instant/offline cache; last-write-wins). `masked`/`month`/
+>   `accountFilter` stay device-local. The `useUI` store + all widgets are unchanged.
+> - **✅ Account avatar + sign-out in the page header** — an avatar (Google photo or initial) in
+>   every page header opens a popover with name/email + **Sign out**, so login status is visible
+>   app-wide and logout is one tap from anywhere (previously only in Settings → Account, under the
+>   "More" menu). `src/components/nav/account-menu.tsx` + a `currentUser()` action.
 > - **Env (not app code):** the corporate **Cloudflare Zero Trust** TLS inspection re-signs HTTPS
 >   with a CA Node doesn't trust, breaking `fetch` to Neon/OpenAI with `SELF_SIGNED_CERT_IN_CHAIN`
 >   ("fetch failed"). Fixed with **`NODE_OPTIONS=--use-system-ca`** (added to `~/.zshrc`). See
@@ -96,9 +107,6 @@
 > - **Vercel deploy** (Neon + OpenAI + the new `AUTH_*` / `OWNER_EMAIL` env vars; add the prod
 >   Google redirect URI); **overspend alerts via PWA Web Push** (deferred).
 > - **Light-theme ("Silver Slate") polish** — deferred.
-> - **Persist dashboard layout + nav config per user** — `layout` + `navConfig` live in the
->   Zustand UI store (localStorage, per-browser). Move them into Neon keyed by `getUserId()` so
->   they follow the user across devices. (Now unblocked — auth has shipped.)
 > - Optional follow-ups: offline **write** queue/replay; dashboard "Budgets" widget forecast;
 >   recurring-charge-aware forecasting. (Bare-number internal transfers are now largely handled
 >   by the own-account-number rule + user Rules.)
