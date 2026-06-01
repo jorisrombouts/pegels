@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { matchesRule, applyRules, isRiskyMatch, suggestRulesFromMonth, planRuleBackfill } from "./rules";
+import { matchesRule, applyRules, isRiskyMatch, suggestRulesFromMonth, planRuleBackfill, selectRulesForBackfill } from "./rules";
 import type { CategorizationRule } from "@/lib/domain/types";
 import type { Transaction } from "@/lib/domain/types";
 
@@ -18,6 +18,23 @@ describe("matchesRule", () => {
     expect(matchesRule("kassa SL", rule({ matchText: "sl", matchMode: "startsWith" }))).toBe(false);
     expect(matchesRule("LÖN", rule({ matchText: "lön", matchMode: "exact" }))).toBe(true);
     expect(matchesRule("LÖN ACME", rule({ matchText: "lön", matchMode: "exact" }))).toBe(false);
+  });
+});
+
+describe("selectRulesForBackfill", () => {
+  const rules = [rule({ id: "a", enabled: true }), rule({ id: "b", enabled: false }), rule({ id: "c", enabled: true })];
+
+  it("returns the full set unchanged when no ruleId is given", () => {
+    expect(selectRulesForBackfill(rules)).toBe(rules);
+  });
+  it("returns only the named rule, forced enabled", () => {
+    const picked = selectRulesForBackfill(rules, "b");
+    expect(picked).toHaveLength(1);
+    expect(picked[0].id).toBe("b");
+    expect(picked[0].enabled).toBe(true); // explicit apply runs even when the auto-toggle is off
+  });
+  it("returns empty for an unknown ruleId", () => {
+    expect(selectRulesForBackfill(rules, "nope")).toEqual([]);
   });
 });
 
