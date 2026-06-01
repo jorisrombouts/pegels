@@ -14,3 +14,19 @@ export async function currentUserEmail(): Promise<string | null> {
   const session = await auth();
   return session?.user?.email ?? null;
 }
+
+export interface SessionUser {
+  name: string | null;
+  email: string | null;
+  image: string | null;
+}
+
+export async function currentUser(): Promise<SessionUser | null> {
+  const session = await auth();
+  if (!session?.user) return null;
+  return {
+    name: session.user.name ?? null,
+    email: session.user.email ?? null,
+    image: session.user.image ?? null,
+  };
+}
