@@ -3,6 +3,8 @@ import { vi } from "vitest";
 
 // next-auth imports next/server without an extension, which vitest can't resolve under ESM.
 // Stub the auth seam so the real next-auth module is never imported during tests.
+// NOTE: this means component/action tests always run as "user-stub". Auth integration
+// (allowlist, session expiry) must be verified via manual smoke tests, not this suite.
 vi.mock("@/lib/auth", () => ({
   getUserId: async () => "user-stub",
 }));
