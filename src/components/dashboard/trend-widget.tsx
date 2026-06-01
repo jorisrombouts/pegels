@@ -27,6 +27,12 @@ export function TrendWidget({
   const [hover, setHover] = useState<number | null>(null);
   const active = series.find((s) => s.id === selectedId) ?? series[0];
 
+  // Drill-down: top row = Total + top-level categories; a second row shows the selected
+  // category's subcategories. Selecting a sub keeps its parent highlighted as context.
+  const topRow = series.filter((s) => s.parentId == null);
+  const activeParentId = active.parentId ?? (active.id !== "total" ? active.id : null);
+  const subRow = activeParentId ? series.filter((s) => s.parentId === activeParentId) : [];
+
   const color = active.color === "primary" ? "hsl(var(--primary))" : `hsl(${active.color})`;
   const points = active.points;
 
@@ -56,28 +62,19 @@ export function TrendWidget({
     <Card className="flex h-full flex-col" data-testid="trend">
       <CardHeader label="Trend · 6 months" />
 
-      {/* Series chips — glass, horizontally scrollable */}
-      <div className="-mx-1 mb-3 flex gap-1.5 overflow-x-auto px-1 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        {series.map((s) => {
-          const sel = s.id === active.id;
-          const triplet = s.color === "primary" ? "var(--primary)" : s.color;
-          return (
-            <button
-              key={s.id}
-              type="button"
-              onClick={() => setSelectedId(s.id)}
-              className={cn(
-                "pressable flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium",
-                !sel && "glass-inset text-muted-foreground hover:text-foreground",
-              )}
-              style={sel ? { backgroundColor: `hsl(${triplet} / 0.18)`, color: `hsl(${triplet})` } : undefined}
-            >
-              {s.icon && <span aria-hidden>{s.icon}</span>}
-              {s.label}
-            </button>
-          );
-        })}
+      {/* Series chips — top level (Total + categories); subcategories drill down below. */}
+      <div className="-mx-1 mb-2 flex gap-1.5 overflow-x-auto px-1 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        {topRow.map((s) => (
+          <Chip key={s.id} s={s} selected={s.id === selectedId || s.id === activeParentId} onClick={() => setSelectedId(s.id)} />
+        ))}
       </div>
+      {subRow.length > 0 && (
+        <div className="-mx-1 mb-3 flex gap-1.5 overflow-x-auto px-1 pb-1 pl-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {subRow.map((s) => (
+            <Chip key={s.id} s={s} selected={s.id === selectedId} small onClick={() => setSelectedId(s.id)} />
+          ))}
+        </div>
+      )}
 
       <p className="font-display tnum text-2xl font-bold" style={{ color }}>{formatSEKAbs(latest, masked)}</p>
       <p className="mb-3 text-xs text-muted-foreground">
@@ -146,5 +143,25 @@ export function TrendWidget({
         )}
       </div>
     </Card>
+  );
+}
+
+/** A selectable series pill; tinted with the series colour when active. */
+function Chip({ s, selected, small, onClick }: { s: TrendSeries; selected: boolean; small?: boolean; onClick: () => void }) {
+  const triplet = s.color === "primary" ? "var(--primary)" : s.color;
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "pressable flex shrink-0 items-center gap-1.5 rounded-full font-medium",
+        small ? "px-2.5 py-1 text-[11px]" : "px-3 py-1.5 text-xs",
+        !selected && "glass-inset text-muted-foreground hover:text-foreground",
+      )}
+      style={selected ? { backgroundColor: `hsl(${triplet} / 0.18)`, color: `hsl(${triplet})` } : undefined}
+    >
+      {s.icon && <span aria-hidden>{s.icon}</span>}
+      {s.label}
+    </button>
   );
 }

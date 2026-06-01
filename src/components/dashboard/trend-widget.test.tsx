@@ -28,6 +28,22 @@ describe("TrendWidget", () => {
     expect(screen.getByText(/Food & Drinks · March 2025/)).toBeInTheDocument();
   });
 
+  it("reveals subcategory chips when a parent is selected and switches to a sub", async () => {
+    const withSub: TrendSeries[] = [
+      ...series,
+      { id: "cat-resto", label: "Restaurants", icon: "🍽️", color: "158 52% 50%", parentId: "cat-food",
+        points: keys.map((k, i) => ({ key: k, amount: [100, 100, 100, 100, 100, 1234][i] })) },
+    ];
+    const { container } = render(<TrendWidget series={withSub} size="medium" />);
+    // The sub chip is hidden until its parent is selected.
+    expect(screen.queryByRole("button", { name: /Restaurants/ })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /Food & Drinks/ }));
+    const sub = screen.getByRole("button", { name: /Restaurants/ });
+    await userEvent.click(sub);
+    expect(money(container.textContent ?? "")).toContain("1234,00kr");
+    expect(screen.getByText(/Restaurants · March 2025/)).toBeInTheDocument();
+  });
+
   it("renders month axis labels at medium but not at small", () => {
     const { rerender } = render(<TrendWidget series={series} size="medium" />);
     expect(screen.getByText("Oct")).toBeInTheDocument();
