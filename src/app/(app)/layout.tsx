@@ -5,6 +5,7 @@ import { QuickAddModal } from "@/components/nav/quick-add-modal";
 import { ImportModal } from "@/components/import/import-modal";
 import { HydrationGate } from "@/components/hydration-gate";
 import { ServiceWorkerRegister } from "@/components/service-worker-register";
+import { PreferencesSync } from "@/components/preferences-sync";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const session = await auth();
@@ -13,6 +14,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   return (
     <HydrationGate>
       <ServiceWorkerRegister />
+      <PreferencesSync />
       <div className="mx-auto w-full max-w-6xl px-4 pb-36 pt-6 sm:px-6 sm:pt-10">{children}</div>
       <QuickAddModal />
       <ImportModal />
