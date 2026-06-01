@@ -25,17 +25,31 @@ describe("BreakdownWidget", () => {
     expect(screen.getByText(/Tags can overlap/i)).toBeInTheDocument();
   });
 
-  it("expands a category into subcategories on bar tap", () => {
+  it("toggles a category open/closed via its chevron row", () => {
     render(<BreakdownWidget ctx={ctx()} size="large" />);
-    fireEvent.click(screen.getByLabelText("Expand Food & Drinks"));
+    // Collapsed: an expandable category exposes an "Expand" control and no subcategory yet.
+    const toggle = screen.getByLabelText("Expand Food & Drinks");
+    expect(screen.queryByText("Groceries")).not.toBeInTheDocument();
+    fireEvent.click(toggle); // unfold
     expect(screen.getByText("Groceries")).toBeInTheDocument();
+    fireEvent.click(screen.getByLabelText("Collapse Food & Drinks")); // fold again
+    expect(screen.queryByText("Groceries")).not.toBeInTheDocument();
   });
 
-  it("deep-links on label tap", () => {
+  it("deep-links to filtered transactions from a leaf (subcategory) row", () => {
     const onNavigate = vi.fn();
     render(<BreakdownWidget ctx={ctx(onNavigate)} size="large" />);
-    fireEvent.click(screen.getByText("Food & Drinks"));
+    fireEvent.click(screen.getByLabelText("Expand Food & Drinks"));
+    fireEvent.click(screen.getByText("Groceries")); // a leaf row navigates
     expect(onNavigate).toHaveBeenCalledWith(expect.stringContaining("/transactions?category="));
+  });
+
+  it("a non-expandable mode (tags) deep-links on row tap", () => {
+    const onNavigate = vi.fn();
+    render(<BreakdownWidget ctx={ctx(onNavigate)} size="large" />);
+    fireEvent.click(screen.getByText("Tags"));
+    fireEvent.click(screen.getByText("Fixed cost")); // a tag row (no chevron) navigates
+    expect(onNavigate).toHaveBeenCalledWith(expect.stringContaining("/transactions?tag="));
   });
 
   it("hides the toggle at small size", () => {
