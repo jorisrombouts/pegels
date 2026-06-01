@@ -17,7 +17,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   }),
   providers: [Google],
   session: { strategy: "database" },
-  pages: { signIn: "/signin" },
+  // Route auth errors (e.g. allowlist AccessDenied) back to /signin so its banner shows,
+  // instead of Auth.js's built-in /api/auth/error page.
+  pages: { signIn: "/signin", error: "/signin" },
   callbacks: {
     // Allowlist gate — runs before the adapter persists any row.
     signIn: ({ user }) => isAllowedEmail(user.email, OWNER_EMAIL),
