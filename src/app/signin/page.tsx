@@ -1,3 +1,5 @@
+import { redirect } from "next/navigation";
+import { auth } from "@/lib/auth";
 import { signInWithGoogle } from "@/app/actions/auth";
 
 export default async function SignInPage({
@@ -5,6 +7,9 @@ export default async function SignInPage({
 }: {
   searchParams: Promise<{ error?: string }>;
 }) {
+  const session = await auth();
+  if (session?.user) redirect("/");
+
   const { error } = await searchParams;
 
   return (
