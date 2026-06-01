@@ -36,15 +36,6 @@ export function SplitEditor({
     ]);
   }
 
-  const evenControls = (
-    <>
-      <PeopleStepper people={people} setPeople={setPeople} />
-      <Button variant="glass" size="sm" onClick={() => splitEvenly(people)}>
-        Split evenly
-      </Button>
-    </>
-  );
-
   if (!splits || splits.length === 0) {
     return (
       <div className="space-y-3">
@@ -52,14 +43,12 @@ export function SplitEditor({
           Splitting only counts the share you mark as <span className="font-semibold text-foreground">mine</span> toward your expenses.
         </p>
         <div className="flex flex-wrap items-center gap-2">
-          <Button variant="glass" size="sm" onClick={() => onChange([{ id: newId(), label: "Mine", amount: abs, mine: true }])}>
-            + Add split
+          <PeopleStepper people={people} setPeople={setPeople} />
+          <Button variant="glass" size="sm" onClick={() => splitEvenly(people)}>
+            Split among {people} people
           </Button>
-          {evenControls}
         </div>
-        <p className="tnum text-xs text-muted-foreground">
-          You’d pay {formatSEKAbs(round2(abs / people))} · split {people} ways
-        </p>
+        <p className="tnum text-xs text-muted-foreground">You’d pay {formatSEKAbs(round2(abs / people))}</p>
       </div>
     );
   }
@@ -96,15 +85,14 @@ export function SplitEditor({
         </div>
       ))}
 
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex flex-wrap items-center gap-2">
+      <div className="flex items-center justify-between">
+        <div className="flex gap-2">
           <Button variant="glass" size="sm" onClick={() => onChange([...splits, { id: newId(), amount: 0, mine: false }])}>
             + Add
           </Button>
           <Button variant="ghost" size="sm" onClick={() => onChange(undefined)}>
             Clear
           </Button>
-          {evenControls}
         </div>
         <p className="tnum text-xs text-muted-foreground">You pay: {formatSEKAbs(mineTotal)}</p>
       </div>
