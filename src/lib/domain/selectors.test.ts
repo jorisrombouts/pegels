@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { budgetForecasts, budgetStatuses, buildMaps, categorySpendInMonth, detectTransfersOnImport, earliestDataMonth, goalProgress, goalSaved, latestDataMonth, monthNet, monthProgress, orderCategories } from "./selectors";
+import { budgetForecasts, budgetStatuses, buildMaps, categorySpendInMonth, detectTransfersOnImport, earliestDataMonth, goalProgress, goalSaved, latestDataMonth, monthNet, monthProgress, orderCategories, withDelta } from "./selectors";
 import type { Budget, Category, Goal, Transaction } from "./types";
 
 const food: Category = { id: "food", name: "Food", icon: "🍔", color: "150 60% 45%", parentId: null };
@@ -183,6 +183,21 @@ describe("detectTransfersOnImport", () => {
     const { rows, existingUpdates } = detectTransfersOnImport([mk("b", "seb", 5000, "2025-03-10")] as never, existing as never, goals as never);
     expect(rows[0].kind).toBe("income");
     expect(existingUpdates).toEqual([]);
+  });
+});
+
+describe("withDelta", () => {
+  const A = { id: "a", name: "A" };
+  const B = { id: "b", name: "B" };
+  const C = { id: "c", name: "C" };
+  it("joins current+prev by key and computes pct (null when prev is 0)", () => {
+    const cur = [{ item: A, amount: 110 }, { item: B, amount: 50 }, { item: C, amount: 30 }];
+    const prev = [{ item: A, amount: 100 }, { item: B, amount: 0 }];
+    const out = withDelta(cur, prev, (x) => x.id);
+    expect(out.map((r) => r.item.id)).toEqual(["a", "b", "c"]); // current order preserved
+    expect(out[0]).toMatchObject({ amount: 110, prevAmount: 100, changePct: 10 });
+    expect(out[1]).toMatchObject({ amount: 50, prevAmount: 0, changePct: null }); // prev 0 -> null
+    expect(out[2]).toMatchObject({ amount: 30, prevAmount: 0, changePct: null }); // absent in prev -> 0 basis
   });
 });
 
