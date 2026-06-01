@@ -1,5 +1,5 @@
 import { effectiveExpense, includedNet } from "./effectiveExpense";
-import type { Account, Budget, Category, Goal, Transaction } from "./types";
+import type { Account, Budget, Category, Goal, Tag, Transaction } from "./types";
 import { monthKey } from "@/lib/format";
 
 export interface Maps {
@@ -195,6 +195,51 @@ export function spendByRootCategory(
 
 function fallbackCategory(id: string): Category {
   return { id, name: "Other", icon: "📎", color: "220 8% 55%", parentId: null };
+}
+
+/** Spend within one top-level category, grouped by the immediate (sub)category, sorted desc. */
+export function spendBySubcategory(
+  transactions: Transaction[],
+  maps: Maps,
+  parentId: string,
+  key: string,
+  accountFilter = "all",
+): CategorySpend[] {
+  const totals = new Map<string, number>();
+  for (const tx of transactions) {
+    if (!inMonth(tx, key) || !accountMatches(tx, accountFilter)) continue;
+    if (rootCategoryId(tx.categoryId, maps.categoryById) !== parentId) continue;
+    const amount = effectiveExpense(tx);
+    if (amount === 0) continue;
+    const immediate = tx.categoryId ?? parentId; // tx filed directly on the parent counts under it
+    totals.set(immediate, (totals.get(immediate) ?? 0) + amount);
+  }
+  return [...totals.entries()]
+    .map(([id, amount]) => ({ category: maps.categoryById.get(id) ?? fallbackCategory(id), amount }))
+    .sort((a, b) => b.amount - a.amount);
+}
+
+/** Spend per tag for a month — a transaction's full spend counts once per tag it carries. */
+export function spendByTag(
+  transactions: Transaction[],
+  tags: Tag[],
+  key: string,
+  accountFilter = "all",
+): { tag: Tag; amount: number }[] {
+  const tagById = new Map(tags.map((t) => [t.id, t]));
+  const totals = new Map<string, number>();
+  for (const tx of transactions) {
+    if (!inMonth(tx, key) || !accountMatches(tx, accountFilter)) continue;
+    const amount = effectiveExpense(tx);
+    if (amount === 0) continue;
+    for (const tagId of tx.tagIds) {
+      if (!tagById.has(tagId)) continue;
+      totals.set(tagId, (totals.get(tagId) ?? 0) + amount);
+    }
+  }
+  return [...totals.entries()]
+    .map(([id, amount]) => ({ tag: tagById.get(id)!, amount }))
+    .sort((a, b) => b.amount - a.amount);
 }
 
 /** Spend per account for a month. */
