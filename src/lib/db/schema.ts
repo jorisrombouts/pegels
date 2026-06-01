@@ -1,4 +1,4 @@
-import { pgTable, text, numeric, real, boolean, jsonb, index } from "drizzle-orm/pg-core";
+import { pgTable, text, numeric, real, boolean, jsonb, index, timestamp, integer, primaryKey } from "drizzle-orm/pg-core";
 import type { AccountKind, CategorySource, MatchMode, RuleOrigin, Split, TransactionKind } from "../domain/types";
 
 // Every table is scoped by userId (stub today; real auth later). Embedded arrays
@@ -131,4 +131,48 @@ export const goals = pgTable(
     accountId: text("account_id"), // linked savings account or null
   },
   (t) => [index("goals_user_idx").on(t.userId)],
+);
+
+// --- Auth.js (next-auth) tables. users.id is the app-wide userId. ---
+
+export const authUsers = pgTable("auth_users", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  name: text("name"),
+  email: text("email").notNull(),
+  emailVerified: timestamp("email_verified", { mode: "date" }),
+  image: text("image"),
+});
+
+export const authAccounts = pgTable(
+  "auth_accounts",
+  {
+    userId: text("user_id").notNull().references(() => authUsers.id, { onDelete: "cascade" }),
+    type: text("type").notNull(),
+    provider: text("provider").notNull(),
+    providerAccountId: text("provider_account_id").notNull(),
+    refresh_token: text("refresh_token"),
+    access_token: text("access_token"),
+    expires_at: integer("expires_at"),
+    token_type: text("token_type"),
+    scope: text("scope"),
+    id_token: text("id_token"),
+    session_state: text("session_state"),
+  },
+  (t) => [primaryKey({ columns: [t.provider, t.providerAccountId] })],
+);
+
+export const authSessions = pgTable("auth_sessions", {
+  sessionToken: text("session_token").primaryKey(),
+  userId: text("user_id").notNull().references(() => authUsers.id, { onDelete: "cascade" }),
+  expires: timestamp("expires", { mode: "date" }).notNull(),
+});
+
+export const authVerificationTokens = pgTable(
+  "auth_verification_tokens",
+  {
+    identifier: text("identifier").notNull(),
+    token: text("token").notNull(),
+    expires: timestamp("expires", { mode: "date" }).notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.identifier, t.token] })],
 );
