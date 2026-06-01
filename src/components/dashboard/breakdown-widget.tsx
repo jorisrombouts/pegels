@@ -32,10 +32,10 @@ function DeltaChip({ pct }: { pct: number | null }) {
 }
 
 function SpendBar({
-  icon, name, amount, pctOfMax, color, changePct, masked, indent, onBar, onLabel,
+  icon, name, amount, pctOfMax, color, changePct, masked, indent, expands, onBar, onLabel,
 }: {
   icon: string; name: string; amount: number; pctOfMax: number; color: string;
-  changePct: number | null; masked: boolean; indent?: boolean;
+  changePct: number | null; masked: boolean; indent?: boolean; expands?: boolean;
   onBar?: () => void; onLabel?: () => void;
 }) {
   return (
@@ -50,7 +50,7 @@ function SpendBar({
           <span className="tnum text-muted-foreground">{formatSEKAbs(amount, masked)}</span>
         </span>
       </div>
-      <button onClick={onBar} className="block w-full" aria-label={`Expand ${name}`}>
+      <button onClick={onBar} className="block w-full" aria-label={expands ? `Expand ${name}` : `View ${name} transactions`}>
         <ProgressBar pct={pctOfMax} color={color} height={6} />
       </button>
     </div>
@@ -129,6 +129,7 @@ export function BreakdownWidget({ ctx, size }: { ctx: DashCtx; size: WidgetSize 
                   color={catColor(r.item)}
                   changePct={r.changePct}
                   masked={masked}
+                  expands={expandable && !isSmall}
                   onLabel={() => onNavigate(meta.href)}
                   onBar={expandable && !isSmall ? () => setExpandedId(expanded ? null : r.item.id) : () => onNavigate(meta.href)}
                 />
