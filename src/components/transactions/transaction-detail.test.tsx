@@ -2,6 +2,7 @@ import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 import { renderWithData } from "@/test/render";
+import { seedDataset } from "@/data/mock";
 import { TransactionDetail, DetailEmpty } from "./transaction-detail";
 
 // Uses the real (seeded) Zustand store. tx-001 = "Hyra Mars" (Rent, 97% model confidence).
@@ -11,6 +12,18 @@ describe("TransactionDetail", () => {
     expect(screen.getByText("Hyra Mars")).toBeInTheDocument();
     expect(screen.getByText(/SEB/)).toBeInTheDocument();
     expect(screen.getByText("97%")).toBeInTheDocument();
+  });
+
+  it("shows 100% (not the model score) for a hand-corrected category", () => {
+    const dataset = {
+      ...seedDataset,
+      transactions: seedDataset.transactions.map((t) =>
+        t.id === "tx-001" ? { ...t, categorySource: "user" as const } : t,
+      ),
+    };
+    renderWithData(<TransactionDetail txId="tx-001" />, { dataset });
+    expect(screen.getByText("100%")).toBeInTheDocument();
+    expect(screen.queryByText("97%")).not.toBeInTheDocument();
   });
 
   it("exposes a notes field", () => {

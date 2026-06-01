@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, EyeOff, MousePointerClick } from "lucide-react";
+import { EyeOff, MousePointerClick } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Field, Textarea } from "@/components/ui/input";
 import { TagEditor } from "./tag-editor";
@@ -66,17 +66,20 @@ export function TransactionDetail({ txId }: { txId: string }) {
       <div className="space-y-1.5">
         <div className="flex items-center justify-between">
           <Label>Category</Label>
-          {tx.categorySource === "model" && tx.categoryConfidence != null ? (
+          {tx.categorySource === "user" ? (
+            // A hand-pick is certain → 100%. We don't touch the stored categoryConfidence so the
+            // model's original score stays available for the training-set log.
+            <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <span className="size-1.5 rounded-full" style={{ backgroundColor: "hsl(var(--positive))" }} />
+              100%
+            </span>
+          ) : tx.categorySource === "model" && tx.categoryConfidence != null ? (
             <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
               <span
                 className="size-1.5 rounded-full"
                 style={{ backgroundColor: tx.categoryConfidence >= 0.85 ? "hsl(var(--positive))" : tx.categoryConfidence >= 0.6 ? "hsl(var(--warning))" : "hsl(var(--negative))" }}
               />
               {Math.round(tx.categoryConfidence * 100)}%
-            </span>
-          ) : tx.categorySource === "user" ? (
-            <span className="flex items-center gap-1 text-xs text-primary">
-              <Check className="size-3.5" /> Corrected
             </span>
           ) : null}
         </div>
