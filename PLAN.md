@@ -5,7 +5,7 @@
 > project is now **pegels**. Several items it marks TODO/PLANNED have since shipped, and the
 > core spending invariant in the Context below has since **changed** — see the ⚠️ note.)
 >
-> **All UI-first work is complete** — 199 tests passing, build + lint clean, deployed against
+> **All UI-first work is complete** — 208 tests passing, build + lint clean, deployed against
 > Neon (migrated + seeded). Built since the log was last written:
 > - Dashboard polish batch #3–#6 (trend line morph, "This month" button via
 >   `month-switcher.tsx`, hero "This month" widget, recurated default layout).
@@ -77,19 +77,28 @@
 >   chips appear, the line redraws for the chosen sub (parent kept highlighted as context).
 > - **✅ Transactions filter total** — the month count + "Spent" figure now reflect the active
 >   filter, not just the whole month.
+> - **✅ Google sign-in (Auth.js v5)** (spec + plan in `docs/superpowers/`, 2026-06-01):
+>   `getUserId()` now reads a real session. `next-auth@5` + `@auth/drizzle-adapter` with
+>   **database sessions** (4 `auth_*` tables in Neon); `users.id` is the app-wide `userId`.
+>   **Single-owner allowlist** (`OWNER_EMAIL`, fail-closed) gates `signIn` before any row is
+>   written; on the owner's **first sign-in** a one-time idempotent `claimStubData` re-points all
+>   `user-stub` rows to the real id (`src/lib/db/claim.ts`). Route protection lives in the `(app)`
+>   server-layout (`auth()` + `redirect("/signin")`); public `/signin` page + Settings → Account
+>   sign-out. Pure logic in `src/lib/auth-helpers.ts` (unit-tested). **Owner setup before live
+>   use:** create a Google OAuth client and set `AUTH_GOOGLE_ID` / `AUTH_GOOGLE_SECRET` /
+>   `OWNER_EMAIL` / `AUTH_SECRET` in `.env.local` (redirect URI `…/api/auth/callback/google`).
 > - **Env (not app code):** the corporate **Cloudflare Zero Trust** TLS inspection re-signs HTTPS
 >   with a CA Node doesn't trust, breaking `fetch` to Neon/OpenAI with `SELF_SIGNED_CERT_IN_CHAIN`
 >   ("fetch failed"). Fixed with **`NODE_OPTIONS=--use-system-ca`** (added to `~/.zshrc`). See
 >   memory `neon-corporate-tls-interception`.
 >
 > **Still left to implement (Phase 4b+):**
-> - **Auth.js Google sign-in** — make `getUserId()` (`src/lib/auth.ts`) read the real session.
->   (Everything is already scoped by `getUserId()`, so this is the unlock for multi-user.)
-> - **Vercel deploy** (Neon + OpenAI env vars); **overspend alerts via PWA Web Push** (deferred).
+> - **Vercel deploy** (Neon + OpenAI + the new `AUTH_*` / `OWNER_EMAIL` env vars; add the prod
+>   Google redirect URI); **overspend alerts via PWA Web Push** (deferred).
 > - **Light-theme ("Silver Slate") polish** — deferred.
 > - **Persist dashboard layout + nav config per user** — `layout` + `navConfig` live in the
 >   Zustand UI store (localStorage, per-browser). Move them into Neon keyed by `getUserId()` so
->   they follow the user across devices. (Recorded for later; do after auth.)
+>   they follow the user across devices. (Now unblocked — auth has shipped.)
 > - Optional follow-ups: offline **write** queue/replay; dashboard "Budgets" widget forecast;
 >   recurring-charge-aware forecasting. (Bare-number internal transfers are now largely handled
 >   by the own-account-number rule + user Rules.)
