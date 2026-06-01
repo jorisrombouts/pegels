@@ -4,16 +4,16 @@ import { describe, expect, it, vi } from "vitest";
 import { SplitEditor } from "./split-editor";
 
 describe("SplitEditor", () => {
-  it("offers Add split / Split evenly when there are no splits", () => {
+  it("offers a single 'Split among N people' action when there are no splits", () => {
     render(<SplitEditor amount={-890} splits={undefined} onChange={() => {}} />);
-    expect(screen.getByText("+ Add split")).toBeInTheDocument();
-    expect(screen.getByText("Split evenly")).toBeInTheDocument();
+    expect(screen.getByText("Split among 2 people")).toBeInTheDocument();
+    expect(screen.queryByText("+ Add split")).not.toBeInTheDocument();
   });
 
-  it("splits evenly two ways by default (mine + the rest)", async () => {
+  it("splits two ways by default (mine + the rest)", async () => {
     const onChange = vi.fn();
     render(<SplitEditor amount={-890} splits={undefined} onChange={onChange} />);
-    await userEvent.click(screen.getByText("Split evenly"));
+    await userEvent.click(screen.getByText("Split among 2 people"));
     const splits = onChange.mock.calls[0][0];
     expect(splits).toHaveLength(2);
     expect(splits[0].mine).toBe(true);
@@ -26,7 +26,7 @@ describe("SplitEditor", () => {
     const onChange = vi.fn();
     render(<SplitEditor amount={-890} splits={undefined} onChange={onChange} />);
     await userEvent.click(screen.getByRole("button", { name: "More people" })); // 2 → 3
-    await userEvent.click(screen.getByText("Split evenly"));
+    await userEvent.click(screen.getByText("Split among 3 people"));
     const splits = onChange.mock.calls[0][0];
     expect(splits[0].mine).toBe(true);
     expect(splits[0].amount).toBeCloseTo(296.67, 2); // 890 / 3
