@@ -12,6 +12,27 @@ export function buildMaps(categories: Category[]): Maps {
   };
 }
 
+export interface WithDelta<T> {
+  item: T;
+  amount: number;
+  prevAmount: number;
+  changePct: number | null; // null when prevAmount === 0 (no basis)
+}
+
+/** Annotate current rows with their prior-period amount + % change, matched by key. */
+export function withDelta<T>(
+  current: { item: T; amount: number }[],
+  prev: { item: T; amount: number }[],
+  keyOf: (item: T) => string,
+): WithDelta<T>[] {
+  const prevByKey = new Map(prev.map((r) => [keyOf(r.item), r.amount]));
+  return current.map((r) => {
+    const prevAmount = prevByKey.get(keyOf(r.item)) ?? 0;
+    const changePct = prevAmount > 0 ? ((r.amount - prevAmount) / prevAmount) * 100 : null;
+    return { item: r.item, amount: r.amount, prevAmount, changePct };
+  });
+}
+
 /**
  * Flatten categories into parent-then-children order, independent of the source
  * array order — so dropdowns group children under the right parent even after
