@@ -1,9 +1,10 @@
 import { PrivacyToggle } from "@/components/nav/privacy-toggle";
 import { ThemeToggle } from "@/components/nav/theme-toggle";
+import { AccountMenu } from "@/components/nav/account-menu";
 
 /**
  * Page chrome: large title (e.g. "Dashboard"), optional subtitle, a slot for
- * page-specific controls, then the always-present privacy + theme toggles.
+ * page-specific controls, then the always-present privacy + theme toggles + account avatar.
  */
 export function PageHeader({
   title,
@@ -27,6 +28,7 @@ export function PageHeader({
         <div className="flex shrink-0 items-center gap-2">
           {showPrivacy && <PrivacyToggle />}
           <ThemeToggle />
+          <AccountMenu />
         </div>
       </div>
 
