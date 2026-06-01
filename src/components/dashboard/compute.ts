@@ -67,8 +67,6 @@ export function computeDashboard(data: Dataset, month: string, accountFilter: st
     budgetRemaining,
     safePerDay,
     avgPerDay,
-    byCategory: spendByRootCategory(data.transactions, maps, data.categories, month, accountFilter),
-    byAccount: spendByAccount(data.transactions, maps, data.accounts, month),
     byCategoryDelta,
     byTagDelta,
     byAccountDelta,
