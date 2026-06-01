@@ -1,7 +1,37 @@
-// Auth seam. Today a single stub user owns all data; Phase 4b (Auth.js Google) makes
-// getUserId() read the real session. Everything else scopes by whatever this returns.
-export const STUB_USER_ID = "user-stub";
+import NextAuth from "next-auth";
+import Google from "next-auth/providers/google";
+import { DrizzleAdapter } from "@auth/drizzle-adapter";
+import { db } from "./db";
+import { authUsers, authAccounts, authSessions, authVerificationTokens } from "./db/schema";
+import { isAllowedEmail, requireUserId, sessionCallback } from "./auth-helpers";
+import { claimStubData } from "./db/claim";
 
+const OWNER_EMAIL = process.env.OWNER_EMAIL;
+
+export const { handlers, auth, signIn, signOut } = NextAuth({
+  adapter: DrizzleAdapter(db, {
+    usersTable: authUsers,
+    accountsTable: authAccounts,
+    sessionsTable: authSessions,
+    verificationTokensTable: authVerificationTokens,
+  }),
+  providers: [Google],
+  session: { strategy: "database" },
+  pages: { signIn: "/signin" },
+  callbacks: {
+    // Allowlist gate — runs before the adapter persists any row.
+    signIn: ({ user }) => isAllowedEmail(user.email, OWNER_EMAIL),
+    session: sessionCallback,
+  },
+  events: {
+    // First-ever sign-in only: claim the owner's existing stub-owned data.
+    createUser: async ({ user }) => {
+      if (user.id && isAllowedEmail(user.email, OWNER_EMAIL)) await claimStubData(user.id);
+    },
+  },
+});
+
+/** The single auth seam. Returns the authenticated user's id or throws UNAUTHENTICATED. */
 export async function getUserId(): Promise<string> {
-  return STUB_USER_ID;
+  return requireUserId(await auth());
 }

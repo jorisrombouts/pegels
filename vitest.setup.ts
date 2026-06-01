@@ -1,6 +1,12 @@
 import "@testing-library/jest-dom/vitest";
 import { vi } from "vitest";
 
+// next-auth imports next/server without an extension, which vitest can't resolve under ESM.
+// Stub the auth seam so the real next-auth module is never imported during tests.
+vi.mock("@/lib/auth", () => ({
+  getUserId: async () => "user-stub",
+}));
+
 // Mock the server actions globally: the real module imports the Neon client, whose neon()
 // throws at import when DATABASE_URL is unset. loadDataset returns the seed; writes are
 // inert (the useData facade still updates the Query cache optimistically before calling them).
