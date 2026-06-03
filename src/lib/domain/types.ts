@@ -76,6 +76,8 @@ export interface Transaction {
   /** "model" = AI-assigned, "user" = manually corrected. */
   categorySource: CategorySource;
   needsReview: boolean;
+  /** User flagged this to be ignored — kept in the list but excluded from all spending math. */
+  excluded?: boolean;
   tagIds: string[];
   splits?: Split[];
   notes?: string;

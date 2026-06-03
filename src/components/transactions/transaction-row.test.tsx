@@ -27,6 +27,12 @@ describe("TransactionRow", () => {
     expect(screen.getByText("Transfer")).toBeInTheDocument();
   });
 
+  it("dims, strikes through, and tags an excluded transaction", () => {
+    render(<TransactionRow tx={tx({ excluded: true })} category={groceries} selected={false} onSelect={() => {}} />);
+    expect(screen.getByText("Ignored")).toBeInTheDocument();
+    expect(screen.getByText("ICA Maxi").className).toContain("line-through");
+  });
+
   it("shows a needs-review indicator", () => {
     render(<TransactionRow tx={tx({ needsReview: true })} category={groceries} selected={false} onSelect={() => {}} />);
     expect(screen.getByLabelText("Needs review")).toBeInTheDocument();
@@ -37,6 +43,23 @@ describe("TransactionRow", () => {
     render(<TransactionRow tx={tx({})} category={groceries} selected={false} onSelect={onSelect} />);
     await userEvent.click(screen.getByText("ICA Maxi"));
     expect(onSelect).toHaveBeenCalledOnce();
+  });
+
+  it("shows only the user's share (not the gross) for a split expense, with a Split tag", () => {
+    render(
+      <TransactionRow
+        tx={tx({ amount: -300.61, splits: [
+          { id: "a", amount: 150.31, mine: true },
+          { id: "b", amount: 150.3, mine: false },
+        ] })}
+        category={groceries}
+        selected={false}
+        onSelect={() => {}}
+      />,
+    );
+    expect(screen.getByText("Split")).toBeInTheDocument();
+    expect(screen.getByText(/150,31/)).toBeInTheDocument();
+    expect(screen.queryByText(/300,61/)).not.toBeInTheDocument();
   });
 
   it("masks the amount when privacy mask is on", () => {

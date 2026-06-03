@@ -60,6 +60,7 @@ export const transactions = pgTable(
     categoryConfidence: real("category_confidence"),
     categorySource: text("category_source").$type<CategorySource>().notNull(),
     needsReview: boolean("needs_review").notNull(),
+    excluded: boolean("excluded").notNull(),
     kind: text("kind").$type<TransactionKind>().notNull(),
     goalId: text("goal_id"),
     tagIds: jsonb("tag_ids").$type<string[]>().notNull(),
