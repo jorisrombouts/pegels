@@ -15,12 +15,14 @@ export const DialogClose = DialogPrimitive.Close;
  * mobile (PRD: modal on desktop, bottom sheet on mobile). Centering is done via
  * flex so Motion is free to animate the panel's transform.
  */
-export function DialogContent({ className, children, title, ...props }: React.ComponentProps<typeof DialogPrimitive.Content> & { title: string }) {
+export function DialogContent({ className, children, title, description, ...props }: React.ComponentProps<typeof DialogPrimitive.Content> & { title: string; description?: string }) {
   return (
     <DialogPrimitive.Portal>
       <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm" />
       <DialogPrimitive.Content
         className="fixed inset-0 z-50 flex items-end justify-center outline-none sm:items-center"
+        // Radix wants a Description or an explicit opt-out; without `description` we opt out.
+        {...(description ? {} : { "aria-describedby": undefined })}
         {...props}
       >
         <motion.div
@@ -39,6 +41,9 @@ export function DialogContent({ className, children, title, ...props }: React.Co
               <X className="size-4" />
             </DialogPrimitive.Close>
           </div>
+          {description && (
+            <DialogPrimitive.Description className="-mt-3 mb-4 text-sm text-muted-foreground">{description}</DialogPrimitive.Description>
+          )}
           {children}
         </motion.div>
       </DialogPrimitive.Content>
