@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useData } from "@/store/data";
 import { useUI } from "@/store/ui";
 import { parseCsv, parseAmount, parseDate, cleanDescription, type ColumnField, type ParsedCsv } from "@/lib/parse-csv";
+import { isRevolutCsv, normalizeRevolut } from "@/lib/parse-revolut";
 import { needsReview } from "@/lib/categorize";
 import { categorizeTransactions, logImportExamples } from "@/app/actions/ai";
 import { detectTransfersOnImport, orderCategories, type ExistingTransferUpdate } from "@/lib/domain/selectors";
@@ -52,6 +53,7 @@ export function ImportModal() {
   // of syncing it via an effect, so it's correct as soon as accounts arrive.
   const [pickedAccountId, setPickedAccountId] = useState("");
   const accountId = pickedAccountId || accounts.find((a) => a.kind === "spending")?.id || accounts[0]?.id || "";
+  const revolutDetected = parsed ? isRevolutCsv(parsed.headers) : false;
   const [existingUpdates, setExistingUpdates] = useState<ExistingTransferUpdate[]>([]);
   const [categorizing, setCategorizing] = useState(false);
   const [kindFilter, setKindFilter] = useState<"all" | TransactionKind>("all");
@@ -90,16 +92,28 @@ export function ImportModal() {
     const existing = new Set(
       transactions.filter((t) => t.accountId === accountId).map((t) => `${t.date}|${t.amount}|${t.description}`),
     );
-    const base = parsed.rows.map((r) => {
-      const date = parseDate(r[mapping.date] ?? "");
-      const description = cleanDescription(r[mapping.description] ?? "");
-      const amount = parseAmount(r[mapping.amount] ?? "");
-      return { date, description, amount };
-    });
-    // One AI pass: rules → OpenAI → fallback (server-side), each result mapped back by index.
-    const ai = await categorizeTransactions(base.map((b, i) => ({ index: i, description: b.description, amount: b.amount })));
+    // `forcedKind` is decided by Revolut's Type column: "transfer" skips the LLM entirely;
+    // "expense" still gets categorized but keeps its kind; null means full LLM (SEB + unknown types).
+    const base: { date: string; description: string; amount: number; forcedKind: TransactionKind | null }[] =
+      isRevolutCsv(parsed.headers)
+        ? normalizeRevolut(parsed).map((r) => ({ date: r.date, description: r.description, amount: r.amount, forcedKind: r.kind }))
+        : parsed.rows.map((r) => ({
+            date: parseDate(r[mapping.date] ?? ""),
+            description: cleanDescription(r[mapping.description] ?? ""),
+            amount: parseAmount(r[mapping.amount] ?? ""),
+            forcedKind: null,
+          }));
+    // One AI pass for every row that still needs it (transfers are already decided). `index` is the
+    // row's position in `base`; categorizeTransactions echoes it back and tolerates the gaps.
+    const ai = await categorizeTransactions(
+      base
+        .map((b, i) => ({ index: i, description: b.description, amount: b.amount, forcedKind: b.forcedKind }))
+        .filter((b) => b.forcedKind !== "transfer")
+        .map(({ index, description, amount }) => ({ index, description, amount })),
+    );
     const drafts = base.map((b, i) => {
-      const res = ai.find((a) => a.index === i);
+      const isTransfer = b.forcedKind === "transfer";
+      const res = isTransfer ? undefined : ai.find((a) => a.index === i);
       const isDup = existing.has(`${b.date}|${b.amount}|${b.description}`);
       return {
         id: String(i),
@@ -107,15 +121,15 @@ export function ImportModal() {
         description: b.description,
         amount: b.amount,
         accountId,
-        categoryId: res?.categoryId ?? null,
-        confidence: res?.confidence ?? 0.4,
-        tagIds: res?.addTagIds ?? [],
+        categoryId: isTransfer ? null : res?.categoryId ?? null,
+        confidence: isTransfer ? 1 : res?.confidence ?? 0.4,
+        tagIds: isTransfer ? [] : res?.addTagIds ?? [],
         include: !isDup,
-        kind: (res?.kind ?? (b.amount < 0 ? "expense" : "income")) as TransactionKind,
+        kind: (b.forcedKind ?? res?.kind ?? (b.amount < 0 ? "expense" : "income")) as TransactionKind,
         goalId: null as string | null,
-        predictedKind: (res?.kind ?? null) as TransactionKind | null,
-        predictedCategoryId: res?.categoryId ?? null,
-        predictedConfidence: res?.confidence ?? null,
+        predictedKind: (b.forcedKind ?? res?.kind ?? null) as TransactionKind | null,
+        predictedCategoryId: isTransfer ? null : res?.categoryId ?? null,
+        predictedConfidence: isTransfer ? 1 : res?.confidence ?? null,
       };
     });
     // Pair each new row against existing transactions (the other leg arrived in a prior import).
@@ -229,23 +243,31 @@ export function ImportModal() {
                   <FileText className="size-4" /> {fileName} · {parsed.rows.length} rows detected
                 </p>
 
-                <div className="space-y-3">
-                  <span className="text-xs font-medium text-muted-foreground">Column mapping (auto-detected — adjust if needed)</span>
-                  <div className="grid gap-3 sm:grid-cols-3">
-                    {(["date", "description", "amount"] as ColumnField[]).map((field) => (
-                      <Field key={field} label={FIELD_LABEL[field]}>
-                        <Select value={String(mapping[field])} onValueChange={(v) => setMapping((m) => ({ ...m, [field]: Number(v) }))}>
-                          <SelectTrigger><SelectValue /></SelectTrigger>
-                          <SelectContent>
-                            {parsed.headers.map((h, i) => (
-                              <SelectItem key={i} value={String(i)}>{h || `Column ${i + 1}`}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </Field>
-                    ))}
+                {revolutDetected ? (
+                  <div className="rounded-2xl glass-inset p-4 text-xs text-muted-foreground">
+                    <span className="font-medium text-foreground">Revolut statement detected.</span> Fees are folded into
+                    the amount, only completed transactions are imported, top-ups and exchanges are skipped, and the
+                    transaction type sets transfers automatically.
                   </div>
-                </div>
+                ) : (
+                  <div className="space-y-3">
+                    <span className="text-xs font-medium text-muted-foreground">Column mapping (auto-detected — adjust if needed)</span>
+                    <div className="grid gap-3 sm:grid-cols-3">
+                      {(["date", "description", "amount"] as ColumnField[]).map((field) => (
+                        <Field key={field} label={FIELD_LABEL[field]}>
+                          <Select value={String(mapping[field])} onValueChange={(v) => setMapping((m) => ({ ...m, [field]: Number(v) }))}>
+                            <SelectTrigger><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              {parsed.headers.map((h, i) => (
+                                <SelectItem key={i} value={String(i)}>{h || `Column ${i + 1}`}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </Field>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 <Field label="Import into">
                   <Select value={accountId} onValueChange={setPickedAccountId}>
