@@ -63,6 +63,10 @@ describe("effectiveExpense", () => {
     });
     expect(effectiveExpense(t)).toBe(445);
   });
+
+  it("does not count a transaction the user has excluded", () => {
+    expect(effectiveExpense(tx({ amount: -487, excluded: true }))).toBe(0);
+  });
 });
 
 describe("includedNet", () => {
@@ -84,5 +88,9 @@ describe("includedNet", () => {
       ],
     });
     expect(includedNet(t)).toBe(-445);
+  });
+
+  it("excludes an ignored transaction from the net", () => {
+    expect(includedNet(tx({ amount: -487, excluded: true }))).toBe(0);
   });
 });

@@ -12,6 +12,7 @@ import type { Transaction } from "./types";
  * `amount` directly.
  */
 export function effectiveExpense(tx: Transaction): number {
+  if (tx.excluded) return 0; // user flagged it "don't count"
   if (tx.kind !== "expense") return 0; // income & transfers never count as spend
   if (tx.amount >= 0) return 0;
   if (tx.splits && tx.splits.length > 0) {
@@ -26,6 +27,7 @@ export function effectiveExpense(tx: Transaction): number {
  * Expenses stay negative; income and transfers contribute nothing.
  */
 export function includedNet(tx: Transaction): number {
+  if (tx.excluded) return 0; // user flagged it "don't count"
   if (tx.kind !== "expense") return 0; // only expenses contribute to month spend/net now
   if (tx.splits && tx.splits.length > 0) {
     return -tx.splits.reduce((s, x) => (x.mine ? s + Math.abs(x.amount) : s), 0);

@@ -37,6 +37,7 @@ export function rowToTransaction(r: TransactionRow): Transaction {
     categoryConfidence: r.categoryConfidence,
     categorySource: r.categorySource,
     needsReview: r.needsReview,
+    excluded: r.excluded || undefined, // false → absent, matching the optional domain field
     tagIds: r.tagIds ?? [],
     splits: r.splits ?? undefined,
     notes: r.notes ?? undefined,
@@ -88,6 +89,7 @@ export function transactionToRow(t: Transaction, userId: string): TransactionRow
     categoryConfidence: t.categoryConfidence,
     categorySource: t.categorySource,
     needsReview: t.needsReview,
+    excluded: t.excluded ?? false,
     kind: t.kind,
     goalId: t.goalId,
     tagIds: t.tagIds,

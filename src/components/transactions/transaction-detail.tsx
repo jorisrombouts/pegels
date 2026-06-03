@@ -3,6 +3,7 @@
 import { EyeOff, MousePointerClick } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Field, Textarea } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
 import { TagEditor } from "./tag-editor";
 import { SplitEditor } from "./split-editor";
 import { logDetailCorrection } from "@/app/actions/ai";
@@ -186,6 +187,19 @@ export function TransactionDetail({ txId }: { txId: string }) {
           </Select>
         </div>
       )}
+
+      {/* Ignore */}
+      <div className="flex items-center justify-between gap-4">
+        <div>
+          <Label>Don&apos;t count this transaction</Label>
+          <p className="mt-0.5 text-xs text-muted-foreground">Stays in the list but is excluded from all spending totals.</p>
+        </div>
+        <Switch
+          aria-label="Don't count this transaction"
+          checked={!!tx.excluded}
+          onCheckedChange={(v) => updateTransaction(tx.id, { excluded: v })}
+        />
+      </div>
 
       {/* Notes */}
       <Field label="Notes">

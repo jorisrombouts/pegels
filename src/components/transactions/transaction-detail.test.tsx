@@ -26,6 +26,15 @@ describe("TransactionDetail", () => {
     expect(screen.queryByText("97%")).not.toBeInTheDocument();
   });
 
+  it("can flag a transaction to not count toward spending", async () => {
+    const user = userEvent.setup();
+    renderWithData(<TransactionDetail txId="tx-001" />);
+    const toggle = screen.getByRole("switch", { name: /count this transaction/i });
+    expect(toggle).not.toBeChecked();
+    await user.click(toggle);
+    expect(toggle).toBeChecked();
+  });
+
   it("exposes a notes field", () => {
     renderWithData(<TransactionDetail txId="tx-001" />);
     expect(screen.getByPlaceholderText("Add a note…")).toBeInTheDocument();
