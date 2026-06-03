@@ -224,8 +224,7 @@ export function ImportModal() {
 
   return (
     <Dialog open={importOpen} onOpenChange={(o) => { setImportOpen(o); if (!o) reset(); }}>
-      <DialogContent title="Import Transactions" className="sm:max-w-3xl">
-        <p className="-mt-3 mb-4 text-sm text-muted-foreground">Review and edit before importing. Duplicates are auto-skipped.</p>
+      <DialogContent title="Import Transactions" description="Review and edit before importing. Duplicates are auto-skipped." className="sm:max-w-3xl">
 
         {step === "upload" ? (
           <div className="space-y-5">
