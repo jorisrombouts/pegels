@@ -5,7 +5,7 @@
 > project is now **pegels**. Several items it marks TODO/PLANNED have since shipped, and the
 > core spending invariant in the Context below has since **changed** — see the ⚠️ note.)
 >
-> **All UI-first work is complete** — 226 tests passing, build + lint clean, deployed against
+> **All UI-first work is complete** — 239 tests passing, build + lint clean, deployed against
 > Neon (migrated + seeded). Built since the log was last written:
 > - Dashboard polish batch #3–#6 (trend line morph, "This month" button via
 >   `month-switcher.tsx`, hero "This month" widget, recurated default layout).
@@ -114,6 +114,28 @@
 >   puts the remainder in one "Shared" row (only the `mine` portion counts as spending). The earlier
 >   confusing "+ Add split" / "Split evenly" pair was removed; the populated view keeps a clean
 >   + Add / Clear / You pay footer (re-split via Clear).
+> - **✅ Revolut CSV import** — the importer (built for SEB's 3-column `;` format) now detects the
+>   richer **Revolut** export (`Type,Product,Started Date,…,Amount,Fee,…,State,…`) and normalizes it
+>   before import via a pure `src/lib/parse-revolut.ts` (`isRevolutCsv` / `normalizeRevolut`): folds
+>   the **Fee** column into the amount (`Amount − Fee`, so a 0-amount "Premium plan fee" becomes a real
+>   −104,99 expense), keeps only **`COMPLETED`** rows (REVERTED no longer leak in as spend), **drops
+>   `Topup` + `Exchange`** rows entirely (internal movements that bloated the list), and uses the
+>   **`Type`** column to mark `Transfer` as a transfer (skips the LLM) while `Card Payment`/`Charge`
+>   categorize normally. `buildRows` branches on the format (SEB path byte-for-byte unchanged); step 1
+>   shows a "Revolut statement detected" note instead of the column mapper. **No new seed Rules** — the
+>   Type column does the work. (Top-ups are dropped on the trust that the matching SEB outgoing leg is
+>   marked a transfer; exchanges-as-neutral means foreign-pocket spend stays invisible unless imported.)
+> - **✅ Split rows show your share** — the transactions list row rendered the **gross** `tx.amount`
+>   (the lone place bypassing `effectiveExpense`), so splitting a payment looked like nothing changed
+>   even though the monthly **Spent** total already counted only the `mine` share. The row now shows
+>   your **effective share** (e.g. −150,31 kr of a −300,61 charge) with a small **Split** tag; the full
+>   amount stays in the detail panel.
+> - **✅ "Don't count this transaction" (ignore) toggle** — re-introduced a per-transaction exclude
+>   flag (the old `ignored` was removed when the kind model landed). A **Switch in the detail panel**
+>   sets an optional `excluded` flag; `effectiveExpense` and `includedNet` both return 0 for it, so it
+>   drops from every total/widget. Excluded rows **stay visible** but dimmed/struck with an **Ignored**
+>   tag (so you can toggle them back). Persisted via a new `transactions.excluded` column (`boolean NOT
+>   NULL DEFAULT false`; additive migration applied to Neon).
 > - **Env (not app code):** the corporate **Cloudflare Zero Trust** TLS inspection re-signs HTTPS
 >   with a CA Node doesn't trust, breaking `fetch` to Neon/OpenAI with `SELF_SIGNED_CERT_IN_CHAIN`
 >   ("fetch failed"). Fixed with **`NODE_OPTIONS=--use-system-ca`** (added to `~/.zshrc`). See
