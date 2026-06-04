@@ -132,8 +132,9 @@ export const useUI = create<UIState>()(
     {
       name: "pegels-ui",
       version: 3,
-      // Persist only durable preferences — transient flags (importOpen) stay out.
-      partialize: (s) => ({ masked: s.masked, month: s.month, accountFilter: s.accountFilter, layout: s.layout, navConfig: s.navConfig }),
+      // Persist only durable preferences — transient flags (importOpen) stay out. `month` is NOT
+      // persisted: MonthInitializer resets it to the latest data month on each load.
+      partialize: (s) => ({ masked: s.masked, accountFilter: s.accountFilter, layout: s.layout, navConfig: s.navConfig }),
       // Ensure new widgets appear for users with a persisted older layout.
       migrate: (persisted) => {
         const state = persisted as Partial<UIState> | undefined;
