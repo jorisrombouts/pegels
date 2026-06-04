@@ -13,6 +13,15 @@ export function requireUserId(session: { user?: { id?: string } } | null): strin
   return id;
 }
 
+/**
+ * The active user id. A local-dev override (DEV_USER_ID — set only in .env.local, never on
+ * Vercel) wins so local development needs no Google sign-in; otherwise a real session is required.
+ */
+export function resolveUserId(devUserId: string | undefined, session: { user?: { id?: string } } | null): string {
+  if (devUserId) return devUserId;
+  return requireUserId(session);
+}
+
 /** Database-session callback: surface the adapter user's id on session.user.id. */
 export function sessionCallback({ session, user }: { session: Session; user: AdapterUser }): Session {
   session.user.id = user.id;

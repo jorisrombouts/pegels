@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isAllowedEmail, requireUserId, sessionCallback } from "./auth-helpers";
+import { isAllowedEmail, requireUserId, resolveUserId, sessionCallback } from "./auth-helpers";
 
 describe("isAllowedEmail", () => {
   it("matches the owner case-insensitively", () => {
@@ -24,6 +24,18 @@ describe("requireUserId", () => {
   });
   it("throws when user id is missing", () => {
     expect(() => requireUserId({ user: {} })).toThrow("UNAUTHENTICATED");
+  });
+});
+
+describe("resolveUserId", () => {
+  it("returns the dev override when one is set", () => {
+    expect(resolveUserId("user-stub", null)).toBe("user-stub");
+  });
+  it("falls back to the session user id when there is no override", () => {
+    expect(resolveUserId(undefined, { user: { id: "u1" } })).toBe("u1");
+  });
+  it("throws when there is no override and no session", () => {
+    expect(() => resolveUserId(undefined, null)).toThrow("UNAUTHENTICATED");
   });
 });
 
