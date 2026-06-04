@@ -5,7 +5,7 @@
 > project is now **pegels**. Several items it marks TODO/PLANNED have since shipped, and the
 > core spending invariant in the Context below has since **changed** — see the ⚠️ note.)
 >
-> **All UI-first work is complete** — 239 tests passing, build + lint clean, deployed against
+> **All UI-first work is complete** — 242 tests passing, build + lint clean, deployed against
 > Neon (migrated + seeded). Built since the log was last written:
 > - Dashboard polish batch #3–#6 (trend line morph, "This month" button via
 >   `month-switcher.tsx`, hero "This month" widget, recurated default layout).
@@ -136,18 +136,30 @@
 >   drops from every total/widget. Excluded rows **stay visible** but dimmed/struck with an **Ignored**
 >   tag (so you can toggle them back). Persisted via a new `transactions.excluded` column (`boolean NOT
 >   NULL DEFAULT false`; additive migration applied to Neon).
+> - **✅ Shipped to production on Vercel** (spec/plan in `docs/superpowers/plans/2026-06-04-vercel-deploy.md`,
+>   2026-06-04): GitHub auto-deploy from `main`; **prod reuses the current Neon DB** (the real data) +
+>   the 6 env vars (`DATABASE_URL`, `OPENAI_API_KEY`, `AUTH_SECRET`, `AUTH_GOOGLE_ID/SECRET`,
+>   `OWNER_EMAIL`); the existing Google OAuth client gained the prod redirect URI. Live + verified
+>   (sign-in, real data, DB + OpenAI reachable). The only repo change was an env-gated **`DEV_USER_ID`
+>   bypass** in `getUserId()` (pure `resolveUserId()` in `auth-helpers`, unit-tested) so local dev needs
+>   no Google sign-in; it's **unset on Vercel** so prod uses real auth. `NODE_OPTIONS` is a VPN-only
+>   local thing and set nowhere on Vercel.
 > - **Env (not app code):** the corporate **Cloudflare Zero Trust** TLS inspection re-signs HTTPS
 >   with a CA Node doesn't trust, breaking `fetch` to Neon/OpenAI with `SELF_SIGNED_CERT_IN_CHAIN`
 >   ("fetch failed"). Fixed with **`NODE_OPTIONS=--use-system-ca`** (added to `~/.zshrc`). See
 >   memory `neon-corporate-tls-interception`.
 >
 > **Still left to implement (Phase 4b+):**
-> - **Vercel deploy** (Neon + OpenAI + the new `AUTH_*` / `OWNER_EMAIL` env vars; add the prod
->   Google redirect URI); **overspend alerts via PWA Web Push** (deferred).
+> - **Local-dev DB isolation (one local step, not shipped):** a Neon **`dev` branch** exists (copied
+>   from prod), but `.env.local` still points at the prod/real-data branch. Task 2 of the deploy plan
+>   (repoint `.env.local` at the dev branch + `DEV_USER_ID=user-stub`, wipe it, `db:seed` mock data)
+>   is pending the dev branch connection string. Until then, **local dev writes to prod data.**
+> - **PWA install — not actually wired.** Serwist deps are present but `next.config.ts` is bare (no
+>   `withSerwist`/`sw.ts`/`manifest.ts`), so the app isn't installable yet. Prerequisite for Web Push.
+> - **Overspend alerts via PWA Web Push** — deferred; depends on the PWA being wired.
 > - **Light-theme ("Silver Slate") polish** — deferred.
-> - Optional follow-ups: offline **write** queue/replay; dashboard "Budgets" widget forecast;
->   recurring-charge-aware forecasting. (Bare-number internal transfers are now largely handled
->   by the own-account-number rule + user Rules.)
+> - Optional follow-ups: **forecasting** (recurring-charge-aware projection; a dashboard "Budgets"
+>   forecast widget — builds on `budgetForecasts()`); offline **write** queue/replay.
 
 ## Context
 
