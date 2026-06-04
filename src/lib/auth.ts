@@ -3,7 +3,7 @@ import Google from "next-auth/providers/google";
 import { DrizzleAdapter } from "@auth/drizzle-adapter";
 import { db } from "./db";
 import { authUsers, authAccounts, authSessions, authVerificationTokens } from "./db/schema";
-import { isAllowedEmail, requireUserId, sessionCallback } from "./auth-helpers";
+import { isAllowedEmail, resolveUserId, sessionCallback } from "./auth-helpers";
 import { claimStubData } from "./db/claim";
 
 const OWNER_EMAIL = process.env.OWNER_EMAIL;
@@ -35,5 +35,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
 /** The single auth seam. Returns the authenticated user's id or throws UNAUTHENTICATED. */
 export async function getUserId(): Promise<string> {
-  return requireUserId(await auth());
+  const dev = process.env.DEV_USER_ID; // local-dev bypass; unset on Vercel → real auth
+  return resolveUserId(dev, dev ? null : await auth());
 }
