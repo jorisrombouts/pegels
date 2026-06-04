@@ -355,13 +355,13 @@ export function ImportModal() {
               >
                 Hide duplicates <span className="tnum opacity-70">{dupCount}</span>
               </button>
-              <div className="relative ml-auto">
+              <div className="relative ml-auto w-full sm:w-auto">
                 <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   placeholder="Search description"
-                  className="w-48 py-1 pl-8 pr-2 text-xs"
+                  className="w-full py-1 pl-8 pr-2 text-xs sm:w-48"
                 />
               </div>
             </div>
@@ -375,7 +375,9 @@ export function ImportModal() {
                 if (!matchesFilters(r)) return null;
                 const dup = isDup(r);
                 return (
-                  <div key={i} className={cn("flex items-center gap-2 border-b border-[hsl(var(--glass-border))] px-3 py-2 last:border-0", dup && "opacity-60")}>
+                  <div key={i} className={cn("flex flex-wrap items-center gap-2 border-b border-[hsl(var(--glass-border))] px-3 py-2 last:border-0 sm:flex-nowrap", dup && "opacity-60")}>
+                    {/* On phones this wraps to 3 lines: [date · amount] / [description] / [kind · category].
+                        sm:order-* restores the desktop column order (date, description, amount, kind, category). */}
                     <input
                       type="checkbox"
                       checked={r.include}
@@ -383,25 +385,25 @@ export function ImportModal() {
                       className="size-4 shrink-0 accent-[hsl(var(--primary))]"
                       aria-label={`Include ${r.description}`}
                     />
-                    <Input type="date" value={r.date} onChange={(e) => update(i, { date: e.target.value })} className="w-32 shrink-0 px-2 py-1 text-xs" />
-                    <div className="min-w-0 flex-1">
+                    <Input type="date" value={r.date} onChange={(e) => update(i, { date: e.target.value })} className="min-w-0 flex-1 px-2 py-1 text-xs sm:order-1 sm:w-32 sm:flex-none" />
+                    <Input value={String(r.amount)} onChange={(e) => update(i, { amount: parseAmount(e.target.value) })} className="w-24 shrink-0 px-2 py-1 text-right text-sm tnum sm:order-3" />
+                    <div className="w-full min-w-0 sm:order-2 sm:w-auto sm:flex-1">
                       <Input value={r.description} onChange={(e) => update(i, { description: e.target.value })} className={cn("px-2 py-1 text-sm", dup && "line-through")} />
                       {dup && <span className="ml-1 text-[10px] text-muted-foreground">Duplicate of existing</span>}
                     </div>
-                    <Input value={String(r.amount)} onChange={(e) => update(i, { amount: parseAmount(e.target.value) })} className="w-24 shrink-0 px-2 py-1 text-right text-sm tnum" />
                     <Select value={r.kind} onValueChange={(v) => update(i, { kind: v as TransactionKind })}>
-                      <SelectTrigger className="w-28 shrink-0 px-2 py-1 text-xs"><SelectValue /></SelectTrigger>
+                      <SelectTrigger className="flex-1 px-2 py-1 text-xs sm:order-4 sm:w-28 sm:flex-none"><SelectValue /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="expense">Expense</SelectItem>
                         <SelectItem value="transfer">Transfer</SelectItem>
                         <SelectItem value="income">Income</SelectItem>
                       </SelectContent>
                     </Select>
-                    <div className="flex w-44 shrink-0 items-center gap-1.5">
+                    <div className="flex min-w-0 flex-1 items-center gap-1.5 sm:order-5 sm:w-44 sm:flex-none">
                       {r.kind === "expense" ? (
                         <>
                           <Select value={r.categoryId ?? ""} onValueChange={(v) => update(i, { categoryId: v, confidence: 1 })}>
-                            <SelectTrigger className="px-2 py-1 text-xs"><SelectValue placeholder="Uncategorized" /></SelectTrigger>
+                            <SelectTrigger className="min-w-0 flex-1 px-2 py-1 text-xs"><SelectValue placeholder="Uncategorized" /></SelectTrigger>
                             <SelectContent>
                               {orderCategories(categories).map((c) => (
                                 <SelectItem key={c.id} value={c.id}>{c.parentId ? "↳ " : ""}{c.icon} {c.name}</SelectItem>
