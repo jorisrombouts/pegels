@@ -154,9 +154,14 @@
 >   from prod), but `.env.local` still points at the prod/real-data branch. Task 2 of the deploy plan
 >   (repoint `.env.local` at the dev branch + `DEV_USER_ID=user-stub`, wipe it, `db:seed` mock data)
 >   is pending the dev branch connection string. Until then, **local dev writes to prod data.**
-> - **PWA install — not actually wired.** Serwist deps are present but `next.config.ts` is bare (no
->   `withSerwist`/`sw.ts`/`manifest.ts`), so the app isn't installable yet. Prerequisite for Web Push.
-> - **Overspend alerts via PWA Web Push** — deferred; depends on the PWA being wired.
+> - **PWA: installable + offline shell already work** — a hand-rolled `public/sw.js` (app-shell cache,
+>   network-first nav, stale-while-revalidate; deliberately Turbopack-safe, no bundler plugin) +
+>   `src/app/manifest.ts` + SVG icons; `ServiceWorkerRegister` registers it **in production only**, so
+>   install/test from the Vercel URL (not local dev). The `@serwist/next` / `serwist` deps are
+>   **vestigial/unused** — optional cleanup (YAGNI).
+> - **Overspend alerts via PWA Web Push** — NOT built: `sw.js` has no `push`/`notificationclick`
+>   handlers and there's no subscription flow or server-side trigger. The install/offline-shell PWA is
+>   already in place, so this is the real remaining PWA work.
 > - **Light-theme ("Silver Slate") polish** — deferred.
 > - Optional follow-ups: **forecasting** (recurring-charge-aware projection; a dashboard "Budgets"
 >   forecast widget — builds on `budgetForecasts()`); offline **write** queue/replay.
