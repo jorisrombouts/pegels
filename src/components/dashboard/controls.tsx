@@ -14,7 +14,9 @@ export function DashboardControls() {
       <MonthSwitcher />
 
       <Select value={accountFilter} onValueChange={setAccountFilter}>
-        <SelectTrigger className="h-10 w-auto rounded-full">
+        {/* Fixed width + truncation: the trigger's footprint stays constant whatever account is
+            selected, so changing accounts never reflows the header row to a different line. */}
+        <SelectTrigger className="h-10 w-[150px] rounded-full [&>span]:min-w-0 [&>span]:truncate">
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
