@@ -63,5 +63,7 @@ export function useData() {
     };
   }, [qc]);
 
-  return { ...dataset, ...actions };
+  // Memoize the merged view so its identity is stable between actual data changes. Without this the
+  // spread allocates a fresh object every render, defeating any consumer memo/effect keyed on `useData()`.
+  return useMemo(() => ({ ...dataset, ...actions }), [dataset, actions]);
 }
