@@ -450,7 +450,7 @@ export function dailySpend(
   const totals = new Array(days).fill(0);
   for (const tx of transactions) {
     if (!inMonth(tx, key)) continue;
-    const day = new Date(tx.date).getDate();
+    const day = Number(tx.date.slice(8, 10)); // ISO "yyyy-mm-dd" → day-of-month, no Date alloc / TZ shift
     totals[day - 1] += effectiveExpense(tx);
   }
   return totals.map((amount, i) => ({ day: i + 1, amount }));

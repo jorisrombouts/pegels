@@ -42,8 +42,11 @@ export function formatSignedPct(value: number): string {
 
 /** "yyyy-mm" key for a date. */
 export function monthKey(date: Date | string): string {
-  const d = typeof date === "string" ? new Date(date) : date;
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+  // Transaction dates are ISO "yyyy-mm-dd" strings — slice directly. This is the hot path (called once
+  // per transaction in nearly every selector) and also avoids the `new Date("yyyy-mm-dd")` UTC-parse /
+  // local-getter mismatch that can shift the month near boundaries.
+  if (typeof date === "string") return date.slice(0, 7);
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
 }
 
 const monthLabelFmt = new Intl.DateTimeFormat("en-GB", { month: "long", year: "numeric" });
