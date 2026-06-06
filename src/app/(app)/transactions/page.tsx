@@ -150,8 +150,9 @@ function TransactionsView({ initial }: { initial: InitialFilters }) {
         <TogglePill active={hasSplitsOnly} onClick={() => setHasSplitsOnly((v) => !v)} icon={<Split className="size-4" />} label="Has splits" />
       </div>
 
-      {/* Month nav */}
-      <div className="mb-3 flex items-center justify-between gap-3">
+      {/* Month nav — stack on mobile so the MonthSwitcher's "This month" button (only present off the
+          current month) never collides with the Spent total; side-by-side once there's room. */}
+      <div className="mb-3 flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
         <MonthSwitcher suffix={count} />
         <span className="tnum text-sm font-semibold text-muted-foreground">
           Spent {formatSEKAbs(spent, masked)}
