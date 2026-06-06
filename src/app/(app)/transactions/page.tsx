@@ -179,14 +179,17 @@ function TransactionsView({ initial }: { initial: InitialFilters }) {
           )}
         </Card>
 
-        {/* Desktop side panel — content animates in / cross-fades on switch */}
+        {/* Desktop side panel — content cross-fades on switch. popLayout (not "wait") so the
+            outgoing content fades out while the new one fades in, instead of waiting for it to
+            finish — no blank gap, so opening the panel feels instant. */}
         <Card className="hidden h-fit lg:sticky lg:top-6 lg:block">
-          <AnimatePresence mode="wait" initial={false}>
+          <AnimatePresence mode="popLayout" initial={false}>
             <motion.div
               key={selectedId ?? "empty"}
-              initial={{ opacity: 0, y: 10 }}
+              className="w-full"
+              initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -6 }}
+              exit={{ opacity: 0 }}
               transition={spring}
             >
               {selectedId ? <TransactionDetail txId={selectedId} /> : <DetailEmpty />}
