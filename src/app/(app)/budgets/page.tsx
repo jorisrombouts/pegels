@@ -48,7 +48,9 @@ export default function BudgetsPage() {
 
       {/* Month + overall */}
       <div className="mb-4 space-y-2">
-        <div className="flex items-center justify-between gap-3">
+        {/* Stack on mobile so the MonthSwitcher's "This month" button (off the current month) doesn't
+            collide with the overall %; side-by-side from sm: up. */}
+        <div className="flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
           <MonthSwitcher suffix={statuses.length} />
           <span className="tnum text-sm text-muted-foreground">{Math.round(overallPct * 100)}%</span>
         </div>
