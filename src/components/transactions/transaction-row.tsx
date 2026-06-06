@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from "react";
 import { EyeOff, Split } from "lucide-react";
 import { CategoryChip } from "@/components/category-chip";
 import { effectiveExpense } from "@/lib/domain/effectiveExpense";
@@ -7,7 +8,9 @@ import { formatSEK, dayLabel } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type { Category, Transaction } from "@/lib/domain/types";
 
-export function TransactionRow({
+// memo + an id-taking onSelect lets the parent pass one stable callback, so editing the selection
+// (or typing in search) only re-renders the rows whose props actually changed, not the whole list.
+export const TransactionRow = memo(function TransactionRow({
   tx,
   category,
   selected,
@@ -17,7 +20,7 @@ export function TransactionRow({
   tx: Transaction;
   category: Category | undefined;
   selected: boolean;
-  onSelect: () => void;
+  onSelect: (id: string) => void;
   masked?: boolean;
 }) {
   const isTransfer = tx.kind === "transfer";
@@ -31,7 +34,7 @@ export function TransactionRow({
   return (
     <button
       type="button"
-      onClick={onSelect}
+      onClick={() => onSelect(tx.id)}
       aria-current={selected}
       className={cn(
         "pressable flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left",
@@ -84,4 +87,4 @@ export function TransactionRow({
       </span>
     </button>
   );
-}
+});

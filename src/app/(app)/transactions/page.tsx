@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Suspense, useCallback, useDeferredValue, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { AnimatePresence, motion } from "motion/react";
 import { AlertTriangle, Search, Split } from "lucide-react";
@@ -67,29 +67,36 @@ function TransactionsView({ initial }: { initial: InitialFilters }) {
   const [needsReviewOnly, setNeedsReviewOnly] = useState(initial.review);
   const [hasSplitsOnly, setHasSplitsOnly] = useState(initial.splits);
   const [selectedId, setSelectedId] = useState<string | null>(initial.tx);
+  const onSelect = useCallback((id: string) => setSelectedId(id), []);
 
-  const maps = buildMaps(categories);
+  // Defer the search term so typing stays responsive: the input updates immediately while the
+  // (heavier) filtered list recomputes at a lower priority instead of blocking each keystroke.
+  const deferredSearch = useDeferredValue(search);
+
+  const maps = useMemo(() => buildMaps(categories), [categories]);
   const categoryById = maps.categoryById;
   const budgetCategoryId = budgetFilter === "all" ? null : budgets.find((b) => b.id === budgetFilter)?.categoryId ?? null;
 
-  const monthTxs = transactions.filter((t) => inMonth(t, month));
-
-  const filtered = monthTxs
-    .filter((t) => {
-      if (search && !t.description.toLowerCase().includes(search.toLowerCase())) return false;
-      if (categoryFilter !== "all" && !isInCategory(t.categoryId, categoryFilter, categoryById)) return false;
-      if (budgetCategoryId && !isInCategory(t.categoryId, budgetCategoryId, categoryById)) return false;
-      if (accountFilter !== "all" && t.accountId !== accountFilter) return false;
-      if (tagFilter !== "all" && !t.tagIds.includes(tagFilter)) return false;
-      if (needsReviewOnly && !t.needsReview) return false;
-      if (hasSplitsOnly && !(t.splits && t.splits.length > 0)) return false;
-      return true;
-    })
-    .sort((a, b) => b.date.localeCompare(a.date) || b.id.localeCompare(a.id));
+  const filtered = useMemo(() => {
+    const needle = deferredSearch.toLowerCase();
+    return transactions
+      .filter((t) => {
+        if (!inMonth(t, month)) return false;
+        if (needle && !t.description.toLowerCase().includes(needle)) return false;
+        if (categoryFilter !== "all" && !isInCategory(t.categoryId, categoryFilter, categoryById)) return false;
+        if (budgetCategoryId && !isInCategory(t.categoryId, budgetCategoryId, categoryById)) return false;
+        if (accountFilter !== "all" && t.accountId !== accountFilter) return false;
+        if (tagFilter !== "all" && !t.tagIds.includes(tagFilter)) return false;
+        if (needsReviewOnly && !t.needsReview) return false;
+        if (hasSplitsOnly && !(t.splits && t.splits.length > 0)) return false;
+        return true;
+      })
+      .sort((a, b) => b.date.localeCompare(a.date) || b.id.localeCompare(a.id));
+  }, [transactions, month, deferredSearch, categoryFilter, budgetCategoryId, accountFilter, tagFilter, needsReviewOnly, hasSplitsOnly, categoryById]);
 
   // Count + spend reflect the active filter (the visible list), not the whole month.
   const count = filtered.length;
-  const spent = filtered.reduce((sum, t) => sum + effectiveExpense(t), 0);
+  const spent = useMemo(() => filtered.reduce((sum, t) => sum + effectiveExpense(t), 0), [filtered]);
 
   return (
     <>
@@ -164,7 +171,7 @@ function TransactionsView({ initial }: { initial: InitialFilters }) {
                   tx={t}
                   category={t.categoryId ? categoryById.get(t.categoryId) : undefined}
                   selected={isDesktop && selectedId === t.id}
-                  onSelect={() => setSelectedId(t.id)}
+                  onSelect={onSelect}
                   masked={masked}
                 />
               ))}
