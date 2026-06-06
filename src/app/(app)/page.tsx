@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { DndContext, PointerSensor, KeyboardSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, arrayMove, rectSortingStrategy, sortableKeyboardCoordinates } from "@dnd-kit/sortable";
@@ -16,6 +16,8 @@ import { useShallow } from "zustand/react/shallow";
 import { useData } from "@/store/data";
 import { useUI } from "@/store/ui";
 import { monthLabel } from "@/lib/format";
+
+const noop = () => {};
 
 export default function DashboardPage() {
   const data = useData();
@@ -34,17 +36,35 @@ export default function DashboardPage() {
   );
   const [editing, setEditing] = useState(false);
 
-  const maps = buildMaps(data.categories);
+  // The dataset slices are referentially stable across renders (TanStack Query structural sharing),
+  // so memoizing on them skips these full-transaction scans on every unrelated re-render (drag ticks,
+  // modal toggles elsewhere in the tree).
+  const { transactions, categories } = data;
+  const maps = useMemo(() => buildMaps(categories), [categories]);
+  const d = useMemo(
+    () => computeDashboard(data, month, accountFilter),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `data` is a fresh wrapper each render; key on the slices computeDashboard actually reads.
+    [transactions, categories, data.budgets, data.tags, data.accounts, data.goals, month, accountFilter],
+  );
+  const recent = useMemo(
+    () => [...transactions].filter((t) => t.kind !== "income").sort((a, b) => b.date.localeCompare(a.date)).slice(0, 5),
+    [transactions],
+  );
+  const trend = useMemo(() => categoryTrends(transactions, maps, categories, month, 6), [transactions, maps, categories, month]);
+  const daily = useMemo(() => dailySpend(transactions, maps, month), [transactions, maps, month]);
+
+  // Deep-link helper: widgets navigate to filtered pages. Disabled while editing layout.
+  const onNavigate = useCallback((href: string) => router.push(href), [router]);
+
   const ctx: DashCtx = {
-    d: computeDashboard(data, month, accountFilter),
+    d,
     masked,
     month,
     categoryById: maps.categoryById,
-    recent: [...data.transactions].filter((t) => t.kind !== "income").sort((a, b) => b.date.localeCompare(a.date)).slice(0, 5),
-    trend: categoryTrends(data.transactions, maps, data.categories, month, 6),
-    daily: dailySpend(data.transactions, maps, month),
-    // Deep-link helper: widgets navigate to filtered pages. Disabled while editing layout.
-    onNavigate: editing ? () => {} : (href: string) => router.push(href),
+    recent,
+    trend,
+    daily,
+    onNavigate: editing ? noop : onNavigate,
   };
 
   const sensors = useSensors(
