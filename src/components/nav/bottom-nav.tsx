@@ -7,6 +7,7 @@ import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { navByKey, type NavItem } from "./nav-items";
 import { cn } from "@/lib/utils";
 import { useUI } from "@/store/ui";
+import { useKeyboardOpen } from "@/lib/use-keyboard-open";
 
 function isActive(pathname: string, href: string) {
   return href === "/" ? pathname === "/" : pathname.startsWith(href);
@@ -48,13 +49,21 @@ export function BottomNav() {
   const setImportOpen = useUI((s) => s.setImportOpen);
   const setQuickAddOpen = useUI((s) => s.setQuickAddOpen);
 
+  const keyboardOpen = useKeyboardOpen();
+
   const resolve = (keys: { key: string }[]) => keys.map((n) => navByKey.get(n.key)).filter((i): i is NavItem => Boolean(i));
   const primary = resolve(navConfig.filter((n) => n.primary));
   const more = resolve(navConfig.filter((n) => !n.primary));
   const moreActive = more.some((m) => isActive(pathname, m.href));
 
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-40 flex items-center justify-center gap-2 px-2 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:gap-3">
+    <nav
+      className={cn(
+        "fixed inset-x-0 bottom-0 z-40 flex items-center justify-center gap-2 px-2 pb-[max(0.75rem,env(safe-area-inset-bottom))] transition-[transform,opacity] duration-200 ease-out sm:gap-3",
+        // Slide out while the keyboard is up so a tap that dismisses it can't hit a nav tab mid-reflow.
+        keyboardOpen && "pointer-events-none translate-y-[200%] opacity-0",
+      )}
+    >
       {/* Tabs pill — no `layout` here (it caused a vertical pop on route change);
           the pill slide uses layoutId and each tab animates its own width. */}
       <div className="glass flex items-center gap-1 rounded-full p-1.5 shadow-2xl sm:p-2">
