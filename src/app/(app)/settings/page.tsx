@@ -220,7 +220,6 @@ function AboutSection() {
     <Card>
       <SectionLabel className="mb-3">Locale &amp; about</SectionLabel>
       <div className="divide-y divide-[hsl(var(--glass-border))]">
-        <SettingRow title="Language" description="English interface (fixed in this version)." control={<span className="text-sm text-muted-foreground">English</span>} />
         <SettingRow title="Region &amp; currency" description="Swedish formatting (fixed in this version)." control={<span className="tnum text-sm text-muted-foreground">sv-SE · SEK</span>} />
         <SettingRow title="Install as app" description="Use your browser's “Add to Home Screen” / “Install” to run Pegels as a PWA." control={<span className="text-sm text-muted-foreground">PWA</span>} />
         <SettingRow title="Version" control={<span className="tnum text-sm text-muted-foreground">{APP_VERSION}</span>} />
