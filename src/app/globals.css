@@ -115,6 +115,9 @@
       radial-gradient(70rem 70rem at 100% 0%, hsl(var(--glow-2)), transparent 70%);
     background-attachment: fixed;
     min-height: 100dvh;
+    /* Never allow a sideways pan on mobile (e.g. the bottom nav at narrow widths). `clip`, not
+       `hidden`, so it doesn't become a scroll container and break position: sticky. */
+    overflow-x: clip;
   }
 
   /* Fine grain overlay for depth/texture — sits above the gradient, below content. */
@@ -154,9 +157,14 @@
       border-color 0.12s ease,
       opacity 0.12s ease;
     touch-action: manipulation;
+    /* The biggest "native vs. webby" tell on a tap: kill text selection and the iOS long-press
+       callout/magnifier so a press reads as a button press, not selectable content. */
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
   }
   .pressable:active {
-    transform: scale(0.97);
+    transform: scale(0.96);
   }
   @media (prefers-reduced-motion: reduce) {
     .pressable:active {

@@ -15,7 +15,7 @@ function isActive(pathname: string, href: string) {
 // Active = wide rounded rectangle (icon + label); inactive = icon only.
 // The label width is animated with pure CSS (max-width) — NOT Framer `layout`,
 // which mis-measured across route changes and made the bar pop vertically.
-const TAB = "relative flex h-12 items-center rounded-full px-3.5 text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring";
+const TAB = "pressable relative flex h-12 items-center rounded-full px-3 sm:px-3.5 text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring";
 
 function NavButton({ item, active }: { item: NavItem; active: boolean }) {
   const Icon = item.icon;
@@ -29,11 +29,11 @@ function NavButton({ item, active }: { item: NavItem; active: boolean }) {
       {active && (
         <span className="absolute inset-0 rounded-full bg-primary shadow-[0_6px_20px_-6px_hsl(var(--primary)/0.7)]" />
       )}
-      <Icon className="relative z-10 size-6 shrink-0" strokeWidth={2} />
+      <Icon className="relative z-10 size-[22px] shrink-0 sm:size-6" strokeWidth={2} />
       <span
         className={cn(
           "relative z-10 overflow-hidden whitespace-nowrap transition-[max-width,opacity,margin] duration-200 ease-out",
-          active ? "ml-2 max-w-[140px] opacity-100" : "ml-0 max-w-0 opacity-0",
+          active ? "ml-2 max-w-[120px] opacity-100" : "ml-0 max-w-0 opacity-0",
         )}
       >
         {item.label}
@@ -54,17 +54,17 @@ export function BottomNav() {
   const moreActive = more.some((m) => isActive(pathname, m.href));
 
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-40 flex items-center justify-center gap-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+    <nav className="fixed inset-x-0 bottom-0 z-40 flex items-center justify-center gap-2 px-2 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:gap-3">
       {/* Tabs pill — no `layout` here (it caused a vertical pop on route change);
           the pill slide uses layoutId and each tab animates its own width. */}
-      <div className="glass flex items-center gap-1 rounded-full p-2 shadow-2xl">
+      <div className="glass flex items-center gap-1 rounded-full p-1.5 shadow-2xl sm:p-2">
         {primary.map((item) => (
           <NavButton key={item.key} item={item} active={isActive(pathname, item.href)} />
         ))}
 
         <DropdownMenu.Root>
-          <DropdownMenu.Trigger aria-label="More" className={cn(TAB, "pressable px-3.5", moreActive ? "text-foreground" : "text-muted-foreground hover:text-foreground")}>
-            <MoreHorizontal className="size-6 shrink-0" strokeWidth={2} />
+          <DropdownMenu.Trigger aria-label="More" className={cn(TAB, moreActive ? "text-foreground" : "text-muted-foreground hover:text-foreground")}>
+            <MoreHorizontal className="size-[22px] shrink-0 sm:size-6" strokeWidth={2} />
           </DropdownMenu.Trigger>
           <DropdownMenu.Portal>
             <DropdownMenu.Content side="top" align="end" sideOffset={12} className="glass z-50 min-w-44 rounded-2xl p-1.5">
@@ -105,7 +105,7 @@ export function BottomNav() {
         type="button"
         aria-label="Add transaction"
         onClick={() => setQuickAddOpen(true)}
-        className="pressable grid size-[60px] shrink-0 place-items-center rounded-full bg-primary text-primary-foreground shadow-[0_10px_30px_-6px_hsl(var(--primary)/0.8)]"
+        className="pressable grid size-[52px] shrink-0 place-items-center rounded-full bg-primary text-primary-foreground shadow-[0_10px_30px_-6px_hsl(var(--primary)/0.8)] sm:size-[60px]"
       >
         <Plus className="size-6" strokeWidth={2.5} />
       </button>
