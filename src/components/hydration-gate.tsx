@@ -14,7 +14,7 @@ export function HydrationGate({ children }: { children: React.ReactNode }) {
 
   if (!mounted) {
     return (
-      <div className="mx-auto w-full max-w-6xl px-4 pb-36 pt-6 sm:px-6 sm:pt-10">
+      <div className="mx-auto w-full max-w-6xl px-4 pb-36 pt-[max(1.5rem,calc(env(safe-area-inset-top)+0.75rem))] sm:px-6 sm:pt-[max(2.5rem,calc(env(safe-area-inset-top)+0.75rem))]">
         <AppSkeleton />
       </div>
     );
