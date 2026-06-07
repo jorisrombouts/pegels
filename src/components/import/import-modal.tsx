@@ -11,6 +11,8 @@ import { useData } from "@/store/data";
 import { useUI } from "@/store/ui";
 import { parseCsv, parseAmount, parseDate, cleanDescription, type ColumnField, type ParsedCsv } from "@/lib/parse-csv";
 import { isRevolutCsv, normalizeRevolut } from "@/lib/parse-revolut";
+import { convertRowsToSEK, foreignCurrencies } from "@/lib/fx";
+import { fetchRatesToSEK } from "@/app/actions/fx";
 import { needsReview } from "@/lib/categorize";
 import { categorizeTransactions, logImportExamples } from "@/app/actions/ai";
 import { detectTransfersOnImport, orderCategories, type ExistingTransferUpdate } from "@/lib/domain/selectors";
@@ -21,7 +23,10 @@ import type { Transaction, TransactionKind } from "@/lib/domain/types";
 interface DraftRow {
   date: string;
   description: string;
-  amount: number;
+  amount: number; // SEK (foreign rows are converted on import)
+  currency: string; // original currency; "SEK" for already-SEK rows
+  notes?: string; // fx trace, e.g. "-102.00 EUR @ 10.87" — carried to the transaction note
+  unconverted?: boolean; // non-SEK row whose rate couldn't be fetched yet (held back from import)
   categoryId: string | null;
   confidence: number;
   tagIds: string[];
@@ -32,6 +37,12 @@ interface DraftRow {
   predictedKind: TransactionKind | null;
   predictedCategoryId: string | null;
   predictedConfidence: number | null;
+}
+
+interface FxInfo {
+  ratesToSEK: Record<string, number>; // code → SEK (incl. SEK:1)
+  convertedCount: number; // rows converted from a foreign currency
+  failedCurrencies: string[]; // non-SEK currencies we couldn't get a rate for (rows held back)
 }
 
 const FIELD_LABEL: Record<ColumnField, string> = { date: "Date", description: "Description", amount: "Amount" };
@@ -61,6 +72,8 @@ export function ImportModal() {
   const [uncategorizedOnly, setUncategorizedOnly] = useState(false);
   const [hideDuplicates, setHideDuplicates] = useState(false);
   const [search, setSearch] = useState("");
+  const [fx, setFx] = useState<FxInfo | null>(null);
+  const [retryingFx, setRetryingFx] = useState(false);
 
   function reset() {
     setStep("upload");
@@ -69,6 +82,7 @@ export function ImportModal() {
     setRows([]);
     setExistingUpdates([]);
     setCategorizing(false);
+    setFx(null);
   }
 
   function loadText(text: string, name: string) {
@@ -94,15 +108,42 @@ export function ImportModal() {
     );
     // `forcedKind` is decided by Revolut's Type column: "transfer" skips the LLM entirely;
     // "expense" still gets categorized but keeps its kind; null means full LLM (SEB + unknown types).
-    const base: { date: string; description: string; amount: number; forcedKind: TransactionKind | null }[] =
-      isRevolutCsv(parsed.headers)
-        ? normalizeRevolut(parsed).map((r) => ({ date: r.date, description: r.description, amount: r.amount, forcedKind: r.kind }))
-        : parsed.rows.map((r) => ({
-            date: parseDate(r[mapping.date] ?? ""),
-            description: cleanDescription(r[mapping.description] ?? ""),
-            amount: parseAmount(r[mapping.amount] ?? ""),
-            forcedKind: null,
-          }));
+    interface BaseRow {
+      date: string;
+      description: string;
+      amount: number; // SEK
+      forcedKind: TransactionKind | null;
+      currency: string;
+      notes?: string;
+      unconverted?: boolean;
+    }
+    let base: BaseRow[];
+    if (isRevolutCsv(parsed.headers)) {
+      // Revolut rows carry a currency. Convert any non-SEK amount to SEK (today's ECB rate) so the
+      // SEK-only model stays correct; a failed fetch leaves those rows `unconverted` (held back below).
+      const norm = normalizeRevolut(parsed);
+      const foreign = foreignCurrencies(norm);
+      let ratesToSEK: Record<string, number> = { SEK: 1 };
+      if (foreign.length) {
+        try {
+          ratesToSEK = await fetchRatesToSEK(foreign);
+        } catch {
+          ratesToSEK = { SEK: 1 };
+        }
+      }
+      const { rows: conv, unconvertedCurrencies } = convertRowsToSEK(norm, ratesToSEK);
+      base = conv.map((r) => ({ date: r.date, description: r.description, amount: r.amount, forcedKind: r.kind, currency: r.currency, notes: r.fxNote, unconverted: r.unconverted }));
+      setFx({ ratesToSEK, convertedCount: conv.filter((r) => r.fxNote).length, failedCurrencies: unconvertedCurrencies });
+    } else {
+      base = parsed.rows.map((r) => ({
+        date: parseDate(r[mapping.date] ?? ""),
+        description: cleanDescription(r[mapping.description] ?? ""),
+        amount: parseAmount(r[mapping.amount] ?? ""),
+        forcedKind: null,
+        currency: "SEK",
+      }));
+      setFx(null);
+    }
     // One AI pass for every row that still needs it (transfers are already decided). `index` is the
     // row's position in `base`; categorizeTransactions echoes it back and tolerates the gaps.
     const ai = await categorizeTransactions(
@@ -120,11 +161,14 @@ export function ImportModal() {
         date: b.date,
         description: b.description,
         amount: b.amount,
+        currency: b.currency,
+        notes: b.notes,
+        unconverted: b.unconverted,
         accountId,
         categoryId: isTransfer ? null : res?.categoryId ?? null,
         confidence: isTransfer ? 1 : res?.confidence ?? 0.4,
         tagIds: isTransfer ? [] : res?.addTagIds ?? [],
-        include: !isDup,
+        include: !isDup && !b.unconverted, // a row with no exchange rate yet can't be imported
         kind: (b.forcedKind ?? res?.kind ?? (b.amount < 0 ? "expense" : "income")) as TransactionKind,
         goalId: null as string | null,
         predictedKind: (b.forcedKind ?? res?.kind ?? null) as TransactionKind | null,
@@ -136,8 +180,8 @@ export function ImportModal() {
     const detected = detectTransfersOnImport(drafts as unknown as Transaction[], transactions, goals);
     setExistingUpdates(detected.existingUpdates);
     return drafts.map((d, i): DraftRow => ({
-      date: d.date, description: d.description, amount: d.amount, categoryId: d.categoryId,
-      confidence: d.confidence, tagIds: d.tagIds, include: d.include, kind: detected.rows[i].kind, goalId: detected.rows[i].goalId,
+      date: d.date, description: d.description, amount: d.amount, currency: d.currency, notes: d.notes, unconverted: d.unconverted,
+      categoryId: d.categoryId, confidence: d.confidence, tagIds: d.tagIds, include: d.include, kind: detected.rows[i].kind, goalId: detected.rows[i].goalId,
       predictedKind: d.predictedKind, predictedCategoryId: d.predictedCategoryId, predictedConfidence: d.predictedConfidence,
     }));
   }
@@ -152,6 +196,40 @@ export function ImportModal() {
       setCategorizing(false);
     }
   }
+
+  // Re-fetch rates for the rows held back on a failed FX call, and convert them in place. No
+  // re-categorization (those rows were already categorized) — just the amount/note/include flip.
+  async function retryFx() {
+    setRetryingFx(true);
+    try {
+      let rates: Record<string, number> = { SEK: 1 };
+      try {
+        rates = await fetchRatesToSEK(foreignCurrencies(rows.filter((r) => r.unconverted)));
+      } catch {
+        rates = { SEK: 1 };
+      }
+      const newRows = rows.map((r): DraftRow => {
+        if (!r.unconverted) return r;
+        const [c] = convertRowsToSEK([{ date: r.date, description: r.description, amount: r.amount, currency: r.currency, kind: r.kind }], rates).rows;
+        if (c.unconverted) return r; // still no rate
+        return { ...r, amount: c.amount, notes: c.fxNote, unconverted: false, include: !existingKeys.has(`${r.date}|${c.amount}|${r.description}`) };
+      });
+      setRows(newRows);
+      setFx((f) => ({
+        ratesToSEK: { ...(f?.ratesToSEK ?? { SEK: 1 }), ...rates },
+        convertedCount: newRows.filter((r) => r.notes).length,
+        failedCurrencies: foreignCurrencies(newRows.filter((r) => r.unconverted)),
+      }));
+    } finally {
+      setRetryingFx(false);
+    }
+  }
+
+  const fxRateLine = (info: FxInfo) =>
+    Object.entries(info.ratesToSEK)
+      .filter(([c]) => c !== "SEK")
+      .map(([c, r]) => `1 ${c} = ${r.toFixed(2)} kr`)
+      .join(" · ");
 
   const existingKeys = new Set(
     transactions.filter((t) => t.accountId === accountId).map((t) => `${t.date}|${t.amount}|${t.description}`),
@@ -200,6 +278,7 @@ export function ImportModal() {
       tagIds: r.tagIds,
       kind: r.kind,
       goalId: r.goalId,
+      notes: r.notes,
     }));
     addTransactions(txs);
     // Log the AI's prediction vs. the user's final choice for the feedback loop (fire-and-forget).
@@ -293,6 +372,35 @@ export function ImportModal() {
               <FileText className="size-4" /> {fileName} · {parsed?.rows.length ?? 0} rows detected
             </p>
 
+            {/* Currency conversion notice */}
+            {fx && (fx.convertedCount > 0 || fx.failedCurrencies.length > 0) && (
+              <div className="rounded-2xl glass-inset p-3 text-xs">
+                {fx.convertedCount > 0 && (
+                  <p className="text-muted-foreground">
+                    <span className="font-medium text-foreground">
+                      Converted {fx.convertedCount} non-SEK {fx.convertedCount === 1 ? "row" : "rows"} to SEK
+                    </span>{" "}
+                    at today&apos;s ECB rate ({fxRateLine(fx)}).
+                  </p>
+                )}
+                {fx.failedCurrencies.length > 0 && (
+                  <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                    <span className="text-[hsl(var(--warning))]">
+                      Couldn&apos;t fetch a rate for {fx.failedCurrencies.join(", ")} — those rows are held back.
+                    </span>
+                    <button
+                      type="button"
+                      onClick={retryFx}
+                      disabled={retryingFx}
+                      className="pressable rounded-full bg-primary px-3 py-1 text-xs font-medium text-primary-foreground disabled:opacity-50"
+                    >
+                      {retryingFx ? "Retrying…" : "Retry"}
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Summary */}
             <div className="grid grid-cols-2 gap-x-6 gap-y-3 rounded-2xl glass-inset p-4 sm:grid-cols-4">
               <Stat label="Will import" value={`${included.length} / ${rows.length}`} />
@@ -375,14 +483,15 @@ export function ImportModal() {
                 if (!matchesFilters(r)) return null;
                 const dup = isDup(r);
                 return (
-                  <div key={i} className={cn("flex flex-wrap items-center gap-2 border-b border-[hsl(var(--glass-border))] px-3 py-2 last:border-0 sm:flex-nowrap", dup && "opacity-60")}>
+                  <div key={i} className={cn("flex flex-wrap items-center gap-2 border-b border-[hsl(var(--glass-border))] px-3 py-2 last:border-0 sm:flex-nowrap", (dup || r.unconverted) && "opacity-60")}>
                     {/* On phones this wraps to 3 lines: [date · amount] / [description] / [kind · category].
                         sm:order-* restores the desktop column order (date, description, amount, kind, category). */}
                     <input
                       type="checkbox"
                       checked={r.include}
+                      disabled={r.unconverted}
                       onChange={(e) => update(i, { include: e.target.checked })}
-                      className="size-4 shrink-0 accent-[hsl(var(--primary))]"
+                      className="size-4 shrink-0 accent-[hsl(var(--primary))] disabled:opacity-40"
                       aria-label={`Include ${r.description}`}
                     />
                     <Input type="date" value={r.date} onChange={(e) => update(i, { date: e.target.value })} className="min-w-0 flex-1 px-2 py-1 text-xs sm:order-1 sm:w-32 sm:flex-none" />
@@ -390,6 +499,7 @@ export function ImportModal() {
                     <div className="w-full min-w-0 sm:order-2 sm:w-auto sm:flex-1">
                       <Input value={r.description} onChange={(e) => update(i, { description: e.target.value })} className={cn("px-2 py-1 text-sm", dup && "line-through")} />
                       {dup && <span className="ml-1 text-[10px] text-muted-foreground">Duplicate of existing</span>}
+                      {r.unconverted && <span className="ml-1 text-[10px] text-[hsl(var(--warning))]">Needs {r.currency} exchange rate</span>}
                     </div>
                     <Select value={r.kind} onValueChange={(v) => update(i, { kind: v as TransactionKind })}>
                       <SelectTrigger className="flex-1 px-2 py-1 text-xs sm:order-4 sm:w-28 sm:flex-none"><SelectValue /></SelectTrigger>
