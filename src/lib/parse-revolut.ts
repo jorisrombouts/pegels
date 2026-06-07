@@ -6,7 +6,8 @@ import type { TransactionKind } from "./domain/types";
 export interface RevolutRow {
   date: string;
   description: string;
-  amount: number; // effective: Amount − Fee
+  amount: number; // effective: Amount − Fee, in `currency`
+  currency: string; // ISO code from the Currency column, upper-cased (e.g. "EUR"); "SEK" if missing
   kind: TransactionKind | null; // null = unknown Type → caller sign-falls-back + categorizes
 }
 
@@ -44,6 +45,7 @@ export function normalizeRevolut(parsed: ParsedCsv): RevolutRow[] {
   const iDesc = colIndex(h, "description");
   const iAmount = colIndex(h, "amount");
   const iFee = colIndex(h, "fee");
+  const iCurrency = colIndex(h, "currency");
   const iState = colIndex(h, "state");
 
   return parsed.rows
@@ -53,10 +55,12 @@ export function normalizeRevolut(parsed: ParsedCsv): RevolutRow[] {
       const type = (r[iType] ?? "").trim().toLowerCase();
       const amount = parseAmount(r[iAmount] ?? "");
       const fee = parseAmount(r[iFee] ?? ""); // non-negative cost
+      const currency = (iCurrency >= 0 ? (r[iCurrency] ?? "") : "").trim().toUpperCase() || "SEK";
       return {
         date: parseDate(r[iStarted] ?? ""),
         description: cleanDescription(r[iDesc] ?? ""),
         amount: Math.round((amount - fee) * 100) / 100, // fold the fee in
+        currency,
         kind: type in TYPE_KIND ? TYPE_KIND[type] : null,
       };
     });

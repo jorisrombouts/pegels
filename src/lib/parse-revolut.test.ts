@@ -60,4 +60,13 @@ describe("normalizeRevolut", () => {
   it("leaves an unknown Type's kind null for the caller to sign-fall-back", () => {
     expect(byDesc(rows, "Reward bonus")).toMatchObject({ kind: null, amount: 5 });
   });
+
+  it("reads the Currency column for each row (defaults to SEK if missing)", () => {
+    const sample = `Type,Product,Started Date,Completed Date,Description,Amount,Fee,Currency,State,Balance
+Card Payment,Current,2026-02-05 10:00:00,2026-02-05 10:00:00,Hotel Madrid,-100.00,0.00,eur,COMPLETED,-100.00
+Card Payment,Current,2026-01-25 01:00:00,2026-01-26 14:07:10,SL Stockholm,-43.00,0.00,SEK,COMPLETED,-0.99`;
+    const out = normalizeRevolut(parseCsv(sample));
+    expect(byDesc(out, "Hotel Madrid")?.currency).toBe("EUR"); // upper-cased
+    expect(byDesc(out, "SL Stockholm")?.currency).toBe("SEK");
+  });
 });
