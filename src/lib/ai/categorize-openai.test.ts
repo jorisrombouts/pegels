@@ -30,7 +30,7 @@ describe("buildMessages", () => {
       [{ description: "Coop Stockholm", kind: "expense", categoryName: "Groceries" }],
     );
     const system = messages[0].content;
-    expect(system).toContain("Here are how the user has categorized similar transactions:");
+    expect(system).toContain("The user has explicitly corrected these categorizations — prefer them");
     expect(system).toContain("Coop Stockholm");
     expect(system).toContain("Groceries");
   });

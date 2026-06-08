@@ -5,11 +5,13 @@ import {
   getDataset,
   insertCategorizationExamples,
   recentCategorizationExamples,
+  correctedExamples,
   upsertTransaction,
 } from "@/lib/db/queries";
 import { categorize, matchesOwnAccount } from "@/lib/categorize";
 import { applyRules, planRuleBackfill, selectRulesForBackfill } from "@/lib/rules";
 import { categorizeWithOpenAI, type AiExample, type AiResult, type AiRow } from "@/lib/ai/categorize-openai";
+import { selectExamples } from "@/lib/ai/select-examples";
 import type { TransactionKind } from "@/lib/domain/types";
 
 interface CorrectionInput {
@@ -29,14 +31,13 @@ export async function categorizeTransactions(rows: AiRow[]): Promise<AiResult[]>
   const categories = data.categories.map((c) => ({ id: c.id, name: c.name }));
   const validIds = new Set(categories.map((c) => c.id));
 
-  // Feedback loop: feed the user's recent categorizations back as few-shot examples.
+  // Feedback loop: build the few-shot from the user's past corrections (high-signal), with recent
+  // rows as a cold-start top-up. The relevance-matched selection happens once `remaining` is known.
   const categoryName = new Map(categories.map((c) => [c.id, c.name]));
-  const recent = await recentCategorizationExamples(userId, 40);
-  const exampleList: AiExample[] = recent.map((e) => ({
-    description: e.cleanedDescription,
-    kind: e.finalKind,
-    categoryName: e.finalCategoryId ? categoryName.get(e.finalCategoryId) ?? null : null,
-  }));
+  const [corrected, recent] = await Promise.all([
+    correctedExamples(userId, 60),
+    recentCategorizationExamples(userId, 40),
+  ]);
 
   // 1) deterministic: own-account transfers, then user rules
   const ownNumbers = data.accounts.map((a) => a.accountNumber).filter((n): n is string => !!n);
@@ -67,6 +68,11 @@ export async function categorizeTransactions(rows: AiRow[]): Promise<AiResult[]>
   // 2) OpenAI for the rest; on any failure, fall back to keyword categorize + sign-based kind
   let aiResults: AiResult[] = [];
   if (remaining.length) {
+    const exampleList: AiExample[] = selectExamples({ rows: remaining, corrected, recent }).map((e) => ({
+      description: e.cleanedDescription,
+      kind: e.finalKind,
+      categoryName: e.finalCategoryId ? categoryName.get(e.finalCategoryId) ?? null : null,
+    }));
     try {
       aiResults = await categorizeWithOpenAI(remaining, categories, exampleList, `cat:${userId}`);
     } catch {

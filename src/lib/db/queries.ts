@@ -147,6 +147,21 @@ export async function recentCategorizationExamples(userId: string, limit = 40) {
   }));
 }
 
+/** Only the user's actual corrections (corrected=true) — the high-signal few-shot source. */
+export async function correctedExamples(userId: string, limit = 60) {
+  const rows = await db
+    .select()
+    .from(categorizationExamples)
+    .where(and(eq(categorizationExamples.userId, userId), eq(categorizationExamples.corrected, true)))
+    .orderBy(desc(categorizationExamples.createdAt))
+    .limit(limit);
+  return rows.map((r) => ({
+    cleanedDescription: r.cleanedDescription,
+    finalKind: r.finalKind,
+    finalCategoryId: r.finalCategoryId,
+  }));
+}
+
 // ── Bulk ──
 
 export async function clearAll(userId: string): Promise<void> {

@@ -1,15 +1,17 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 
-const { getDatasetMock, categorizeWithOpenAIMock, recentExamplesMock, insertExamplesMock } = vi.hoisted(() => ({
+const { getDatasetMock, categorizeWithOpenAIMock, recentExamplesMock, correctedExamplesMock, insertExamplesMock } = vi.hoisted(() => ({
   getDatasetMock: vi.fn(),
   categorizeWithOpenAIMock: vi.fn(),
   recentExamplesMock: vi.fn(),
+  correctedExamplesMock: vi.fn(),
   insertExamplesMock: vi.fn(),
 }));
 
 vi.mock("@/lib/db/queries", () => ({
   getDataset: getDatasetMock,
   recentCategorizationExamples: recentExamplesMock,
+  correctedExamples: correctedExamplesMock,
   insertCategorizationExamples: insertExamplesMock,
 }));
 vi.mock("@/lib/ai/categorize-openai", () => ({ categorizeWithOpenAIMock, categorizeWithOpenAI: categorizeWithOpenAIMock }));
@@ -22,8 +24,10 @@ beforeEach(() => {
   getDatasetMock.mockReset();
   categorizeWithOpenAIMock.mockReset();
   recentExamplesMock.mockReset();
+  correctedExamplesMock.mockReset();
   insertExamplesMock.mockReset();
   recentExamplesMock.mockResolvedValue([]);
+  correctedExamplesMock.mockResolvedValue([]);
   insertExamplesMock.mockResolvedValue(undefined);
   getDatasetMock.mockResolvedValue({
     accounts: [
@@ -125,6 +129,21 @@ describe("categorizeTransactions", () => {
       { description: "REVOLUT", kind: "transfer", categoryName: null },
       { description: "UNKNOWN CAT", kind: "expense", categoryName: null }, // unknown id → null name
     ]);
+  });
+
+  it("prioritizes a relevant correction over recent examples in the few-shot", async () => {
+    // "zalando" matches no rule, so the row reaches the LLM and the few-shot is built.
+    correctedExamplesMock.mockResolvedValue([
+      { cleanedDescription: "ZALANDO STHLM", finalKind: "expense", finalCategoryId: "cat-groceries" },
+    ]);
+    recentExamplesMock.mockResolvedValue([
+      { cleanedDescription: "SPOTIFY", finalKind: "expense", finalCategoryId: "cat-groceries" },
+    ]);
+    categorizeWithOpenAIMock.mockResolvedValue([]);
+    await categorizeTransactions([{ index: 0, description: "ZALANDO BERLIN", amount: -50 }]);
+    expect(correctedExamplesMock).toHaveBeenCalledWith("user-stub", 60);
+    const examples = categorizeWithOpenAIMock.mock.calls[0][2];
+    expect(examples[0]).toEqual({ description: "ZALANDO STHLM", kind: "expense", categoryName: "Groceries" });
   });
 });
 
