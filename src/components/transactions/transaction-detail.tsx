@@ -1,6 +1,6 @@
 "use client";
 
-import { EyeOff, MousePointerClick } from "lucide-react";
+import { Check, EyeOff, MousePointerClick } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Field, Textarea } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
@@ -116,6 +116,18 @@ export function TransactionDetail({ txId }: { txId: string }) {
           <p className="text-xs text-muted-foreground">
             AI predicted: {predicted!.icon} {predicted!.name}
           </p>
+        )}
+        {tx.needsReview && (
+          // Confirm a low-confidence guess that's actually right (changing the category already clears
+          // the flag, but re-picking the same one does nothing). Marks it user-affirmed → 100%.
+          <button
+            type="button"
+            onClick={() => updateTransaction(tx.id, { needsReview: false, categorySource: "user" })}
+            className="pressable mt-1 inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold"
+            style={{ backgroundColor: "hsl(var(--positive) / 0.15)", color: "hsl(var(--positive))" }}
+          >
+            <Check className="size-4" /> Approve this category
+          </button>
         )}
       </div>
 

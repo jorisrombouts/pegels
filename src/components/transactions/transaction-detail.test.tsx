@@ -48,6 +48,26 @@ describe("TransactionDetail", () => {
     expect(screen.getByText(/Counts toward goal/i)).toBeInTheDocument();
   });
 
+  it("shows an Approve button for a needs-review transaction and clears the flag when clicked", async () => {
+    const user = userEvent.setup();
+    const dataset = {
+      ...seedDataset,
+      transactions: seedDataset.transactions.map((t) => (t.id === "tx-001" ? { ...t, needsReview: true } : t)),
+    };
+    renderWithData(<TransactionDetail txId="tx-001" />, { dataset });
+    await user.click(screen.getByRole("button", { name: /approve/i }));
+    expect(screen.queryByRole("button", { name: /approve/i })).not.toBeInTheDocument();
+  });
+
+  it("shows no Approve button when the transaction does not need review", () => {
+    const dataset = {
+      ...seedDataset,
+      transactions: seedDataset.transactions.map((t) => (t.id === "tx-001" ? { ...t, needsReview: false } : t)),
+    };
+    renderWithData(<TransactionDetail txId="tx-001" />, { dataset });
+    expect(screen.queryByRole("button", { name: /approve/i })).not.toBeInTheDocument();
+  });
+
   it("falls back to the empty state for an unknown id", () => {
     renderWithData(<TransactionDetail txId="nope" />);
     expect(screen.getByText("Select an item")).toBeInTheDocument();
