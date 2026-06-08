@@ -18,10 +18,8 @@ import { spring } from "@/lib/motion";
 import { MonthSwitcher } from "@/components/month-switcher";
 import { buildMaps, inMonth, isInCategory, orderCategories } from "@/lib/domain/selectors";
 import { effectiveExpense } from "@/lib/domain/effectiveExpense";
-import { logDetailCorrection } from "@/app/actions/ai";
 import { formatSEKAbs } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import type { Transaction } from "@/lib/domain/types";
 
 interface InitialFilters {
   category: string;
@@ -57,7 +55,7 @@ function TransactionsRoute() {
 }
 
 function TransactionsView({ initial }: { initial: InitialFilters }) {
-  const { transactions, categories, accounts, tags, budgets, updateTransaction } = useData();
+  const { transactions, categories, accounts, tags, budgets } = useData();
   const { month, masked } = useUI();
   const isDesktop = useMediaQuery("(min-width: 1024px)");
 
@@ -70,26 +68,6 @@ function TransactionsView({ initial }: { initial: InitialFilters }) {
   const [hasSplitsOnly, setHasSplitsOnly] = useState(initial.splits);
   const [selectedId, setSelectedId] = useState<string | null>(initial.tx);
   const onSelect = useCallback((id: string) => setSelectedId(id), []);
-
-  // Inline review: picking a category on a flagged row corrects it in place (clears needsReview) and
-  // logs the correction, which feeds the LLM's few-shot. Same shape the detail panel already uses.
-  const orderedCategories = useMemo(() => orderCategories(categories), [categories]);
-  const onCorrect = useCallback(
-    (t: Transaction, categoryId: string) => {
-      updateTransaction(t.id, { categoryId, categorySource: "user", needsReview: false });
-      void logDetailCorrection({
-        rawDescription: t.description,
-        cleanedDescription: t.description,
-        amount: t.amount,
-        predictedKind: t.kind,
-        predictedCategoryId: t.predictedCategoryId ?? null,
-        predictedConfidence: t.categoryConfidence ?? null,
-        finalKind: t.kind,
-        finalCategoryId: categoryId,
-      });
-    },
-    [updateTransaction],
-  );
 
   // Defer the search term so typing stays responsive: the input updates immediately while the
   // (heavier) filtered list recomputes at a lower priority instead of blocking each keystroke.
@@ -196,8 +174,6 @@ function TransactionsView({ initial }: { initial: InitialFilters }) {
                   selected={isDesktop && selectedId === t.id}
                   onSelect={onSelect}
                   masked={masked}
-                  categories={orderedCategories}
-                  onCorrect={onCorrect}
                 />
               ))}
             </div>
