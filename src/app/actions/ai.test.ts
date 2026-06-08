@@ -1,33 +1,33 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 
-const { getDatasetMock, categorizeWithOpenAIMock, recentExamplesMock, correctedExamplesMock, insertExamplesMock } = vi.hoisted(() => ({
+const { getDatasetMock, categorizeWithOpenAIMock, recentExamplesMock, affirmedExamplesMock, insertExamplesMock } = vi.hoisted(() => ({
   getDatasetMock: vi.fn(),
   categorizeWithOpenAIMock: vi.fn(),
   recentExamplesMock: vi.fn(),
-  correctedExamplesMock: vi.fn(),
+  affirmedExamplesMock: vi.fn(),
   insertExamplesMock: vi.fn(),
 }));
 
 vi.mock("@/lib/db/queries", () => ({
   getDataset: getDatasetMock,
   recentCategorizationExamples: recentExamplesMock,
-  correctedExamples: correctedExamplesMock,
+  affirmedExamples: affirmedExamplesMock,
   insertCategorizationExamples: insertExamplesMock,
 }));
 vi.mock("@/lib/ai/categorize-openai", () => ({ categorizeWithOpenAIMock, categorizeWithOpenAI: categorizeWithOpenAIMock }));
 // vitest.setup.ts stubs @/app/actions/ai globally (Neon import guard); test the real module.
 vi.unmock("@/app/actions/ai");
 
-import { categorizeTransactions, logImportExamples, logDetailCorrection } from "./ai";
+import { categorizeTransactions, logImportExamples, logDetailCorrection, logDetailApproval } from "./ai";
 
 beforeEach(() => {
   getDatasetMock.mockReset();
   categorizeWithOpenAIMock.mockReset();
   recentExamplesMock.mockReset();
-  correctedExamplesMock.mockReset();
+  affirmedExamplesMock.mockReset();
   insertExamplesMock.mockReset();
   recentExamplesMock.mockResolvedValue([]);
-  correctedExamplesMock.mockResolvedValue([]);
+  affirmedExamplesMock.mockResolvedValue([]);
   insertExamplesMock.mockResolvedValue(undefined);
   getDatasetMock.mockResolvedValue({
     accounts: [
@@ -133,7 +133,7 @@ describe("categorizeTransactions", () => {
 
   it("prioritizes a relevant correction over recent examples in the few-shot", async () => {
     // "zalando" matches no rule, so the row reaches the LLM and the few-shot is built.
-    correctedExamplesMock.mockResolvedValue([
+    affirmedExamplesMock.mockResolvedValue([
       { cleanedDescription: "ZALANDO STHLM", finalKind: "expense", finalCategoryId: "cat-groceries" },
     ]);
     recentExamplesMock.mockResolvedValue([
@@ -141,7 +141,7 @@ describe("categorizeTransactions", () => {
     ]);
     categorizeWithOpenAIMock.mockResolvedValue([]);
     await categorizeTransactions([{ index: 0, description: "ZALANDO BERLIN", amount: -50 }]);
-    expect(correctedExamplesMock).toHaveBeenCalledWith("user-stub", 60);
+    expect(affirmedExamplesMock).toHaveBeenCalledWith("user-stub", 60);
     const examples = categorizeWithOpenAIMock.mock.calls[0][2];
     expect(examples[0]).toEqual({ description: "ZALANDO STHLM", kind: "expense", categoryName: "Groceries" });
   });
@@ -195,5 +195,19 @@ describe("logDetailCorrection", () => {
     expect(userId).toBe("user-stub");
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({ corrected: true, source: "detail", finalCategoryId: "cat-entertainment" });
+  });
+});
+
+describe("logDetailApproval", () => {
+  it("logs the confirmed guess as a detail example (not corrected, but still source detail)", async () => {
+    await logDetailApproval({
+      rawDescription: "ICA NORR", cleanedDescription: "ICA NORR", amount: -342,
+      predictedKind: "expense", predictedCategoryId: "cat-groceries", predictedConfidence: 0.52,
+      finalKind: "expense", finalCategoryId: "cat-groceries",
+    });
+    const [userId, rows] = insertExamplesMock.mock.calls[0];
+    expect(userId).toBe("user-stub");
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ corrected: false, source: "detail", finalCategoryId: "cat-groceries" });
   });
 });

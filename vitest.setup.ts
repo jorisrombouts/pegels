@@ -36,6 +36,7 @@ vi.mock("@/app/actions/ai", () => {
     categorizeTransactions: async () => [],
     logImportExamples: noop,
     logDetailCorrection: noop,
+    logDetailApproval: noop,
   };
 });
 

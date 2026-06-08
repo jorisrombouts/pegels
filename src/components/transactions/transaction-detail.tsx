@@ -6,7 +6,7 @@ import { Field, Textarea } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { TagEditor } from "./tag-editor";
 import { SplitEditor } from "./split-editor";
-import { logDetailCorrection } from "@/app/actions/ai";
+import { logDetailCorrection, logDetailApproval } from "@/app/actions/ai";
 import { useData } from "@/store/data";
 import { useUI } from "@/store/ui";
 import { formatSEK, dayLabel } from "@/lib/format";
@@ -122,7 +122,20 @@ export function TransactionDetail({ txId }: { txId: string }) {
           // the flag, but re-picking the same one does nothing). Marks it user-affirmed → 100%.
           <button
             type="button"
-            onClick={() => updateTransaction(tx.id, { needsReview: false, categorySource: "user" })}
+            onClick={() => {
+              updateTransaction(tx.id, { needsReview: false, categorySource: "user" });
+              // Feed the confirmed guess back as a positive few-shot example (final == predicted).
+              void logDetailApproval({
+                rawDescription: tx.description,
+                cleanedDescription: tx.description,
+                amount: tx.amount,
+                predictedKind: tx.kind,
+                predictedCategoryId: tx.predictedCategoryId ?? null,
+                predictedConfidence: tx.categoryConfidence ?? null,
+                finalKind: tx.kind,
+                finalCategoryId: tx.categoryId,
+              });
+            }}
             className="pressable mt-1 inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold"
             style={{ backgroundColor: "hsl(var(--positive) / 0.15)", color: "hsl(var(--positive))" }}
           >

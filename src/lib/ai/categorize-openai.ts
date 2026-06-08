@@ -44,8 +44,8 @@ export function buildMessages(rows: AiRow[], categories: AiCategory[], examples:
       .map((e) => `${e.description} → kind=${e.kind}, category=${e.categoryName ?? "none"}`)
       .join("\n");
     system +=
-      "\n\nThe user has explicitly corrected these categorizations — prefer them over your own prior " +
-      "when a new row resembles one of them (e.g. same merchant):\n" + exampleList;
+      "\n\nThe user has explicitly confirmed or corrected these categorizations — prefer them over your " +
+      "own prior when a new row resembles one of them (e.g. same merchant):\n" + exampleList;
   }
 
   const userLines = rows.map((r) => `${r.index} | ${r.amount} | ${r.description}`).join("\n");

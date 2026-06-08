@@ -5,7 +5,7 @@ import {
   getDataset,
   insertCategorizationExamples,
   recentCategorizationExamples,
-  correctedExamples,
+  affirmedExamples,
   upsertTransaction,
 } from "@/lib/db/queries";
 import { categorize, matchesOwnAccount } from "@/lib/categorize";
@@ -34,8 +34,8 @@ export async function categorizeTransactions(rows: AiRow[]): Promise<AiResult[]>
   // Feedback loop: build the few-shot from the user's past corrections (high-signal), with recent
   // rows as a cold-start top-up. The relevance-matched selection happens once `remaining` is known.
   const categoryName = new Map(categories.map((c) => [c.id, c.name]));
-  const [corrected, recent] = await Promise.all([
-    correctedExamples(userId, 60),
+  const [affirmed, recent] = await Promise.all([
+    affirmedExamples(userId, 60),
     recentCategorizationExamples(userId, 40),
   ]);
 
@@ -68,7 +68,7 @@ export async function categorizeTransactions(rows: AiRow[]): Promise<AiResult[]>
   // 2) OpenAI for the rest; on any failure, fall back to keyword categorize + sign-based kind
   let aiResults: AiResult[] = [];
   if (remaining.length) {
-    const exampleList: AiExample[] = selectExamples({ rows: remaining, corrected, recent }).map((e) => ({
+    const exampleList: AiExample[] = selectExamples({ rows: remaining, corrected: affirmed, recent }).map((e) => ({
       description: e.cleanedDescription,
       kind: e.finalKind,
       categoryName: e.finalCategoryId ? categoryName.get(e.finalCategoryId) ?? null : null,
@@ -146,4 +146,10 @@ export async function logImportExamples(rows: CorrectionInput[]): Promise<void> 
 /** Log a single detail-panel correction (always corrected). */
 export async function logDetailCorrection(ex: CorrectionInput): Promise<void> {
   await insertCategorizationExamples(await getUserId(), [toExampleRow(ex, "detail", true)]);
+}
+
+/** Log a detail-panel approval: the user confirmed the AI's guess (final == predicted). Not a
+ *  correction, but still an explicit affirmation — it feeds the few-shot via affirmedExamples. */
+export async function logDetailApproval(ex: CorrectionInput): Promise<void> {
+  await insertCategorizationExamples(await getUserId(), [toExampleRow(ex, "detail", false)]);
 }

@@ -1,4 +1,4 @@
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, or } from "drizzle-orm";
 import { db } from "./index";
 import { accounts, categories, tags, transactions, budgets, goals, categorizationExamples, categorizationRules, userPreferences } from "./schema";
 import {
@@ -147,12 +147,21 @@ export async function recentCategorizationExamples(userId: string, limit = 40) {
   }));
 }
 
-/** Only the user's actual corrections (corrected=true) — the high-signal few-shot source. */
-export async function correctedExamples(userId: string, limit = 60) {
+/**
+ * The user's explicit affirmations — the high-signal few-shot source: every correction (corrected=true,
+ * incl. import edits) plus detail-panel approvals (source='detail', corrected=false). Excludes passive
+ * import-keeps (the AI agreeing with itself).
+ */
+export async function affirmedExamples(userId: string, limit = 60) {
   const rows = await db
     .select()
     .from(categorizationExamples)
-    .where(and(eq(categorizationExamples.userId, userId), eq(categorizationExamples.corrected, true)))
+    .where(
+      and(
+        eq(categorizationExamples.userId, userId),
+        or(eq(categorizationExamples.corrected, true), eq(categorizationExamples.source, "detail")),
+      ),
+    )
     .orderBy(desc(categorizationExamples.createdAt))
     .limit(limit);
   return rows.map((r) => ({
