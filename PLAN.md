@@ -212,7 +212,9 @@ public/               sw.js, icons, mock-imports/
 
 ## Roadmap — what's left
 
-Everything below is verified against the code as of 2026-06-09. Prioritized.
+Everything below is verified against the code as of 2026-06-09 and **committed** (decided to do).
+Unscoped, user-requested ideas and open product/risk decisions live in **`BACKLOG.md`** (the idea
+funnel) — they graduate here once scoped into a design spec.
 
 **P1 — finish the PWA story / cleanup**
 - **Overspend alerts via Web Push** — *not built.* `sw.js` has no `push`/`notificationclick`
