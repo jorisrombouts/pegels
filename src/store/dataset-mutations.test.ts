@@ -53,6 +53,15 @@ describe("dataset-mutations", () => {
     expect(out.transactions[0].id).toBe("tx-zzz");
     expect(out.transactions).toHaveLength(d.transactions.length + 1);
   });
+
+  it("applyRemoveTransaction deletes one tx immutably", () => {
+    const d = base();
+    const id = d.transactions[0].id;
+    const out = M.applyRemoveTransaction(d, id);
+    expect(out.transactions.some((t) => t.id === id)).toBe(false);
+    expect(out.transactions).toHaveLength(d.transactions.length - 1);
+    expect(d.transactions.some((t) => t.id === id)).toBe(true); // input untouched
+  });
 });
 
 const r = (id: string, priority: number): CategorizationRule => ({

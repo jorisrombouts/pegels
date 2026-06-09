@@ -193,7 +193,7 @@ function TransactionsView({ initial }: { initial: InitialFilters }) {
               exit={{ opacity: 0 }}
               transition={spring}
             >
-              {selectedId ? <TransactionDetail txId={selectedId} /> : <DetailEmpty />}
+              {selectedId ? <TransactionDetail txId={selectedId} onDeleted={() => setSelectedId(null)} /> : <DetailEmpty />}
             </motion.div>
           </AnimatePresence>
         </Card>
@@ -201,7 +201,7 @@ function TransactionsView({ initial }: { initial: InitialFilters }) {
 
       {/* Mobile sheet */}
       <Dialog open={!isDesktop && !!selectedId} onOpenChange={(o) => !o && setSelectedId(null)}>
-        <DialogContent title="Transaction">{selectedId && <TransactionDetail txId={selectedId} />}</DialogContent>
+        <DialogContent title="Transaction">{selectedId && <TransactionDetail txId={selectedId} onDeleted={() => setSelectedId(null)} />}</DialogContent>
       </Dialog>
     </>
   );

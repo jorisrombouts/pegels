@@ -43,6 +43,7 @@ export function useData() {
         ),
       addTransaction: (tx: Transaction) => run((d) => M.applyAddTransaction(d, tx), () => api.upsertTransaction(tx)),
       addTransactions: (txs: Transaction[]) => run((d) => M.applyAddTransactions(d, txs), () => api.addTransactions(txs)),
+      removeTransaction: (id: string) => run((d) => M.applyRemoveTransaction(d, id), () => api.removeTransaction(id)),
 
       upsertCategory: (c: Category) => run((d) => M.applyUpsertCategory(d, c), () => api.upsertCategory(c)),
       removeCategory: (id: string) => run((d) => M.applyRemoveCategory(d, id), () => api.removeCategory(id)),

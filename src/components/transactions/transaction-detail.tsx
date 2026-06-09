@@ -1,9 +1,12 @@
 "use client";
 
-import { Check, EyeOff, MousePointerClick } from "lucide-react";
+import { useState } from "react";
+import { Check, EyeOff, MousePointerClick, Trash2 } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Field, Textarea } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { TagEditor } from "./tag-editor";
 import { SplitEditor } from "./split-editor";
 import { logDetailCorrection, logDetailApproval } from "@/app/actions/ai";
@@ -28,9 +31,10 @@ export function DetailEmpty() {
   );
 }
 
-export function TransactionDetail({ txId }: { txId: string }) {
-  const { transactions, categories, accounts, goals, updateTransaction } = useData();
+export function TransactionDetail({ txId, onDeleted }: { txId: string; onDeleted?: () => void }) {
+  const { transactions, categories, accounts, goals, updateTransaction, removeTransaction } = useData();
   const masked = useUI((s) => s.masked);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const tx = transactions.find((t) => t.id === txId);
   if (!tx) return <DetailEmpty />;
 
@@ -230,6 +234,36 @@ export function TransactionDetail({ txId }: { txId: string }) {
       <Field label="Notes">
         <Textarea value={tx.notes ?? ""} onChange={(e) => updateTransaction(tx.id, { notes: e.target.value })} placeholder="Add a note…" />
       </Field>
+
+      {/* Delete — permanent, so it's gated behind a confirm dialog. */}
+      <div className="border-t border-[hsl(var(--glass-border))] pt-4">
+        <Button variant="danger" size="sm" onClick={() => setConfirmDelete(true)} className="gap-1.5">
+          <Trash2 className="size-4" /> Delete transaction
+        </Button>
+      </div>
+
+      <Dialog open={confirmDelete} onOpenChange={setConfirmDelete}>
+        <DialogContent
+          title="Delete transaction?"
+          description="This permanently removes it from your account and can't be undone."
+        >
+          <div className="flex justify-end gap-2">
+            <Button variant="ghost" size="sm" onClick={() => setConfirmDelete(false)}>Cancel</Button>
+            <Button
+              variant="danger"
+              size="sm"
+              className="gap-1.5"
+              onClick={() => {
+                removeTransaction(tx.id);
+                setConfirmDelete(false);
+                onDeleted?.();
+              }}
+            >
+              <Trash2 className="size-4" /> Delete
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

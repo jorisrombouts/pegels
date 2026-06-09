@@ -21,6 +21,10 @@ export async function addTransactions(txs: Transaction[]): Promise<void> {
   return q.insertTransactions(await getUserId(), txs);
 }
 
+export async function removeTransaction(id: string): Promise<void> {
+  return q.removeTransaction(await getUserId(), id);
+}
+
 export async function upsertCategory(c: Category): Promise<void> {
   return q.upsertCategory(await getUserId(), c);
 }

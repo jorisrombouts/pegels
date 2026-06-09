@@ -34,6 +34,10 @@ export function applyAddTransactions(d: Dataset, txs: Transaction[]): Dataset {
   return { ...d, transactions: [...txs, ...d.transactions] };
 }
 
+export function applyRemoveTransaction(d: Dataset, id: string): Dataset {
+  return { ...d, transactions: d.transactions.filter((t) => t.id !== id) };
+}
+
 export function applyUpsertCategory(d: Dataset, c: Category): Dataset {
   return { ...d, categories: upsertById(d.categories, c) };
 }

@@ -47,6 +47,10 @@ export async function insertTransactions(userId: string, txs: Transaction[]): Pr
   await db.insert(transactions).values(txs.map((t) => transactionToRow(t, userId)));
 }
 
+export async function removeTransaction(userId: string, id: string): Promise<void> {
+  await db.delete(transactions).where(and(eq(transactions.userId, userId), eq(transactions.id, id)));
+}
+
 export async function upsertCategory(userId: string, c: Category): Promise<void> {
   const row = categoryToRow(c, userId);
   await db.insert(categories).values(row).onConflictDoUpdate({ target: categories.id, set: row });
