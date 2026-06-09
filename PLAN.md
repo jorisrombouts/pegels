@@ -1,656 +1,264 @@
-# Saldo — Rebuild as PWA (Next.js + Neon + OpenAI)
+# Pegels — architecture & roadmap
 
-> **Current status — 2026-06-01** (header added after recovering this plan from session
-> history; the log below is the verbatim historical record and still says "Saldo" — the
-> project is now **pegels**. Several items it marks TODO/PLANNED have since shipped, and the
-> core spending invariant in the Context below has since **changed** — see the ⚠️ note.)
+> **Pegels** is a single-user Swedish personal-finance PWA: import your bank transactions,
+> auto-categorize them with an LLM that learns from your corrections, and see calm spending
+> analysis (budgets, goals, trends). Built with Next.js 16 (App Router) + Neon Postgres + OpenAI,
+> deployed on Vercel.
 >
-> **All UI-first work is complete** — 242 tests passing, build + lint clean, deployed against
-> Neon (migrated + seeded). Built since the log was last written:
-> - Dashboard polish batch #3–#6 (trend line morph, "This month" button via
->   `month-switcher.tsx`, hero "This month" widget, recurated default layout).
-> - **Settings → customizable nav bar** — fully built (`navConfig` store + `NavigationSection`
->   with reorder + primary cap).
-> - **Budget forecasts** (history-blended, current-month-only) — `budgetForecasts()` in
->   `selectors.ts`, surfaced on `/budgets` (projected total + per-row trending/on-track).
-> - **✅ Phase 4a — Neon Postgres + Drizzle data layer** — Neon is now the source of truth.
->   Server-owned layer (`src/lib/db/` schema + `queries.ts`, `src/app/actions/data.ts` server
->   actions) with cascades preserved; `useData()` rewritten as a TanStack Query facade (same
->   shape, optimistic updates, offline-read cache). Stub `getUserId()` is the auth seam.
->   Scripts: `db:push` / `db:seed`.
-> - **✅ Transaction roles, transaction-driven goals, hidden income** (spec + plan in
->   `docs/superpowers/`, 2026-05-29; 12 commits; verified live against Neon). **⚠️ This
->   supersedes the `effectiveExpense` invariant described in the Context below:**
->     - Every transaction now has `kind: "expense" | "income" | "transfer"` (+ optional
->       `goalId`). The `ignored` flag and the savings-account exemption are **removed** —
->       `effectiveExpense` counts a tx **iff `kind === "expense"`** (split → `mine` only).
->     - **Transfers** (e.g. SEB→Revolut/savings) count as neither expense nor income; CSV
->       import **auto-detects** transfer pairs against existing transactions (no double-count).
->     - **Goals are transaction-driven**: `goalSaved = baseline + Σ|linked transfer amounts|`;
->       `Goal.contributions[]` removed. Mark a transfer "→ goal" in the detail panel.
->     - **Income never counts**; no dashboard stat, "Net" → "Spent". (Display since refined —
->       see the real-bank-import item below.)
-> - **✅ Real bank import + OpenAI categorization + training set** (spec/plan in
->   `docs/superpowers/` & `.claude/plans/`, 2026-05-30; 10 commits; verified live on a real SEB
->   305-row export + live OpenAI + Neon):
->     - **Money is now decimal** — all amounts `numeric(12,2)`, shown in Swedish notation
->       (`100,75 kr`); inputs parse `100,75`.
->     - **Real SEB parser** — dot-decimal `Belopp`, merchant descriptions cleaned of the
->       trailing `/YY-MM-DD`; realistic sample CSV.
->     - **Category taxonomy expanded** to 23 (Mortgage, Insurance, Travel, Shopping, …).
->     - **OpenAI categorization** (`gpt-4o-mini` structured output → `{kind, categoryId,
->       confidence}`) in `src/lib/ai/` + `src/app/actions/ai.ts`, with deterministic rules
->       (Revolut/SEB-Kort/Amex/Avanza→transfer, LÖN→income, LÅN→expense/Mortgage) + keyword
->       fallback; wired async into the import review step.
->     - **Training set** — Neon `categorization_examples` logs prediction-vs-correction (import
->       + detail edits); recent corrections feed back as few-shot examples (self-improving).
->     - **Income display** — rows stay visible with the **amount always masked**; the detail
->       panel reveals it; changing Type un-masks (`getUserId()` still the single-user stub).
+> **Status — 2026-06-09:** live on Vercel, 267 tests passing, build + lint clean. Every feature
+> screen, the import + categorization pipeline, auth, and per-user sync are shipped. What remains
+> is a short, optional roadmap (see the end of this file).
 >
-> **Shipped 2026-05-30 → 06-01 (this session):**
-> - **✅ User-defined categorization Rules** (spec + plan in `docs/superpowers/`, 2026-05-31):
->   a `/rules` page (create / edit / reorder / enable / delete) where description rules
->   (contains / starts-with / exact) set category and/or kind and/or tags, run **before the LLM**
->   at import (a match skips inference) and can **backfill** existing transactions (skipping
->   hand-corrected rows). Pure engine in `src/lib/rules.ts` (`applyRules` /
->   `suggestRulesFromMonth` / `planRuleBackfill`); the hardcoded `classifyRules` keywords are
->   retired into editable `categorization_rules` **seed rows**; per-month **suggestions** are
->   mined from corrected data. Reachable via Settings → Categorization (+ nav registry).
-> - **✅ Own-account-number transfers** — accounts gained an optional `accountNumber`; import
->   rows whose description references one are auto-classified **transfer** (savings→main no
->   longer mis-read as income). Existing rows backfilled.
-> - **✅ Import review upgrades** — a per-row **kind** control (expense / transfer / income) +
->   a Types summary, and a filter bar (kind chips · Needs review · Uncategorized · Hide
->   duplicates · description search).
-> - **✅ Category taxonomy reworked** — a **Purchases** parent (Clothing / Electronics /
->   Shopping / Home & Furniture / Hobbies), **Café & Fika**, **Services**; user pruned to 24.
->   Every category dropdown now groups children under their parent via `orderCategories`,
->   independent of array order (fixes re-parented categories rendering in the wrong place).
-> - **✅ Dashboard "Spending breakdown" widget** — horizontal bars with a **Categories | Tags |
->   Accounts** toggle, **↑↓ % vs last month** (red up / green down / grey flat, hidden when last
->   month was 0), and **tap-to-expand** a category into its subcategories (chevron). Replaces
->   the donut; folds in the old "Spend by account" tile; **Daily Pace** dropped from the default
->   layout (kept registered); layout re-ordered by value; a **v3** persisted-layout migration;
->   **Recharts removed** (now CSS-width bars). Selectors `withDelta` / `spendBySubcategory` /
->   `spendByTag` in `selectors.ts`.
-> - **✅ Trend widget subcategory drill-down** — pick a top-level category, its subcategory
->   chips appear, the line redraws for the chosen sub (parent kept highlighted as context).
-> - **✅ Transactions filter total** — the month count + "Spent" figure now reflect the active
->   filter, not just the whole month.
-> - **✅ Google sign-in (Auth.js v5)** (spec + plan in `docs/superpowers/`, 2026-06-01):
->   `getUserId()` now reads a real session. `next-auth@5` + `@auth/drizzle-adapter` with
->   **database sessions** (4 `auth_*` tables in Neon); `users.id` is the app-wide `userId`.
->   **Single-owner allowlist** (`OWNER_EMAIL`, fail-closed) gates `signIn` before any row is
->   written; on the owner's **first sign-in** a one-time idempotent `claimStubData` re-points all
->   `user-stub` rows to the real id (`src/lib/db/claim.ts`). Route protection lives in the `(app)`
->   server-layout (`auth()` + `redirect("/signin")`); public `/signin` page + Settings → Account
->   sign-out. Pure logic in `src/lib/auth-helpers.ts` (unit-tested). **Owner setup before live
->   use:** create a Google OAuth client and set `AUTH_GOOGLE_ID` / `AUTH_GOOGLE_SECRET` /
->   `OWNER_EMAIL` / `AUTH_SECRET` in `.env.local` (redirect URI `…/api/auth/callback/google`).
-> - **✅ Per-user UI preferences sync** (spec + plan in `docs/superpowers/`, 2026-06-01):
->   the dashboard **layout** (widget order + size) and **bottom-nav config** now persist in a
->   `user_preferences` table in Neon, keyed by `getUserId()`, so they follow the user across
->   devices. A `<PreferencesSync />` client component (mounted in the `(app)` layout) hydrates the
->   Zustand store from the server on load and debounce-saves edits back (server is source of truth;
->   `localStorage` stays the instant/offline cache; last-write-wins). `masked`/`month`/
->   `accountFilter` stay device-local. The `useUI` store + all widgets are unchanged.
-> - **✅ Account avatar + sign-out in the page header** — an avatar (Google photo or initial) in
->   every page header opens a popover with name/email + **Sign out**, so login status is visible
->   app-wide and logout is one tap from anywhere (previously only in Settings → Account, under the
->   "More" menu). `src/components/nav/account-menu.tsx` + a `currentUser()` action.
-> - **✅ Apply a single rule to existing transactions** — each rule row in `/rules` gained a
->   per-row ⚡ **Apply** action that previews then backfills just that one rule across all
->   transactions (hand-corrected rows skipped), **forced-enabled** so an explicit apply runs even
->   when the rule's auto-toggle is off. `previewRuleBackfill`/`applyRuleBackfill` take an optional
->   `ruleId` routed through a new pure `selectRulesForBackfill` helper; no `ruleId` preserves the
->   existing apply-all behavior. Both share one preview-then-confirm dialog.
-> - **✅ Hand-corrected categories show 100%** — when you pick a category by hand in the detail
->   panel (`categorySource: "user"`), the confidence indicator now reads a green **100%** instead
->   of the stale model score. The stored `categoryConfidence` is deliberately left untouched so the
->   model's original prediction is still captured in the `categorization_examples` training log
->   (corrected=true, predicted vs final); only the display changed.
-> - **✅ Split among N people** — the split editor's empty state is now a single action: a people
->   stepper (min 2) + one "Split among N people" button that sets *your* share to total ÷ N and
->   puts the remainder in one "Shared" row (only the `mine` portion counts as spending). The earlier
->   confusing "+ Add split" / "Split evenly" pair was removed; the populated view keeps a clean
->   + Add / Clear / You pay footer (re-split via Clear).
-> - **✅ Revolut CSV import** — the importer (built for SEB's 3-column `;` format) now detects the
->   richer **Revolut** export (`Type,Product,Started Date,…,Amount,Fee,…,State,…`) and normalizes it
->   before import via a pure `src/lib/parse-revolut.ts` (`isRevolutCsv` / `normalizeRevolut`): folds
->   the **Fee** column into the amount (`Amount − Fee`, so a 0-amount "Premium plan fee" becomes a real
->   −104,99 expense), keeps only **`COMPLETED`** rows (REVERTED no longer leak in as spend), **drops
->   `Topup` + `Exchange`** rows entirely (internal movements that bloated the list), and uses the
->   **`Type`** column to mark `Transfer` as a transfer (skips the LLM) while `Card Payment`/`Charge`
->   categorize normally. `buildRows` branches on the format (SEB path byte-for-byte unchanged); step 1
->   shows a "Revolut statement detected" note instead of the column mapper. **No new seed Rules** — the
->   Type column does the work. (Top-ups are dropped on the trust that the matching SEB outgoing leg is
->   marked a transfer; exchanges-as-neutral means foreign-pocket spend stays invisible unless imported.)
-> - **✅ Split rows show your share** — the transactions list row rendered the **gross** `tx.amount`
->   (the lone place bypassing `effectiveExpense`), so splitting a payment looked like nothing changed
->   even though the monthly **Spent** total already counted only the `mine` share. The row now shows
->   your **effective share** (e.g. −150,31 kr of a −300,61 charge) with a small **Split** tag; the full
->   amount stays in the detail panel.
-> - **✅ "Don't count this transaction" (ignore) toggle** — re-introduced a per-transaction exclude
->   flag (the old `ignored` was removed when the kind model landed). A **Switch in the detail panel**
->   sets an optional `excluded` flag; `effectiveExpense` and `includedNet` both return 0 for it, so it
->   drops from every total/widget. Excluded rows **stay visible** but dimmed/struck with an **Ignored**
->   tag (so you can toggle them back). Persisted via a new `transactions.excluded` column (`boolean NOT
->   NULL DEFAULT false`; additive migration applied to Neon).
-> - **✅ Shipped to production on Vercel** (spec/plan in `docs/superpowers/plans/2026-06-04-vercel-deploy.md`,
->   2026-06-04): GitHub auto-deploy from `main`; **prod reuses the current Neon DB** (the real data) +
->   the 6 env vars (`DATABASE_URL`, `OPENAI_API_KEY`, `AUTH_SECRET`, `AUTH_GOOGLE_ID/SECRET`,
->   `OWNER_EMAIL`); the existing Google OAuth client gained the prod redirect URI. Live + verified
->   (sign-in, real data, DB + OpenAI reachable). The only repo change was an env-gated **`DEV_USER_ID`
->   bypass** in `getUserId()` (pure `resolveUserId()` in `auth-helpers`, unit-tested) so local dev needs
->   no Google sign-in; it's **unset on Vercel** so prod uses real auth. `NODE_OPTIONS` is a VPN-only
->   local thing and set nowhere on Vercel.
-> - **Env (not app code):** the corporate **Cloudflare Zero Trust** TLS inspection re-signs HTTPS
->   with a CA Node doesn't trust, breaking `fetch` to Neon/OpenAI with `SELF_SIGNED_CERT_IN_CHAIN`
->   ("fetch failed"). Fixed with **`NODE_OPTIONS=--use-system-ca`** (added to `~/.zshrc`). See
->   memory `neon-corporate-tls-interception`.
->
-> **Still left to implement (Phase 4b+):**
-> - **Local-dev DB isolation (one local step, not shipped):** a Neon **`dev` branch** exists (copied
->   from prod), but `.env.local` still points at the prod/real-data branch. Task 2 of the deploy plan
->   (repoint `.env.local` at the dev branch + `DEV_USER_ID=user-stub`, wipe it, `db:seed` mock data)
->   is pending the dev branch connection string. Until then, **local dev writes to prod data.**
-> - **PWA: installable + offline shell already work** — a hand-rolled `public/sw.js` (app-shell cache,
->   network-first nav, stale-while-revalidate; deliberately Turbopack-safe, no bundler plugin) +
->   `src/app/manifest.ts` + SVG icons; `ServiceWorkerRegister` registers it **in production only**, so
->   install/test from the Vercel URL (not local dev). The `@serwist/next` / `serwist` deps are
->   **vestigial/unused** — optional cleanup (YAGNI).
-> - **Overspend alerts via PWA Web Push** — NOT built: `sw.js` has no `push`/`notificationclick`
->   handlers and there's no subscription flow or server-side trigger. The install/offline-shell PWA is
->   already in place, so this is the real remaining PWA work.
-> - **Light-theme ("Silver Slate") polish** — deferred.
-> - Optional follow-ups: **forecasting** (recurring-charge-aware projection; a dashboard "Budgets"
->   forecast widget — builds on `budgetForecasts()`); offline **write** queue/replay.
+> This file is the **current** reference. The blow-by-blow build history lives in git and in the
+> design specs under `docs/superpowers/specs/` — it is intentionally not duplicated here.
 
-## Context
+---
 
-Saldo is a single-user Swedish personal-finance app (spend analysis & control) that
-exists today only as a Lovable UI prototype. We are **rebuilding it from scratch** so it
-can be a **PWA**, deploy on **Vercel**, use **Neon Postgres** for data, and **OpenAI** for
-transaction categorization.
+## Running it (for forkers)
 
-Decisions confirmed with the user:
-- **Rebuild fresh from screenshots** (no Lovable code import). Screenshots will guide the
-  visual layer; they are *not* required to start scaffolding/domain work.
-- **Next.js App Router** + TypeScript.
-- **UI-first**: build the full UI against a mock-data layer, then swap in Neon + OpenAI
-  behind the same data contract. This preserves the PRD's UI-first philosophy.
-- **Google auth via Auth.js**, but **deferred** — start with a single stub user.
+```bash
+npm install
+npm run db:push      # create/sync the Neon schema (drizzle-kit)
+npm run db:seed      # load the Swedish sample dataset
+npm run dev          # http://localhost:3000
+npm test             # vitest (267 tests)
+npm run build        # production build (Turbopack)
+```
 
-The central correctness invariant from the PRD (§5.7, §7.1) is `effectiveExpense(tx)`:
-a transaction counts as spending iff `amount < 0` AND `!ignored` AND its account is not
-`savings`; if split, only the `mine` portion counts. **Every SEK figure in the app routes
-through this.** Revolut is just another account under this same rule (transfers to it are
-not expenses; salary counts once as income on the main account).
+**Environment** (`.env.local`):
 
-New scope from user context that extends the PRD (all folded in): budget **health**
-signals ("higher than usual for this day-of-month / on track / below average"), **alerts**
-on overspend (PWA push), **forecasts** per-budget and overall, a **"relative highest
-budget"** widget (share-of-month-spend per budget), budgets that target **top OR sub
-categories**, and an **LLM training set** built from correct + later-corrected categories.
+| Var | Required | Purpose |
+|---|---|---|
+| `DATABASE_URL` | yes | Neon Postgres connection string |
+| `OPENAI_API_KEY` | yes (for AI categorization) | OpenAI; without it, import falls back to keyword rules |
+| `AUTH_SECRET` | yes | Auth.js session encryption |
+| `AUTH_GOOGLE_ID` / `AUTH_GOOGLE_SECRET` | yes | Google OAuth client (redirect URI `…/api/auth/callback/google`) |
+| `OWNER_EMAIL` | yes | Single-owner allowlist — only this Google account may sign in (fail-closed) |
+| `DEV_USER_ID` | optional | Local-dev bypass: skips Google sign-in and acts as this user id (e.g. `user-stub`). **Unset in production.** |
+
+**Notes**
+- This is a **single-owner** app: `OWNER_EMAIL` gates sign-in before any row is written. To make it
+  multi-tenant you'd remove the allowlist and key everything off the session user id (already the
+  case everywhere — see `getUserId()`).
+- Behind a corporate TLS-inspecting proxy, Node may reject Neon/OpenAI TLS
+  (`SELF_SIGNED_CERT_IN_CHAIN`). Fix locally with `NODE_OPTIONS=--use-system-ca`.
+- `README.md` is still create-next-app boilerplate — it should be replaced with the above.
+
+---
+
+## Architecture
+
+### Data flow — a client SPA over Neon
+
+The app is a **client-side SPA** backed by server actions, not a set of server-rendered pages:
+
+- **Neon is the source of truth.** `src/lib/db/` holds the Drizzle schema (`schema.ts`) and all
+  queries (`queries.ts`). `src/app/actions/data.ts` exposes one server action per mutation.
+- **`useData()`** (`src/store/data.ts`) is the single read/write facade. It's a TanStack Query
+  wrapper over one `['dataset']` entry (the whole user dataset: accounts, categories, tags,
+  transactions, budgets, goals, rules). Reads are **persisted to `localStorage`** (instant + offline
+  reads). Each mutation updates the cache **optimistically**, persists via a server action, and
+  **rolls back + resyncs on failure**.
+- **`getUserId()`** (`src/lib/auth.ts`) is the auth seam every query is keyed by — the real session
+  user, or `DEV_USER_ID` locally.
+- **Local UI state** (privacy mask, selected month, account filter, dashboard layout, nav config)
+  lives in a Zustand store (`src/store/ui.ts`); durable preferences also sync to Neon (below).
+
+Implication: the whole dataset is loaded and computed client-side. This is deliberate (instant
+navigation, offline reads) and fine at personal scale. Derived figures are memoized; see `Conventions`.
+
+### The spending invariant — `effectiveExpense`
+
+`src/lib/domain/effectiveExpense.ts` is **the only place spending math lives**. A transaction counts
+as spending iff: it's not `excluded`, its `kind === "expense"` (income and transfers never count),
+and `amount < 0`; for a split, only the `mine` portions count. **Every SEK figure routes through
+this — never sum `amount` directly.** `includedNet` is the signed variant for month-net rows.
+
+Money is decimal throughout (`numeric(12,2)`), displayed in Swedish notation (`12 450,75 kr`,
+`sv-SE`), and inputs parse `100,75`.
+
+### Categorization pipeline (`src/app/actions/ai.ts`)
+
+For each imported row, in order:
+1. **Own-account transfers** — description references one of the user's `accountNumber`s → `transfer`.
+2. **User rules** (`src/lib/rules.ts`) — contains / starts-with / exact rules set category/kind/tags
+   and run **before the LLM**; a resolving match skips inference.
+3. **OpenAI** (`gpt-4o-mini`, structured output → `{kind, categoryId, confidence}`,
+   `src/lib/ai/categorize-openai.ts`) for the rest, with a **few-shot built from the user's
+   affirmations**.
+4. **Keyword fallback** (`src/lib/categorize.ts`) if OpenAI errors.
+
+Low confidence (`< 0.6`) sets `needsReview`.
+
+**The learning loop:** every correction/approval is logged to `categorization_examples`.
+`affirmedExamples()` returns the high-signal set — corrections (`corrected = true`) **plus**
+detail-panel approvals (`source = 'detail'`) — excluding passive import-keeps. `selectExamples()`
+(`src/lib/ai/select-examples.ts`, pure) then **relevance-matches** those to the batch's merchants
+(your past "ICA" fixes steer new "ICA" rows), dedupes, and caps, with recent rows as a cold-start
+top-up. So both **correcting** and **approving** a category sharpen future predictions.
+
+### Import pipeline (`src/components/import/import-modal.tsx`)
+
+Two-step modal (global, opened from the nav). Parses **SEB** (`;`, decimal-comma) and **Revolut**
+exports; the format is auto-detected.
+
+- **Revolut** (`src/lib/parse-revolut.ts`): folds `Fee` into the amount, keeps only `COMPLETED`
+  rows, drops `Topup`/`Exchange`, and uses the `Type` column to mark transfers.
+- **Non-SEK → SEK conversion** (`src/lib/fx.ts` + `src/app/actions/fx.ts`): foreign rows are
+  converted to SEK at import using live ECB rates (Frankfurter, `open.er-api` fallback) so the
+  SEK-only model stays correct; the original is kept in the note. A failed rate fetch holds those
+  rows back with a Retry; SEK rows still import.
+- **Transfer-pair detection** (`detectTransfersOnImport`) pairs new rows against existing ones so
+  internal movements aren't double-counted. Duplicates (date+amount+description) are auto-skipped.
+
+### Review & correct
+
+A `needsReview` row shows a warning dot in the list and a "Needs review" filter on `/transactions`.
+Open the detail panel to either **change** the category (corrects + logs) or **Approve** the guess
+(confirms a correct low-confidence prediction, marks it user-affirmed → 100%, logs the affirmation).
+Both feed the few-shot above.
+
+### Auth & single-owner (`src/lib/auth*.ts`, `src/lib/db/claim.ts`)
+
+Auth.js v5 + Google with **database sessions** (4 `auth_*` tables; `users.id` is the app-wide
+`userId`). A **single-owner allowlist** (`OWNER_EMAIL`, fail-closed) gates `signIn`. On the owner's
+first sign-in, a one-time idempotent `claimStubData` re-points all `user-stub` rows to the real id.
+Route protection lives in the `(app)` server layout (`auth()` + `redirect("/signin")`). Pure logic
+(`resolveUserId`, allowlist) is unit-tested in `src/lib/auth-helpers.ts`.
+
+### Per-user preferences sync
+
+Dashboard **layout** (widget order + size) and **bottom-nav config** persist in a `user_preferences`
+table, keyed by `getUserId()`, so they follow the user across devices. `<PreferencesSync />` (mounted
+in the `(app)` layout) hydrates the Zustand store on load and debounce-saves edits (server is source
+of truth; `localStorage` is the instant/offline cache; last-write-wins). `masked`/`month`/
+`accountFilter` stay device-local.
+
+### PWA
+
+Installable + offline app-shell via a **hand-rolled** `public/sw.js` (app-shell cache, network-first
+nav, stale-while-revalidate — deliberately Turbopack-safe, no bundler plugin) + `src/app/manifest.ts`
++ the level-bars icon set (`public/icon*.svg|png`, generated by `scripts/generate-icons.mjs`, plus an
+iOS `apple-icon.png`). `<ServiceWorkerRegister />` registers it **in production only** — install/test
+from the deployed URL, not local dev. (The `serwist` / `@serwist/next` deps are **unused** — see
+roadmap.)
+
+---
 
 ## Stack
 
-| Concern | Choice | Why |
-|---|---|---|
-| Framework | Next.js 15 App Router, TS | PWA + Vercel + server route handlers for DB/LLM |
-| Styling | Tailwind CSS **v4** (CSS `@theme`, no JS config); **hand-rolled Radix + cva primitives** in `src/components/ui/` (NOT shadcn/ui — full control of the glass aesthetic) | Avoids generic shadcn defaults |
-| Theming | `next-themes`, HSL semantic tokens only (no raw hex) | PRD §7.4 light/dark, WCAG AA |
-| PWA | Serwist (`@serwist/next`) | Maintained App-Router service worker + manifest |
-| Data fetching | TanStack Query over a `DataProvider` interface | Lets us swap mock → Neon with no UI changes |
-| Local UI state | Zustand (theme, privacy mask, dashboard layout) | Light, no boilerplate |
-| Drag reorder | `@dnd-kit` (`SortableWidget`) | PRD §6.1 dashboard |
-| Charts | Recharts, lazy-loaded chunk | PRD perf budget: charts excluded from initial 200KB |
-| i18n/format | `Intl.NumberFormat('sv-SE')` → `12 450 kr`; English chrome | PRD §3.4 |
-| Tests | Vitest + React Testing Library | PRD §8 regression tests (`SafeToSpendWidget.test.tsx`) |
-| DB (later) | Neon Postgres + Drizzle ORM (`@neondatabase/serverless`) | Serverless-friendly on Vercel |
-| Auth (later) | Auth.js Google provider | User choice, deferred |
-| LLM (later) | OpenAI API via route handler | Categorization + confidence + training set |
-
-## Architecture: the data contract
-
-A single TypeScript module defines the domain types (PRD §5) and pure helpers:
-- `lib/domain/types.ts` — `Transaction`, `Account`, `Category`, `Tag`, `Budget`, `Goal`.
-- `lib/domain/effectiveExpense.ts` — `effectiveExpense(tx, account)` + `isCountedSpending`.
-  This is the ONLY place spending math lives; everything imports from here.
-- `lib/data/DataProvider.ts` — interface (`getTransactions`, `addTransactions`,
-  `updateTransaction`, budgets/goals/categories/tags/accounts CRUD).
-- `lib/data/MockDataProvider.ts` — realistic Swedish mock data (incl. SEB sample,
-  Revolut + savings accounts, a salary income tx). Backed by localStorage for persistence.
-- Later: `lib/data/NeonDataProvider.ts` implements the same interface server-side.
-
-All aggregations (widgets, month nets, budget status) consume `DataProvider` results and
-run them through `effectiveExpense`. The collapsed-month net (PRD §6.2) is the canonical
-example and gets a unit test.
-
-## Phased roadmap
-
-### Phase 0 — Scaffold (no screenshots needed)
-- `create-next-app` (TS, App Router, Tailwind) into `saldo/`; init git.
-- Add shadcn/ui, `next-themes`, Zustand, TanStack Query provider, `@dnd-kit`, Recharts,
-  Vitest + RTL config.
-- Serwist: `app/manifest.ts`, service worker, icons → installable PWA shell.
-- HSL semantic token theme ("Silver Slate" greys, frosted glass surfaces), light/dark.
-- **Verify:** `npm run dev` serves; `npm test` runs; Lighthouse shows installable PWA.
-
-### Phase 1 — Domain + mock data (no screenshots needed)
-- Implement `lib/domain/*` and `lib/data/*` as above with full Swedish mock dataset.
-- `lib/format.ts` (SEK/sv-SE, privacy-mask `•••• kr`).
-- **Verify:** unit tests for `effectiveExpense` (ignored / income / savings / split /
-  Revolut-transfer cases) and month-net all pass.
-
-### Phase 2 — App shell & IA (screenshots helpful)
-- Routes per PRD §4: `/`, `/transactions`, `/budgets`, `/goals`, `/categories`,
-  `/accounts`, `/tags`, `/settings`, stub `/login` `/register`.
-- Slim sidebar on `lg+`, bottom tab bar + "More" menu on mobile, Quick Add FAB on every
-  authed route, global privacy-mask toggle.
-- **Verify:** all routes navigable on mobile + desktop breakpoints; 44×44 hit targets.
-
-### Phase 3 — Feature screens (screenshots needed per screen)
-Build against mock data, each with default/hover/selected/excluded/masked states:
-- **Home dashboard** — sortable widgets (Safe to Spend w/ size variants + regression test,
-  Month spend by category, Trend, Budgets status, Goals progress, Recent activity, Calendar
-  heatmap, **Relative highest budget**). Each new widget ships a `size="small"` test (PRD §8).
-- **Activity** — month-grouped infinite list, filters, excluded-row treatment (dimmed,
-  strike-through, "Excluded" pill + `EyeOff`), virtualize >200 rows.
-- **Transaction Detail** — editable category (confidence dot + predicted hint + "corrected"
-  indicator), tags (inline-create), split, exclude switch, notes.
-- **Budgets** — per-category (top or sub), spend-vs-cap, **health** signal, safe-to-spend
-  banner, clone-last-month CTA, overspend **alerts**, **forecast**.
-- **Goals** — rings, contribution log, on-track verdict, linked savings account.
-- **Categories / Tags / Accounts** — CRUD w/ emoji+color, nesting, detach-on-delete.
-- **Import** — Swedish CSV/XLSX, column mapping, preview/summary/dedupe, confirm → append;
-  mock auto-categorization sets confidence + `needsReview`.
-- **Settings** — theme, privacy mask, locale (fixed sv-SE/SEK), data reset/export.
-
-### Phase 4 — Backend wiring (after UI is solid)
-- Neon + Drizzle schema mirroring the domain; `NeonDataProvider` server-side; **preserve
-  `effectiveExpense` in SQL/queries** (PRD §9.1).
-- OpenAI route handler for categorization (confidence stored, low → `needsReview`);
-  **training set** table appended from correct + corrected categories.
-- Auth.js Google provider; budget **alerts** via PWA push (Web Push).
-- Deploy to Vercel (Neon env vars, OpenAI key).
-
-## Verification (end-to-end)
-- `npm run dev` → app loads on mobile + desktop layouts; installable as PWA.
-- `npm test` → `effectiveExpense`, month-net, and every widget `size="small"` test pass.
-- Manual: import the SEB sample, exclude a tx and confirm it stays visible but drops from
-  month net + dashboard; toggle privacy mask hides all amounts; transfer to Revolut/savings
-  is not counted as spend; salary counts once as income.
-- Later: Lighthouse PWA + perf budget (<200KB initial JS gz excl. charts); Vercel preview
-  deploy against Neon works.
-
-## Design polish pass (current)
-
-Dashboard is built and running. This pass raises design quality before moving to the
-remaining screens. Chosen with the user (light-theme polish explicitly deferred):
-
-0. **Widget-size uniformity (in progress).** Same-size widgets must match across rows.
-   - `dashboard/sortable-widget.tsx`: apply `SIZE_MIN_H[size]` + `h-full` to the root and
-     `h-full` to the inner content wrapper.
-   - Add `h-full` to standalone widget Cards: `safe-to-spend-widget.tsx`, `trend-widget.tsx`,
-     `calendar-heatmap.tsx`, `recent-activity.tsx`.
-
-1. **Category donut chart.** Restore the screenshot's donut for "Spending by category".
-   - New `dashboard/category-donut.tsx` ('use client'): Recharts `PieChart`/`Pie` (donut),
-     one `Cell` per category tinted `hsl(category.color)`, center label = total `formatSEK`.
-   - Lazy-load via `next/dynamic` (`ssr:false`) with a skeleton so Recharts stays in its own
-     chunk (PRD perf budget §7.5). Wire into the registry `category` widget; at `size="small"`
-     degrade to the existing compact bar list. Reuse `spendByRootCategory` (already computed).
-
-2. **Motion & micro-interactions** (CSS-only, no new dep; gated by `prefers-reduced-motion`).
-   - `globals.css`: `@keyframes rise` + `.animate-rise`; subtle `.glass` hover-lift.
-   - `ring.tsx` + `progress.tsx`: become client; animate from 0 → target on mount.
-   - `page.tsx`: staggered `animationDelay` per grid item, disabled while `editing`.
-   - Nav buttons + FAB: `active:scale` press feedback (FAB already has it).
-
-3. **Atmosphere & glass depth.**
-   - `globals.css`: fixed, pointer-events-none SVG fractal-noise grain overlay at low opacity;
-     refine `.glass` shadow + inset highlight.
-   - `src/data/mock.ts`: harmonize category `color` HSLs into a cohesive, well-spread palette
-     (current ambers/greens clash).
-
-### Verification
-- `npm run build` clean (TS + Turbopack); `npm test` still 14/14.
-- Dev: donut renders and loads as a separate chunk; widgets stagger in once; rings/bars
-  animate from zero; cards lift on hover; grain texture subtly visible; same-size widgets
-  align across rows. With OS reduce-motion on, no animation (global rule forces ~0ms).
-
-## Status — dashboard complete & visually verified (2026-05-26)
-
-Done and verified (build clean, 64 tests passing, Playwright screenshots reviewed):
-- Editable dashboard: drag-reorder + per-widget S/M/L. **Size now maps to width** on a
-  1/2/4-col grid (small ¼, medium ½, large full) — S and M are visibly distinct.
-- Widgets adapt at narrow width (single-column rings, compact category list, truncation,
-  `overflow-hidden` cards) — **no content overflow**.
-- Widgets: Total spending, Daily pace, Category donut (Recharts, lazy chunk), Trend,
-  Budgets, Goals, Daily-spend heatmap, Recent activity, Total capital, Spend by account.
-- Motion (staggered entrance, rings/bars animate from 0, hover-lift), grain + glass depth,
-  harmonized category palette, Bricolage/Hanken typography.
-- Tests: every widget rendered at every size + size→width mapping + domain contract.
-
-## Liveliness pass — iOS 26 "Liquid Glass" (current)
-
-Make the app feel alive: tactile glass + springy physics. Chosen with user
-(number-rolls and page/theme transitions deferred). Respects `prefers-reduced-motion`
-globally via `<MotionConfig reducedMotion="user">`.
-
-**A. Interactive glass (CSS-only, no dep).**
-- ~~Cursor-tracked specular sheen on cards~~ — **removed at user's request (disliked it).**
-  `ui/card.tsx` reverted to a plain (server) component; the `.glass-sheen` CSS was deleted.
-- Kept: card **hover-lift** (`hover:-translate-y-0.5`) and a spring press easing token
-  `cubic-bezier(0.34,1.56,0.64,1)`.
-- Tactile press (`active:scale-[0.96]` + spring easing) on `ui/button.tsx`, bottom-nav items,
-  FAB, and list rows (`recent-activity.tsx`, future tx rows) get hover bg.
-
-**B. Springy motion system (add `motion` / framer-motion).**
-- `components/providers.tsx` → wrap in `<MotionConfig reducedMotion="user">`.
-- `nav/bottom-nav.tsx` → active pill is a `motion.div` with shared `layoutId="navPill"`, so the
-  blue highlight slides/morphs between tabs (spring).
-- `ui/dialog.tsx` → `motion` spring enter for the dialog/sheet (slide-up + scale, rubber-band);
-  exit via `AnimatePresence` + Radix `forceMount`; backdrop fades.
-- `dashboard/sortable-widget.tsx` → entrance becomes a `motion.div` on the **inner** wrapper
-  (spring + staggered delay) so it does not fight dnd-kit's transform on the outer node; tune the
-  dnd reflow `transition` to a springier curve. (Root keeps `data-testid/data-size/min-h` — tests
-  unaffected.)
-
-### Verification (liveliness)
-- `npm run build` clean; `npm test` still green (tests assert root classes/text, not motion).
-- Playwright: nav pill slides between tabs; Quick-Add sheet springs up; cards lift on hover
-  (no cursor sheen). With OS reduce-motion, no animation. (Verified 2026-05-26.)
-
-## YAGNI/KISS cleanup (2026-05-26)
-
-Removed dead/speculative code; ESLint now clean (0 problems), 63 tests pass, build clean.
-- Deleted dead `.animate-rise`/`@keyframes rise` (replaced by Motion).
-- Consolidated the duplicate `WidgetSize` type into `store/ui.ts`.
-- Dropped unused `shareOfMonth` (+ its extra `monthSpend` pass) from `budgetStatuses`.
-- Removed `isCountedSpending` (only its own test used it).
-- Reverted `Ring`/`ProgressBar` to pure components (the animate-from-zero hack tripped
-  `react-hooks/set-state-in-effect`); CSS transition still animates on value changes.
-- Extracted one `useMounted` hook (`useSyncExternalStore`) for `ThemeToggle` +
-  `HydrationGate`, removing duplicated setState-in-effect mount guards.
-- Kept (next panels need them, not YAGNI): store CRUD, `Switch`, `Textarea`, `Tooltip`
-  primitives, `includedNet`, `CategoryChip.confidence`.
-
-## Transactions screen — done (2026-05-26)
-
-`/transactions`: search + filters (category/account/tag/needs-review/has-splits), month nav
-with count + **Net** (tooltip, via `monthNet`/`includedNet`), colored category chips with
-confidence dots, income green, excluded rows dimmed/struck + "Excluded" pill. Master-detail:
-desktop sticky side panel, mobile springy sheet (`useMediaQuery`). Editable detail
-(`transaction-detail.tsx`): category Select (confidence % / "Corrected" / AI-predicted hint),
-`TagEditor` (add/remove/inline-create), `SplitEditor` (equal/manual, "you pay" mine total),
-exclude Switch, notes — all via `updateTransaction`. New: `ui/popover.tsx`,
-`lib/use-media-query.ts`, shared `nextMonthKey`. Tests: row, split-editor, detail (75 total).
-
-## Native-feel pass — done (2026-05-26)
-
-Built & verified: `.pressable` utility applied across rows/pills/selects/icon-buttons/links/
-tag-add/quick-add toggles (shared `ui/icon-button.ts` extracted); Transactions desktop detail
-panel wrapped in `AnimatePresence` (spring fade+slide on select, cross-fade on switch).
-Lint clean, 75 tests pass, build clean, panel verified via screenshot.
-
-Goal: make the app feel like a native mobile app even on desktop — every tap is physical,
-and the Transactions detail panel animates in. Decided with user: **press feedback
-everywhere**, **Medium intensity** (~3% press scale, ~200ms springs), **no route/screen
-transitions** (kept instant). Respects `prefers-reduced-motion` (already global + explicit guard).
-
-**1. Universal press feedback — one `.pressable` utility (DRY).**
-- `globals.css` → `@layer components` add:
-  `.pressable { transition: transform .18s cubic-bezier(.34,1.56,.64,1) } .pressable:active { transform: scale(.97) }`
-  plus a `@media (prefers-reduced-motion: reduce)` override that nulls the transform.
-- Apply `.pressable` to the shared interactive primitives + tappable rows (representative files):
-  `ui/select.tsx` (SelectTrigger), `transactions/transaction-row.tsx`, `nav/theme-toggle.tsx`
-  + `nav/privacy-toggle.tsx` (the shared `ICON_BTN` string — extract to one constant while
-  here), month-nav arrows in `dashboard/controls.tsx` + `transactions/page.tsx`, the
-  `TogglePill`/`PillSelect` in `transactions/page.tsx`, `dashboard/registry.tsx` `AllLink`,
-  `transactions/tag-editor.tsx` (Add button + chip remove), `dashboard/recent-activity.tsx`
-  rows. `ui/button.tsx`, bottom-nav items, and the FAB already press — leave as-is (or
-  reconcile to the same easing).
-
-**2. Detail-panel transition (Transactions, desktop side panel).**
-- `app/(app)/transactions/page.tsx` → wrap the side-panel content in `AnimatePresence mode="wait"`
-  with a `motion.div` keyed by `selectedId ?? "empty"`; enter = fade + slide-up (~10px) + spring,
-  so selecting animates in and switching transactions cross-fades. Card container stays static.
-- Mobile bottom sheet already springs (`ui/dialog.tsx`) — no change.
-
-### Verification (native-feel)
-- `npm run build` clean; `npm test` green (press is CSS; AnimatePresence wraps but
-  `TransactionDetail` still renders — detail/row tests unaffected).
-- Playwright: select a row → detail still renders (panel animates in); pressing the FAB/rows
-  shows the scale (visual). With OS reduce-motion, no transform/animation.
-
-## Budgets + Goals screens — done (2026-05-26)
-
-Both master-detail (desktop sticky panel + mobile sheet, `useMediaQuery`, `.pressable` rows,
-`AnimatePresence` panel). **Budgets** (`/budgets`): month nav + overall spent/limit bar,
-health-colored rows (sub-cats show parent ↳), `BudgetEditor` (category, monthly limit, repeat
-toggle → `month` null/key, delete) via `upsertBudget`/`removeBudget`. **Goals** (`/goals`):
-overall saved/target bar, rows with deadline status (overdue/left), `GoalEditor` (emoji+name,
-target/already-saved, linked savings account, contribution log add/remove, deadline) via
-`upsertGoal`/`removeGoal`. Tests: selectors (`budgetStatuses` health, `goalProgress`,
-`monthNet`) + both editors. 87 tests total, lint clean, build clean, screenshots verified.
-Note: omitted the screenshot's "Apply to this/future months" segmented control — our Budget
-model is single `month|null` with no per-month overrides (KISS); the repeat toggle covers it.
-
-## Categories screen — done (2026-05-26)
-
-`/categories`: parent cards (emoji badge, name, subcategory count, pencil) with colored
-subcategory chips + dashed "Add subcategory"; "New category" for top-level. `CategoryEditor`
-(name+emoji, color swatch picker, parent hint, delete) via `upsertCategory`/`removeCategory`
-(delete detaches tx). Master-detail + `.pressable` + `AnimatePresence`. Editor test added; 90 total.
-
-## Emoji picker (Categories) — done (2026-05-26)
-
-Reusable `ui/emoji-picker.tsx` (glass Popover, ~60 curated emojis, no dep) wired into
-`CategoryEditor`. Test added (trigger shows value; pick calls onChange). 92 tests, lint/build
-clean, screenshot verified. Reusable for Goals/Accounts/Tags later.
-
-Chosen: **curated grid, no dependency** (matches the lean-deps ethos).
-
-- New `src/components/ui/emoji-picker.tsx`: reusable `EmojiPicker({ value, onChange })` — a
-  glass `Popover` (reuse `ui/popover.tsx`) whose trigger is a `pressable` button showing the
-  current emoji; content is a grid of ~50 curated finance/life emojis; clicking sets value +
-  closes. No new dep.
-- `components/categories/category-editor.tsx`: replace the emoji `Input` with `<EmojiPicker>`.
-  (Reusable later for Goals/Accounts/Tags — not changing those now, step by step.)
-- Test `ui/emoji-picker.test.tsx`: trigger shows current emoji; opening + selecting calls
-  `onChange`.
-
-### Verification
-- `npm run build` clean; `npm test` green (existing category-editor test unaffected — it
-  queries the name field, not the emoji input). Playwright: open Categories editor, open the
-  picker, see the grid.
-
-## Accounts + Tags screens — done (2026-05-26)
-
-Both master-detail (desktop panel + mobile sheet, `.pressable`, snappy `spring`). Extracted
-reusable `ui/color-swatches.tsx` (`ColorSwatches` + `COLOR_SWATCHES`) and refactored
-`CategoryEditor` to use it (DRY). **Accounts** (`/accounts`): rows with icon badge, Savings
-badge, "type · N transactions"; `AccountEditor` (emoji, name, type, Spending/Savings kind +
-hint, color, archive toggle, delete disabled while in-use → "archive instead") via
-`upsertAccount`/`removeAccount`. **Tags** (`/tags`): color-dot rows + "N txs"; `TagEditor`
-(name, color, delete-detaches) via `upsertTag`/`removeTag`. Editor tests added; 96 total,
-lint/build clean, screenshots verified.
-
-## Settings screen — done (2026-05-26)
-
-Built & verified: Appearance (Light/Dark/System segmented), Privacy (mask switch), Data
-(Clear all data → confirm Dialog → new `clearData()` store action), Locale & about (read-only
-sv-SE/SEK, PWA hint, version). Added `window.matchMedia` polyfill to `vitest.setup.ts`
-(jsdom lacks it; next-themes system mode + `useMediaQuery` need it). 100 tests, lint/build
-clean, screenshot verified.
-
-A single scrollable column of grouped glass cards (settings-list style, not master-detail).
-Scoped with user: four sections, **only "Clear all data"** for data actions, **future
-features hidden** (no alerts/AI/auth). `src/app/(app)/settings/page.tsx` + one store action.
-
-1. **Appearance** — theme **Light / Dark / System** segmented control (`next-themes`
-   `useTheme().setTheme`; `useMounted` to mark the active one without hydration mismatch).
-2. **Privacy** — "Mask amounts" `Switch` bound to `useUI` `masked`/`toggleMask` (mirrors the
-   header eye toggle).
-3. **Data** — destructive "Clear all data" button → confirm `Dialog` → new store
-   `clearData()` (sets every entity array to `[]`, persists). Note: no Reset-to-demo per user,
-   so clearing leaves an empty app (no in-app path back to the seed).
-4. **Locale & About** — sv-SE / SEK shown read-only (PRD-fixed); app version; "Install as app"
-   (PWA) hint.
-
-Reuse: `Card`, `Switch`, `Button`, `Dialog`, `useMounted`, `useUI`, `useData`. Small inline
-`SettingRow` (label + description + control). Add `clearData` to `src/store/data.ts`.
-
-### Verification
-- `npm run build` + `npm test` clean. New tests: store `clearData` empties all arrays;
-  settings page renders the four sections (wrap in `next-themes` ThemeProvider).
-- Manual: switch theme (persists, header reflects); toggle mask (header eye reflects);
-  Clear all data → confirm → dashboard/lists show empty states.
-
-## Import flow — done (2026-05-26)
-
-Built & verified. More → Import opens a global 2-step modal (`importOpen` in `useUI`, modal
-mounted in `(app)/layout.tsx`; `/import` route removed; More-menu Import is now a button).
-Step 1: choose CSV / "Use sample" → editable auto-detected mapping + "Import into" account.
-Step 2: live summary grid + editable rows (date/description/amount/category+confidence),
-duplicates (date+amount+description in target account) auto-deselected/struck → "Import N rows"
-→ `addTransactions` (categorySource model, needsReview) → /transactions. New: `lib/parse-csv.ts`,
-`lib/categorize.ts`, `components/import/import-modal.tsx`, `public/mock-imports/seb-april-2025.csv`.
-`useUI` got `partialize` (importOpen never persists). Screenshot showed 42/44 import, 2 dups,
-9 review — dedup against seed works. **All UI-first screens now complete; 107 tests, lint/build
-clean.** Deviation: omitted the Tags column in import rows (table width; add later in Activity).
-
-Global modal launched from **More → Import** (like Quick Add). Two steps; **CSV-only** (no
-dep); **account picker**; **auto-detected + editable** column mapping; **all review fields
-editable**; duplicate = **date+amount+description** in target account; **realistic sample,
-live stats**.
-
-**Wiring / state**
-- `store/ui.ts`: add transient `importOpen` + `setImportOpen`; add `partialize` so persistence
-  keeps only `{ masked, month, accountFilter, layout }` (importOpen never persists).
-- `app/(app)/layout.tsx`: mount `<ImportModal/>` (alongside the FAB).
-- `nav/bottom-nav.tsx` + `nav/nav-items.ts`: the "Import" More-menu entry becomes a **button**
-  → `setImportOpen(true)` (Tags/Settings stay links); remove `/import` from `moreNav` and
-  **delete `app/(app)/import/page.tsx`**.
-- Widen the dialog for the table: pass `className="sm:max-w-3xl"` to `DialogContent` (it
-  merges className; mobile stays a full-width bottom sheet, table scrolls horizontally).
-
-**New files**
-- `lib/parse-csv.ts`: detect delimiter (`,`/`;`), parse quoted fields, **auto-detect** the
-  date/description/amount columns from headers (datum/date · text/beskrivning/description ·
-  belopp/amount), Swedish number parse (`−12 500,00` → `-12500`), normalize date → `YYYY-MM-DD`.
-- `lib/categorize.ts`: mock keyword model → `{ categoryId, confidence }` (ICA/Hemköp/Coop/
-  Willys/Lidl→Groceries; Spotify/Netflix/HBO/Disney+/iCloud→Subscriptions; SL/Månadskort→
-  Public Transit; Hyra→Rent; Vattenfall/Elräkning→Electricity; Klarna/H&M/Zalando→Clothing;
-  Apotek→Health; OKQ8/Bensin→Fuel; Restaurang/Max/Café/Espresso/Pelikan→Restaurants; Uber→
-  Transport; fallback Other ≈0.4). `needsReview = confidence < 0.6`.
-- `components/import/import-modal.tsx`: **Step 1** — file upload OR "Use sample"
-  (`fetch('/mock-imports/seb-april-2025.csv')`), editable detected-mapping `Select`s, "Import
-  into" account `Select`, Continue. **Step 2** — summary grid (will-import/dups/date-range/
-  needs-review/money in·out·net/account-rows, live) + editable review table (include checkbox,
-  date, description, amount inputs; category `Select`+confidence dot/%; reuse `TagEditor`);
-  duplicates auto-deselected + struck + "Duplicate of existing"; Back / **Import N rows** →
-  `addTransactions` (`categorySource:"model"`, `predictedCategoryId=categoryId`, `needsReview`),
-  then close + navigate `/transactions`.
-- `public/mock-imports/seb-april-2025.csv`: realistic SEB-style April-2025 export (~50 rows,
-  `;`-delimited, decimal comma, headers e.g. `Bokföringsdatum;Belopp;Text`); a few rows mirror
-  seed dates/amounts to demo duplicate-skip.
-
-**Reuse**: `CategoryChip`, `Select`, `TagEditor` (`components/transactions/tag-editor.tsx`),
-`formatSEK`, `Dialog`, `useData` (accounts/categories/transactions/`addTransactions`), domain types.
-
-### Verification
-- `npm run build` + `npm test` clean. New unit tests: `parse-csv` (delimiter/amount/date/
-  auto-detect) and `categorize` (keywords → category+confidence; fallback → needsReview).
-- Playwright: More → Import → Use sample → Continue → review shows summary + struck duplicate
-  rows; edit a row; **Import N rows** appends to the chosen account and lands on /transactions.
-
-## Nav redesign — done (2026-05-26)
-
-iOS-style bottom nav reworked: **4 roomy primary tabs** (Home/Activity/Budgets/Goals);
-Categories + Accounts moved under **More** (`nav-items.ts`). Active tab = **wide rounded
-rectangle** (icon + label), inactive = icon-only; label width animates via **pure CSS**
-(`max-width`/opacity transition). Detached **"+" circle** beside the pill opens Quick Add
-(`QuickAddModal` is now store-controlled via `useUI.quickAddOpen`; old floating `QuickAddFab`
-deleted). Active-end pill hugs the container corner.
-
-**Jank fix (important):** Framer `layout`/`layoutId` on nav elements mis-measured viewport
-boxes across route changes and made the bar visibly **pop up ~20–420px** then settle. Removed
-ALL Framer layout animation from the nav (container `layout`, per-tab `layout`, and the
-`layoutId="navPill"` slide). Active highlight is now a static `bg-primary` span; the only
-animation is the CSS label expand. Verified with a Playwright probe: max nav element
-translateY during navigation = **0.0px** (was 420). Trade-off accepted: the pill no longer
-slides between tabs.
-
-## Settings → customizable nav bar — PLANNED (not built)
-
-User wants to **restructure the bottom nav from Settings** — choose which destinations are
-primary tabs vs. under "More" (and ideally their order). Approach when built:
-- `store/ui.ts`: persist a `navOrder`/`navPrimary` (list of route keys + which are primary,
-  cap primary at ~4). Add to `partialize`.
-- `nav-items.ts`: keep a master registry of all destinations; `bottom-nav.tsx` derives
-  primary vs. More from the store instead of hard-coded `primaryNav`/`moreNav`.
-- Settings: new "Navigation" section — reorder + toggle primary (dnd-kit reuse, or simple
-  up/down + a "primary" switch with a max-4 guard). Mirror the dashboard layout-edit pattern.
-- Tests: store reducer (set primary, cap, reorder); Settings section renders.
-
-## Dashboard polish batch — current (in progress / planned)
-
-Several small dashboard improvements. Some already landed on disk before re-entering plan
-mode (noted DONE); the rest are to implement on approval.
-
-1. **Trend per-category — DONE.** `categoryTrends()` selector (Total + top-6 categories);
-   `TrendWidget` now takes `series`, renders glass chips (Total + category, colored), switches
-   the line/value on click. `spendTrend` removed (unused). Tests updated (108 pass).
-2. **Snappier motion — DONE.** Shared `spring` → stiffness 920 / damping 42 (drives panels,
-   sheets, entrances); nav label expand 200ms; `.pressable` 110ms.
-3. **Trend graph animation — TODO.** When switching series, morph the SVG line/area with
-   `motion.path` animating `d` + `stroke` (all series share 6 points → interpolates); end-dot
-   `motion.circle` animates cx/cy; transition `spring`. iOS-glass feel, snappy.
-4. **"Back to current month" button — TODO.** `latestDataMonth(transactions)` selector DONE.
-   New shared `components/month-switcher.tsx` (prev/label/next pill + an animated "This month"
-   button that appears via `AnimatePresence` only when `month !== latestDataMonth`; opacity+x,
-   no width animation). Replace the inline month pills in `dashboard/controls.tsx`,
-   `transactions/page.tsx`, `budgets/page.tsx` with it (DRY). Suffix prop for the "· N" count.
-5. **Redesign hero "This month" widget — TODO.** Replace the sparse centered Total-spending
-   card (`registry.tsx` `total` entry — keep the id "total" to avoid layout-key migration).
-   New = **hero + stat row**, left-aligned, vertically centered:
-   - Headline: big `font-display` **Spent** (−X kr) + vs-last-month arrow/percent chip.
-   - Stat row (glass-inset chips): **Left to spend** (budgetLimitTotal − spent) and
-     **Safe to spend/day** (remaining ÷ days left; for non-current months show avg/day instead).
-     Graceful no-budget fallback (avg/day + days-in-month).
-   - Retitle label to "This month". Update its registry title.
-6. **Clearer default dashboard — TODO.** Recurate `defaultLayout` in `store/ui.ts` for a
-   focused first screen (hero large; then budgets, category donut, trend, recent, goals; then
-   pace, calendar, capital, byaccount). Keep ALL widgets present (no hide concept yet — true
-   show/hide ties into the planned customizable layout). Note: existing persisted layouts keep
-   their order; "Edit layout → Reset" applies the new default (non-destructive; no version bump).
-
-### Verification
-- `npm run build` + `npm test` clean (update/extend widget tests: hero renders Spent + Left
-  to spend; trend chip switch already covered; month-switcher shows the button only off-current).
-- Playwright: dashboard opens focused; hero shows headline + 2 stats, vertically centered;
-  switch trend series → line morphs; navigate a month → "This month" button appears, returns.
-
-## Open items / next
-The authoritative, current list lives in the **status header** at the top of this file
-("Still left to implement"). In short, what remains is **Phase 4b+**: Auth.js Google sign-in,
-Vercel deploy + PWA push overspend alerts, light-theme polish, per-user persistence of the
-dashboard layout/nav, and a few optional forecasting/offline follow-ups. All feature screens,
-the rules engine, real-bank import + OpenAI categorization, and the dashboard rework are done.
-
-## ✅ DONE: user-defined categorization rules page (shipped 2026-05-31)
-This idea was implemented. Design + plan: `docs/superpowers/specs/2026-05-31-categorization-rules-design.md`
-and `docs/superpowers/plans/2026-05-31-categorization-rules.md`. Outcome: a `/rules` page with
-description rules (contains/starts-with/exact) setting category/kind/tags, running before the
-LLM at import with on-demand backfill; the hardcoded `classifyRules` keywords were migrated into
-editable `categorization_rules` seed rows; per-month suggestions are mined from corrected data.
-See the status header for the full summary.
-
-## Future dashboard idea (not started): `/spending` explorer page
-Noted while building the breakdown widget (`docs/superpowers/specs/2026-06-01-dashboard-spending-breakdown-design.md`,
-"Out of scope"): a dedicated full page with cross-filtering chips and a month switcher for
-deeper "click around" exploration, beyond the single dashboard widget. Only build if the widget
-proves insufficient.
+| Concern | Choice |
+|---|---|
+| Framework | **Next.js 16** App Router + TypeScript, Turbopack |
+| UI | React 19, **Tailwind v4** (CSS `@theme`, no JS config), hand-rolled Radix + `cva` primitives in `src/components/ui/` (not shadcn — full control of the glass aesthetic) |
+| Theming | `next-themes`, HSL semantic tokens only (no raw hex), dark-first |
+| Motion | `motion` (Framer Motion v12), `<MotionConfig reducedMotion="user">`; springy presets in `src/lib/motion.ts` |
+| Data | TanStack Query v5 over `useData()`; Drizzle ORM + Neon serverless |
+| Local state | Zustand v5 |
+| Drag reorder | `@dnd-kit` (dashboard widgets) |
+| Charts | **CSS-width bars + inline SVG** (Recharts was removed — no chart dep) |
+| Auth | Auth.js v5 (`next-auth@5`) + `@auth/drizzle-adapter`, Google |
+| LLM | OpenAI `gpt-4o-mini` (structured output) |
+| Format | `Intl.NumberFormat('sv-SE')`; English chrome |
+| Tests | Vitest + React Testing Library |
+
+---
+
+## Repo map
+
+```
+src/
+  app/
+    (app)/            authed routes: dashboard (page.tsx), transactions, budgets, goals,
+                      categories, accounts, tags, rules, settings; layout = auth gate
+    actions/          server actions: data (CRUD), ai (categorize + training log), fx, auth, preferences
+    layout.tsx        root: fonts, Providers, metadata; manifest.ts; apple-icon.png
+  components/
+    dashboard/        widgets + registry + compute (pure dashboard aggregation)
+    transactions/     row, detail panel, split/tag editors
+    import/           the import modal
+    nav/              bottom nav, account menu, toggles
+    ui/               Radix + cva primitives (button, select, dialog, …)
+  lib/
+    domain/           types + effectiveExpense (the spending invariant) + selectors
+    ai/               categorize-openai, select-examples (few-shot selection)
+    db/               schema, queries, map (row<->domain), claim, index
+    rules.ts fx.ts parse-csv.ts parse-revolut.ts categorize.ts format.ts auth*.ts
+  store/              data.ts (TanStack Query facade) + ui.ts (Zustand)
+  data/mock.ts        seed dataset (24 categories, sample accounts/transactions)
+docs/superpowers/     design specs + implementation plans (the decision record)
+scripts/              generate-icons.mjs
+public/               sw.js, icons, mock-imports/
+```
+
+---
+
+## Conventions
+
+- **TDD.** New behavior gets a failing test first (the suite is the regression net). Pure logic
+  (selectors, fx, rules, example selection, parsers) is unit-tested directly; UI tests render with
+  `src/test/render.tsx` (`renderWithData` seeds a QueryClient).
+- **Spending math only via `effectiveExpense`** — never sum `amount`.
+- **Money is decimal** (`numeric(12,2)`), displayed `sv-SE`; parse `100,75`.
+- **Dates are ISO `yyyy-mm-dd` strings.** Slice them (`monthKey = date.slice(0,7)`) — don't
+  `new Date()`-parse in hot loops (it's slower and shifts months across timezones).
+- **Colors are HSL token triplets** (`--primary: 217 91% 60%`), composed with `hsl(var(--x) / a)`.
+  No raw hex in components.
+- **Memoize derived figures.** The dashboard/transactions pages `useMemo` their aggregations on the
+  dataset slices (referentially stable via Query structural sharing); rows are `React.memo`'d.
+- **Server actions are the only DB boundary;** components never import `db` directly.
+
+---
+
+## Roadmap — what's left
+
+Everything below is verified against the code as of 2026-06-09. Prioritized.
+
+**P1 — finish the PWA story / cleanup**
+- **Overspend alerts via Web Push** — *not built.* `sw.js` has no `push`/`notificationclick`
+  handlers and there's no subscription flow or server-side trigger. This is the real remaining PWA
+  work (install + offline shell already work).
+- **Local-dev DB isolation** — a Neon `dev` branch exists, but `.env.local` still points at the
+  prod/real-data branch, so **local dev currently writes to prod data.** Repoint `.env.local` at the
+  dev branch, set `DEV_USER_ID=user-stub`, wipe + `db:seed`. (Code side is done via the env bypass.)
+- **Cleanup** — drop the unused `serwist` / `@serwist/next` deps; replace the boilerplate `README.md`
+  with the "Running it" section above.
+
+**P2 — nice-to-haves**
+- **Dashboard forecast widget** — `budgetForecasts()` (history-blended, current-month projection)
+  exists and is surfaced on `/budgets`; a dashboard widget would reuse it.
+- **Light-theme ("Silver Slate") polish** — the light theme exists in `globals.css` but was tuned
+  less than dark; a polish pass is deferred.
+- **Offline write queue/replay** — reads work offline (localStorage cache); writes need the network
+  (optimistic + rollback). A queue would let edits made offline replay on reconnect.
+
+**Optional / only if needed**
+- **`/spending` explorer page** — a dedicated cross-filtering page for deeper exploration. Only build
+  if the dashboard breakdown widget proves insufficient
+  (`docs/superpowers/specs/2026-06-01-dashboard-spending-breakdown-design.md`, "Out of scope").
+
+---
+
+## Feature inventory (shipped)
+
+A quick map of what's done, for orientation. Details + rationale are in the design specs.
+
+- **Dashboard** — drag-reorderable widgets with per-widget S/M/L sizing: hero "This month",
+  spending breakdown (Categories | Tags | Accounts toggle, ±% vs last month, tap-to-expand
+  subcategories), trend (with subcategory drill-down), budgets, goals, recent activity, calendar
+  heatmap. Layout persists per user.
+- **Transactions** — search + filters (category/account/tag/needs-review/has-splits), month nav with
+  filtered count + Spent, master-detail (desktop sticky panel + mobile sheet). Detail panel: category
+  + **Approve**, tags, split (among N people; only `mine` counts), kind, exclude, notes.
+- **Budgets / Goals / Categories / Tags / Accounts** — full CRUD; budgets have health + forecast;
+  goals are transaction-driven (`baseline + Σ|linked transfers|`); categories nest (parent/sub).
+- **Rules** — `/rules` page: description rules set category/kind/tags, run before the LLM at import,
+  with per-rule and bulk backfill; per-month suggestions mined from corrected data.
+- **Import** — SEB + Revolut CSV, non-SEK→SEK conversion, dedupe, transfer-pair detection, editable
+  review with kind/category/confidence and a filter bar.
+- **AI categorization + learning loop** — rules → OpenAI few-shot (built from your corrections +
+  approvals, relevance-matched) → keyword fallback; training set in `categorization_examples`.
+- **Auth** — Google sign-in (Auth.js v5), single-owner allowlist, stub-data claim, dev bypass.
+- **Per-user sync** — dashboard layout + nav config in Neon; account avatar + sign-out in every header.
+- **PWA + polish** — installable, offline shell, level-bars icon; native tap feedback, iOS safe-area,
+  springy detail-panel cross-fade, memoized aggregations, mobile-contained bottom nav.
