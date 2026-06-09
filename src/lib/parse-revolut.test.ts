@@ -61,6 +61,31 @@ describe("normalizeRevolut", () => {
     expect(byDesc(rows, "Reward bonus")).toMatchObject({ kind: null, amount: 5 });
   });
 
+  it("detects and normalizes a Dutch-language Revolut export", () => {
+    // Real header + rows from a Dutch (nl) Revolut account statement.
+    const nl = `Type,Product,Startdatum,Datum voltooid,Beschrijving,Bedrag,Kosten,Valuta,Status,Saldo
+Wisselen,Betaalrekening,2026-03-05 21:44:31,2026-03-05 21:44:31,Gewisseld naar EUR,251.00,0.00,EUR,VOLTOOID,251.00
+Geld toevoegen,Betaalrekening,2026-01-17 10:41:37,2026-01-17 10:41:39,xPay top-up,500.00,0.00,EUR,VOLTOOID,500.00
+Overschrijving,Betaalrekening,2026-03-05 21:44:44,2026-03-05 21:44:46,To Katherine Ospina Morales,-251.00,0.00,EUR,VOLTOOID,0.00
+Kaartbetaling,Betaalrekening,2026-03-10 10:00:00,2026-03-10 10:00:00,Mercadona,-30.00,0.50,EUR,VOLTOOID,0.00
+Overschrijving,Betaalrekening,2026-02-01 02:13:06,,Pending,-10.00,0.00,EUR,WACHT,0.00`;
+    const parsed = parseCsv(nl);
+    expect(isRevolutCsv(parsed.headers)).toBe(true);
+
+    const out = normalizeRevolut(parsed);
+    // Drops the exchange (Wisselen) and top-up (Geld toevoegen); the non-completed (WACHT) row is gone too.
+    expect(out).toHaveLength(2);
+    expect(byDesc(out, "Gewisseld")).toBeUndefined();
+    expect(byDesc(out, "xPay")).toBeUndefined();
+    expect(byDesc(out, "Pending")).toBeUndefined();
+
+    // EUR is read from the Valuta column (so it can later be converted to SEK).
+    const katherine = byDesc(out, "Katherine");
+    expect(katherine).toMatchObject({ currency: "EUR", amount: -251, kind: "transfer", date: "2026-03-05" });
+    // Kaartbetaling → expense, with the Kosten (fee) folded in.
+    expect(byDesc(out, "Mercadona")).toMatchObject({ currency: "EUR", amount: -30.5, kind: "expense" });
+  });
+
   it("reads the Currency column for each row (defaults to SEK if missing)", () => {
     const sample = `Type,Product,Started Date,Completed Date,Description,Amount,Fee,Currency,State,Balance
 Card Payment,Current,2026-02-05 10:00:00,2026-02-05 10:00:00,Hotel Madrid,-100.00,0.00,eur,COMPLETED,-100.00
