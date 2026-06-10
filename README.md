@@ -62,9 +62,10 @@ With `DEV_USER_ID` set you can run locally without configuring Google at all (th
 - **Import** parses SEB + Revolut CSV, converts non-SEK rows to SEK at today's ECB rate, dedupes, and
   detects transfer pairs.
 
-Full architecture, conventions, and the verified roadmap are in **[PLAN.md](./PLAN.md)**; requested
-ideas and open decisions are in **[BACKLOG.md](./BACKLOG.md)**; design specs live in
-`docs/superpowers/specs/`.
+Want to rebuild Pegels from scratch? **[PRD.md](./PRD.md)** is the requirements-first spec — domain
+model, business rules, per-feature acceptance criteria, and a definition of done. Full architecture,
+conventions, and the verified roadmap are in **[PLAN.md](./PLAN.md)**; requested ideas and open
+decisions are in **[BACKLOG.md](./BACKLOG.md)**; design specs live in `docs/superpowers/specs/`.
 
 ## Deploy
 
