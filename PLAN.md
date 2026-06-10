@@ -5,7 +5,7 @@
 > analysis (budgets, goals, trends). Built with Next.js 16 (App Router) + Neon Postgres + OpenAI,
 > deployed on Vercel.
 >
-> **Status — 2026-06-09:** live on Vercel, 267 tests passing, build + lint clean. Every feature
+> **Status — 2026-06-09:** live on Vercel, 269 tests passing, build + lint clean. Every feature
 > screen, the import + categorization pipeline, auth, and per-user sync are shipped. What remains
 > is a short, optional roadmap (see the end of this file).
 >
@@ -21,7 +21,7 @@ npm install
 npm run db:push      # create/sync the Neon schema (drizzle-kit)
 npm run db:seed      # load the Swedish sample dataset
 npm run dev          # http://localhost:3000
-npm test             # vitest (267 tests)
+npm test             # vitest (269 tests)
 npm run build        # production build (Turbopack)
 ```
 

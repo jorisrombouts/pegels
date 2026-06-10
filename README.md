@@ -43,7 +43,7 @@ With `DEV_USER_ID` set you can run locally without configuring Google at all (th
 |---|---|
 | `npm run dev` | Dev server (Turbopack) |
 | `npm run build` / `start` | Production build / serve |
-| `npm test` | Vitest suite (267 tests) |
+| `npm test` | Vitest suite (269 tests) |
 | `npm run lint` | ESLint |
 | `npm run db:push` | Sync the Drizzle schema to Neon |
 | `npm run db:seed` | Load the sample dataset |
