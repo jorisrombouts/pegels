@@ -1,4 +1,4 @@
-import { QueryClient } from "@tanstack/react-query";
+import { QueryClient, defaultShouldDehydrateQuery, type Query } from "@tanstack/react-query";
 import { createSyncStoragePersister } from "@tanstack/query-sync-storage-persister";
 
 const DAY = 1000 * 60 * 60 * 24;
@@ -31,3 +31,16 @@ export function createPersister() {
 }
 
 export const PERSIST_MAX_AGE = DAY;
+
+// Bump to discard a previously persisted cache (e.g. when changing what gets persisted below).
+export const PERSIST_BUSTER = "2026-06-10-prefs";
+
+/**
+ * Persist the dataset (for instant + offline reads) but NEVER the `['preferences']` query: prefs
+ * are read fresh from the server each session (server is source of truth). A persisted,
+ * infinitely-stale copy would be restored on reload and clobber the user's saved dashboard layout
+ * and bottom-nav config — making preferences effectively write-only.
+ */
+export function shouldDehydrateQuery(query: Query): boolean {
+  return query.queryKey[0] !== "preferences" && defaultShouldDehydrateQuery(query);
+}

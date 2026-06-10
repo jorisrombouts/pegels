@@ -5,7 +5,7 @@ import { MotionConfig } from "motion/react";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { getQueryClient, createPersister, PERSIST_MAX_AGE } from "@/lib/query";
+import { getQueryClient, createPersister, PERSIST_MAX_AGE, PERSIST_BUSTER, shouldDehydrateQuery } from "@/lib/query";
 
 export function Providers({ children }: { children: React.ReactNode }) {
   const client = getQueryClient();
@@ -22,7 +22,10 @@ export function Providers({ children }: { children: React.ReactNode }) {
   // Browser: persist the Query cache to localStorage (instant + offline reads).
   // Server render: no persister available, use the plain provider.
   return persister ? (
-    <PersistQueryClientProvider client={client} persistOptions={{ persister, maxAge: PERSIST_MAX_AGE }}>
+    <PersistQueryClientProvider
+      client={client}
+      persistOptions={{ persister, maxAge: PERSIST_MAX_AGE, buster: PERSIST_BUSTER, dehydrateOptions: { shouldDehydrateQuery } }}
+    >
       {inner}
     </PersistQueryClientProvider>
   ) : (
