@@ -107,6 +107,30 @@ describe("categorizeTransactions", () => {
     expect(out[0]).toMatchObject({ kind: "expense", categoryId: null, confidence: 0.4 });
   });
 
+  it("never classifies a negative amount as income, even when the AI says income", async () => {
+    categorizeWithOpenAIMock.mockResolvedValue([
+      { index: 0, kind: "income", categoryId: null, confidence: 0.9 },
+    ]);
+    const out = await categorizeTransactions([{ index: 0, description: "MYSTERY SHOP", amount: -742.5 }]);
+    expect(out[0].kind).toBe("expense");
+  });
+
+  it("never classifies a positive amount as expense, and drops its category", async () => {
+    categorizeWithOpenAIMock.mockResolvedValue([
+      { index: 0, kind: "expense", categoryId: "cat-groceries", confidence: 0.9 },
+    ]);
+    const out = await categorizeTransactions([{ index: 0, description: "MYSTERY DEPOSIT", amount: 500 }]);
+    expect(out[0]).toMatchObject({ kind: "income", categoryId: null });
+  });
+
+  it("leaves a transfer's kind alone regardless of the amount sign", async () => {
+    categorizeWithOpenAIMock.mockResolvedValue([
+      { index: 0, kind: "transfer", categoryId: null, confidence: 0.9 },
+    ]);
+    const out = await categorizeTransactions([{ index: 0, description: "MYSTERY MOVE", amount: -1000 }]);
+    expect(out[0].kind).toBe("transfer");
+  });
+
   it("applies a matching rule deterministically and skips the LLM, carrying tags", async () => {
     categorizeWithOpenAIMock.mockResolvedValue([]);
     const out = await categorizeTransactions([{ index: 0, description: "ICA Maxi", amount: -200 }]);

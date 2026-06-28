@@ -90,11 +90,26 @@ export async function categorizeTransactions(rows: AiRow[]): Promise<AiResult[]>
       ruled.get(r.index) ??
       aiResults.find((a) => a.index === r.index) ??
       ({ index: r.index, kind: r.amount < 0 ? "expense" : "income", categoryId: null, confidence: 0.4 } as AiResult);
+    reconcileKindWithSign(res, r.amount); // the data model forbids income<0 / expense>0; the sign wins
     if (res.categoryId && !validIds.has(res.categoryId)) res.categoryId = null;
     if (!ruled.has(r.index)) res.addTagIds = ruleTags.get(r.index) ?? [];
     out.push(res);
   }
   return out;
+}
+
+/**
+ * Enforce the sign convention (negative = expense, positive = income) the LLM can violate.
+ * Transfers move in either direction, so they're left untouched; a kind flipped to a non-expense
+ * also drops its category (only expenses carry one).
+ */
+function reconcileKindWithSign(res: AiResult, amount: number): void {
+  if (res.kind === "transfer" || amount === 0) return;
+  const expected: TransactionKind = amount < 0 ? "expense" : "income";
+  if (res.kind !== expected) {
+    res.kind = expected;
+    if (expected !== "expense") res.categoryId = null;
+  }
 }
 
 export async function previewRuleBackfill(ruleId?: string): Promise<{ count: number; samples: { description: string }[] }> {

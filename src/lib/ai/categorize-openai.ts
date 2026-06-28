@@ -29,11 +29,14 @@ export function buildMessages(rows: AiRow[], categories: AiCategory[], examples:
   let system =
     "You categorize Swedish bank transactions. For each row classify it into a kind and, " +
     "for expenses, the best-fit category from the list.\n\n" +
+    "The amount sign is authoritative: a negative amount is money leaving the account, a positive " +
+    "amount is money coming in. Never label a negative amount as income, and never label a positive " +
+    "amount as expense.\n\n" +
     "kind is one of:\n" +
-    "- income: money coming in. Salary (LÖN) is income.\n" +
+    "- income: money coming in (amount is positive). Salary (LÖN) is income.\n" +
     "- transfer: movement between the user's own accounts, card-bill payments " +
     "(SEB Kort, American Express/Amex), and top-ups to Revolut or Avanza. Transfers have categoryId null.\n" +
-    "- expense: everything the user actually buys. Pick the best-fit categoryId.\n\n" +
+    "- expense: everything the user actually buys (amount is negative). Pick the best-fit categoryId.\n\n" +
     "Set categoryId to null when no category fits or when the kind is income/transfer.\n" +
     "confidence is a number from 0 to 1.\n\n" +
     "Categories (id = name):\n" +
