@@ -28,10 +28,11 @@ export function computeDashboard(data: Dataset, month: string, accountFilter: st
   const budgets = budgetStatuses(data.budgets, data.transactions, maps, month);
   const budgetLimitTotal = budgets.reduce((s, b) => s + b.limit, 0);
 
-  const budgetRemaining = budgetLimitTotal - spent; // can be negative if over
-  // Safe to spend per day for the rest of the month (only meaningful for the current month).
-  const safePerDay = isCurrentMonth && daysLeft > 0 ? Math.max(budgetRemaining, 0) / daysLeft : null;
   const avgPerDay = daysElapsed > 0 ? spent / daysElapsed : 0;
+  // End-of-month projection: scale the current daily pace across the whole month. A completed /
+  // non-current month is already final, so its projection is just its actual spend.
+  const projected = isCurrentMonth ? avgPerDay * daysInMonth : spent;
+  const projectedChangePct = prevSpent > 0 ? ((projected - prevSpent) / prevSpent) * 100 : null;
 
   const byCategoryDelta = withDelta<Category>(
     spendByRootCategory(data.transactions, maps, data.categories, month, accountFilter).map((r) => ({ item: r.category, amount: r.amount })),
@@ -64,9 +65,9 @@ export function computeDashboard(data: Dataset, month: string, accountFilter: st
     daysElapsed,
     daysLeft,
     isCurrentMonth,
-    budgetRemaining,
-    safePerDay,
     avgPerDay,
+    projected,
+    projectedChangePct,
     byCategoryDelta,
     byTagDelta,
     byAccountDelta,

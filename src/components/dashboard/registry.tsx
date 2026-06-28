@@ -74,8 +74,7 @@ function HeroStat({ label, value, sub, tone }: { label: string; value: string; s
 
 export const widgets: Record<string, (ctx: DashCtx, size: WidgetSize) => React.ReactNode> = {
   total: ({ d, masked }) => {
-    const over = d.budgetRemaining < 0;
-    const hasBudget = d.budgetLimitTotal > 0;
+    const days = (n: number) => `${n} ${n === 1 ? "day" : "days"}`;
     return (
       <Card className="flex h-full flex-col justify-center">
         <CardHeader label="This month" />
@@ -95,25 +94,24 @@ export const widgets: Record<string, (ctx: DashCtx, size: WidgetSize) => React.R
           </div>
           <p className="mt-1 text-xs text-muted-foreground">spent so far</p>
 
-          {/* Supporting stats: left to spend + pace */}
+          {/* Supporting stats: spending pace + where it lands by month end */}
           <div className="mt-5 flex gap-3">
-            {hasBudget ? (
-              <>
-                <HeroStat
-                  label={over ? "Over budget" : "Left to spend"}
-                  value={formatSEKAbs(d.budgetRemaining, masked)}
-                  sub={`of ${formatSEKAbs(d.budgetLimitTotal, masked)} budget`}
-                  tone={over ? "hsl(var(--negative))" : undefined}
-                />
-                <HeroStat
-                  label={d.safePerDay != null ? "Safe to spend" : "Avg / day"}
-                  value={`${formatSEKAbs(d.safePerDay ?? d.avgPerDay, masked)}/day`}
-                  sub={d.safePerDay != null ? `${d.daysLeft} days left` : `over ${d.daysInMonth} days`}
-                  tone={d.safePerDay != null ? "hsl(var(--positive))" : undefined}
-                />
-              </>
-            ) : (
-              <HeroStat label="Avg / day" value={`${formatSEKAbs(d.avgPerDay, masked)}/day`} sub={`over ${d.daysElapsed} days`} />
+            <HeroStat
+              label="Daily pace"
+              value={`${formatSEKAbs(d.avgPerDay, masked)}/day`}
+              sub={`over ${days(d.daysElapsed)}`}
+            />
+            {d.isCurrentMonth && (
+              <HeroStat
+                label="Projected"
+                value={formatSEKAbs(d.projected, masked)}
+                sub={
+                  d.projectedChangePct != null
+                    ? `${formatSignedPct(d.projectedChangePct)} vs ${monthLabel(d.prevKey).split(" ")[0]}`
+                    : `${days(d.daysLeft)} left`
+                }
+                tone={d.projectedChangePct != null ? (d.projectedChangePct <= 0 ? "hsl(var(--positive))" : "hsl(var(--negative))") : undefined}
+              />
             )}
           </div>
         </div>

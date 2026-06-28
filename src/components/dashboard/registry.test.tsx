@@ -47,16 +47,25 @@ function makeCtx(): DashCtx {
 
 const SIZES: WidgetSize[] = ["small", "medium", "large"];
 
-describe("total widget no-budget hero", () => {
-  it("shows 'Avg / day' but not 'Income' when there are no budgets", () => {
+describe("total widget hero", () => {
+  it("shows daily pace and a projection, never the old budget tiles or an Income line", () => {
+    const ctx = makeCtx(); // current month (today = 2025-03-31)
+    render(<>{widgets.total(ctx, "large")}</>);
+    expect(screen.getByText("Daily pace")).toBeInTheDocument();
+    expect(screen.getByText("Projected")).toBeInTheDocument();
+    expect(screen.queryByText("Income")).not.toBeInTheDocument();
+    expect(screen.queryByText("Safe to spend")).not.toBeInTheDocument();
+    expect(screen.queryByText("Over budget")).not.toBeInTheDocument();
+  });
+
+  it("renders the hero even with no budgets (budgets no longer drive it)", () => {
     const ctx = makeCtx();
     const noBudget: DashCtx = {
       ...ctx,
       d: computeDashboard({ ...seedDataset, budgets: [] }, "2025-03", "all", new Date("2025-03-31T12:00:00Z")),
     };
     render(<>{widgets.total(noBudget, "large")}</>);
-    expect(screen.getByText("Avg / day")).toBeInTheDocument();
-    expect(screen.queryByText("Income")).not.toBeInTheDocument();
+    expect(screen.getByText("Daily pace")).toBeInTheDocument();
   });
 });
 
