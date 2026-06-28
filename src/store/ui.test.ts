@@ -1,7 +1,14 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { MAX_PRIMARY_NAV, useUI, migrateLayoutToV3, defaultLayout } from "./ui";
+import { monthKey } from "@/lib/format";
 
 beforeEach(() => useUI.getState().resetNav());
+
+describe("default month", () => {
+  it("defaults to the current month, not a hardcoded mock month", () => {
+    expect(useUI.getState().month).toBe(monthKey(new Date()));
+  });
+});
 
 const primaryKeys = () => useUI.getState().navConfig.filter((n) => n.primary).map((n) => n.key);
 
