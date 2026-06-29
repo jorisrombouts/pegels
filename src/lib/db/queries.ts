@@ -15,7 +15,8 @@ const batch = (ops: Batchable[]) => db.batch(ops as [Batchable, ...Batchable[]])
 // ── Reads ──
 
 export async function getDataset(userId: string): Promise<Dataset> {
-  const [accRows, catRows, tagRows, txRows, budRows, goalRows, ruleRows] = await Promise.all([
+  // One Neon round-trip for all seven reads (batch) instead of seven parallel HTTP requests.
+  const [accRows, catRows, tagRows, txRows, budRows, goalRows, ruleRows] = await batch([
     db.select().from(accounts).where(eq(accounts.userId, userId)),
     db.select().from(categories).where(eq(categories.userId, userId)),
     db.select().from(tags).where(eq(tags.userId, userId)),
