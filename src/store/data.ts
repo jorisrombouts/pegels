@@ -2,13 +2,13 @@
 
 import { useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { seedDataset } from "@/data/mock";
 import type { Dataset } from "@/data/mock";
 import * as api from "@/app/actions/data";
 import * as M from "./dataset-mutations";
 import type { Account, Budget, Category, CategorizationRule, Goal, Tag, Transaction } from "@/lib/domain/types";
 
-export const DATASET_KEY = ["dataset"] as const;
+export { DATASET_KEY } from "./dataset-key";
+import { DATASET_KEY } from "./dataset-key";
 
 /**
  * Same shape as the old Zustand store (6 arrays + 15 mutations), so consumers are
@@ -60,7 +60,12 @@ export function useData() {
       reorderRules: (orderedIds: string[]) => run((d) => M.applyReorderRules(d, orderedIds), () => api.reorderRules(orderedIds)),
 
       clearData: () => run(() => M.emptyDataset, () => api.clearData()),
-      resetData: () => run(() => seedDataset, () => api.resetData()),
+      // Lazy-load the sample dataset so it isn't in the main client bundle — this seldom-used
+      // action is the only thing that needs it on the client.
+      resetData: async () => {
+        const { seedDataset } = await import("@/data/mock");
+        run(() => seedDataset, () => api.resetData());
+      },
     };
   }, [qc]);
 

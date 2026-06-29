@@ -45,4 +45,15 @@ describe("useData facade", () => {
     expect(cache().transactions).toHaveLength(0);
     expect(cache().accounts).toHaveLength(0);
   });
+
+  it("resetData repopulates the cache with the lazily-loaded sample dataset", async () => {
+    const { result, cache } = setup();
+    act(() => result.current.clearData());
+    expect(cache().transactions).toHaveLength(0);
+    await act(async () => {
+      await result.current.resetData();
+    });
+    expect(cache().transactions.length).toBeGreaterThan(0);
+    expect(cache().accounts.length).toBeGreaterThan(0);
+  });
 });
