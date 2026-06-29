@@ -43,11 +43,15 @@ With `DEV_USER_ID` set you can run locally without configuring Google at all (th
 |---|---|
 | `npm run dev` | Dev server (Turbopack) |
 | `npm run build` / `start` | Production build / serve |
-| `npm test` | Vitest suite (269 tests) |
-| `npm run lint` | ESLint |
+| `npm test` | Vitest suite (296 tests) |
+| `npm run lint` | ESLint — fails on unused imports/vars |
+| `npm run lint:fix` | ESLint with autofix |
+| `npm run check:docs` | Verify markdown links + source-path references resolve |
 | `npm run db:push` | Sync the Drizzle schema to Neon |
 | `npm run db:seed` | Load the sample dataset |
 | `npm run db:generate` | Generate a SQL migration |
+
+A Husky pre-commit hook runs `lint-staged` (ESLint + autofix on staged files) and `check:docs` on every commit.
 
 ## How it works
 
