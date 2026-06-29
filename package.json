@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint --max-warnings 0",
     "lint:fix": "eslint --fix",
+    "check:docs": "node scripts/check-doc-refs.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
     "db:push": "drizzle-kit push",
@@ -16,7 +17,7 @@
     "prepare": "husky"
   },
   "lint-staged": {
-    "*.{ts,tsx}": "eslint --fix --max-warnings 0"
+    "*.{ts,tsx,mjs,cjs}": "eslint --fix --max-warnings 0"
   },
   "dependencies": {
     "@auth/drizzle-adapter": "^1.11.2",
