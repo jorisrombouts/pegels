@@ -1,6 +1,6 @@
-import { and, eq, isNull, ne, sql, type SQL } from "drizzle-orm";
+import { and, desc, eq, isNull, ne, sql, type SQL } from "drizzle-orm";
 import { db } from "./index";
-import { categorizationExamples, EMBED_DIMS, type ExampleStatus } from "./schema";
+import { categorizationExamples, evalRuns, EMBED_DIMS, type ExampleStatus } from "./schema";
 import type { PlannedExample } from "../corpus/record";
 import type { TransactionKind } from "../domain/types";
 
@@ -181,6 +181,79 @@ export async function upsertExamples(rows: PlannedExample[]): Promise<void> {
   });
 
   await db.batch(ops as [(typeof ops)[number], ...typeof ops]);
+}
+
+/** A corpus row as the curation page shows it — everything except the embedding. */
+export interface CurationRow extends CorpusRow {
+  status: ExampleStatus;
+  gold: boolean;
+  source: string;
+  createdAt: string;
+  embedded: boolean;
+}
+
+/** The whole corpus for curation, most-seen first — the highest-leverage review order. */
+export async function loadCurationRows(userId: string): Promise<CurationRow[]> {
+  const rows = await db
+    .select()
+    .from(categorizationExamples)
+    .where(eq(categorizationExamples.userId, userId))
+    .orderBy(desc(categorizationExamples.hitCount));
+  return rows.map((r) => ({
+    id: r.id,
+    dedupKey: r.dedupKey,
+    cleanedDescription: r.cleanedDescription,
+    amount: Number(r.amount),
+    finalKind: r.finalKind,
+    finalCategoryId: r.finalCategoryId,
+    finalTagIds: r.finalTagIds ?? [],
+    hitCount: r.hitCount,
+    lastSeenAt: r.lastSeenAt,
+    status: r.status,
+    gold: r.gold,
+    source: r.source,
+    createdAt: r.createdAt,
+    embedded: r.embedding !== null,
+  }));
+}
+
+/** Curation edits. Scoped by userId so a stray id can't touch another user's corpus. */
+export async function updateExample(
+  userId: string,
+  id: string,
+  patch: Partial<{
+    status: ExampleStatus;
+    gold: boolean;
+    finalCategoryId: string | null;
+    finalTagIds: string[];
+    finalKind: TransactionKind;
+  }>,
+): Promise<void> {
+  await db
+    .update(categorizationExamples)
+    .set(patch)
+    .where(and(eq(categorizationExamples.userId, userId), eq(categorizationExamples.id, id)));
+}
+
+export async function deleteExample(userId: string, id: string): Promise<void> {
+  await db
+    .delete(categorizationExamples)
+    .where(and(eq(categorizationExamples.userId, userId), eq(categorizationExamples.id, id)));
+}
+
+/** Latest eval run, for the accuracy panel. */
+export async function latestEvalRun(userId: string) {
+  const rows = await db
+    .select()
+    .from(evalRuns)
+    .where(eq(evalRuns.userId, userId))
+    .orderBy(desc(evalRuns.createdAt))
+    .limit(1);
+  return rows[0] ?? null;
+}
+
+export async function insertEvalRun(row: typeof evalRuns.$inferInsert): Promise<void> {
+  await db.insert(evalRuns).values(row);
 }
 
 export interface VectorHit {

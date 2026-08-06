@@ -5,7 +5,7 @@
 > analysis (budgets, trends). Built with Next.js 16 (App Router) + Neon Postgres + OpenAI,
 > deployed on Vercel.
 >
-> **Status — 2026-06-09:** live on Vercel, 269 tests passing, build + lint clean. Every feature
+> **Status — 2026-08-06:** live on Vercel, 454 tests passing, build + lint clean. Every feature
 > screen, the import + categorization pipeline, auth, and per-user sync are shipped. What remains
 > is a short, optional roadmap (see the end of this file).
 >
@@ -18,11 +18,13 @@
 
 ```bash
 npm install
-npm run db:push      # create/sync the Neon schema (drizzle-kit)
-npm run db:seed      # load the Swedish sample dataset
-npm run dev          # http://localhost:3000
-npm test             # vitest (269 tests)
-npm run build        # production build (Turbopack)
+npm run db:push          # create/sync the Neon schema (runs db:prepare first)
+npm run db:seed          # load the Swedish sample dataset
+npm run corpus:backfill  # seed the categorization corpus from your own corrections
+npm run eval             # score categorization against the hold-out
+npm run dev              # http://localhost:3000
+npm test                 # vitest (454 tests)
+npm run build            # production build (Turbopack)
 ```
 
 **Environment** (`.env.local`):
@@ -30,7 +32,7 @@ npm run build        # production build (Turbopack)
 | Var | Required | Purpose |
 |---|---|---|
 | `DATABASE_URL` | yes | Neon Postgres connection string |
-| `OPENAI_API_KEY` | yes (for AI categorization) | OpenAI; without it, import falls back to keyword rules |
+| `OPENAI_API_KEY` | yes | OpenAI. There is no fallback — without a valid key, import fails with a visible error rather than guessing |
 | `AUTH_SECRET` | yes | Auth.js session encryption |
 | `AUTH_GOOGLE_ID` / `AUTH_GOOGLE_SECRET` | yes | Google OAuth client (redirect URI `…/api/auth/callback/google`) |
 | `OWNER_EMAIL` | yes | Single-owner allowlist — only this Google account may sign in (fail-closed) |
@@ -107,6 +109,18 @@ The prompt splits into a **stable, cacheable system message** (instructions, pri
 taxonomies) and a volatile user message carrying a deduplicated evidence table. `clampConfidence()`
 re-anchors the model's self-reported confidence on what retrieval actually found, so the review
 queue means *"the system has never seen this merchant"*.
+
+**Curating it** — `/training` (`src/app/(app)/training/page.tsx`). Retrieval fires only on
+**approved** merchants, so the review queue is the highest-leverage surface in the app: it is
+ordered most-seen-first, because approving a merchant seen 47 times buys far more future accuracy
+than one seen once. The corpus lives in its own `['corpus']` query rather than `['dataset']`, which
+is on every page's critical path.
+
+**Measuring it** — `npm run eval` (`src/lib/eval/`) scores the live pipeline against a
+deterministic hold-out (`gold`, excluded from retrieval). Reports kind, exact and root category,
+and micro-averaged tag F1, each split overall / seen-merchant / unseen-merchant, plus confidence
+calibration and review precision. The unseen number is the one that predicts how the next import
+will feel.
 
 ### Import pipeline (`src/components/import/import-modal.tsx`)
 
