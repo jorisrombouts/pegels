@@ -11,6 +11,7 @@ import { ServiceWorkerRegister } from "@/components/service-worker-register";
 import { PreferencesSync } from "@/components/preferences-sync";
 import { SaveFailedBanner } from "@/components/save-failed-banner";
 import { MonthInitializer } from "@/components/month-initializer";
+import { MotionProvider } from "@/components/motion-provider";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const session = await auth();
@@ -24,15 +25,17 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   return (
     <HydrationBoundary state={dehydratedState}>
-      <HydrationGate>
-        <ServiceWorkerRegister />
-        <PreferencesSync />
-        <SaveFailedBanner />
-        <MonthInitializer />
-        <div className="mx-auto w-full max-w-6xl px-4 pb-36 pt-[max(1.5rem,calc(env(safe-area-inset-top)+0.75rem))] sm:px-6 sm:pt-[max(2.5rem,calc(env(safe-area-inset-top)+0.75rem))]">{children}</div>
-        <LazyModals />
-        <BottomNav />
-      </HydrationGate>
+      <MotionProvider>
+        <HydrationGate>
+          <ServiceWorkerRegister />
+          <PreferencesSync />
+          <SaveFailedBanner />
+          <MonthInitializer />
+          <div className="mx-auto w-full max-w-6xl px-4 pb-36 pt-[max(1.5rem,calc(env(safe-area-inset-top)+0.75rem))] sm:px-6 sm:pt-[max(2.5rem,calc(env(safe-area-inset-top)+0.75rem))]">{children}</div>
+          <LazyModals />
+          <BottomNav />
+        </HydrationGate>
+      </MotionProvider>
     </HydrationBoundary>
   );
 }
