@@ -2,7 +2,7 @@
 
 A single-user Swedish personal-finance PWA. Import your bank transactions (SEB / Revolut CSV),
 auto-categorize them with an LLM that **learns from your corrections**, and get calm spending
-analysis — budgets, goals, trends, and a tap-to-fix review loop.
+analysis — budgets, trends, and a tap-to-fix review loop.
 
 Built with **Next.js 16** (App Router) · **Neon Postgres** + Drizzle · **OpenAI** · **Auth.js**
 (Google) · Tailwind v4 · TanStack Query. Deployed on Vercel.

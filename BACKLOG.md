@@ -22,15 +22,6 @@ and onboarding work but makes compliance a hard prerequisite (see Risks). Everyt
 by `getUserId()`, so the data model is ready — the gap is signup/authz, tenant-isolation hardening,
 and the compliance assessment. **Decide this before scoping integration/onboarding/compliance.**
 
-### Saving goals — keep, simplify, or cut? · Decision · needs-decision
-pegels centers on **expense analysis**; goals are a separate "savings" dimension (transaction-driven:
-`baseline + Σ |linked transfers|`, no manual logging). Worth deciding whether they earn their surface
-area.
-- **Keep** — low-maintenance, adds a forward-looking savings view.
-- **Simplify** — demote the `/goals` screen to a single "savings rate / saved this month" stat.
-- **Cut** — sharper focus on spending; removes a screen + the goal-linking UI in the detail panel.
-- Open Q: do you actually use them? Decide from real usage before investing further.
-
 ---
 
 ## Feature ideas

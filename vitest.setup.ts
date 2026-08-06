@@ -22,7 +22,6 @@ vi.mock("@/app/actions/data", async () => {
     upsertTag: noop, removeTag: noop,
     upsertAccount: noop, removeAccount: noop,
     upsertBudget: noop, removeBudget: noop,
-    upsertGoal: noop, removeGoal: noop,
     clearData: noop, resetData: noop,
   };
 });

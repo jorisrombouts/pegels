@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { MoreHorizontal, Plus, Upload } from "lucide-react";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
-import { navByKey, type NavItem } from "./nav-items";
+import { MORE_NAV, PRIMARY_NAV, type NavItem } from "./nav-items";
 import { cn } from "@/lib/utils";
 import { useUI } from "@/store/ui";
 import { useKeyboardOpen } from "@/lib/use-keyboard-open";
@@ -45,16 +45,12 @@ function NavButton({ item, active }: { item: NavItem; active: boolean }) {
 
 export function BottomNav() {
   const pathname = usePathname();
-  const navConfig = useUI((s) => s.navConfig);
   const setImportOpen = useUI((s) => s.setImportOpen);
   const setQuickAddOpen = useUI((s) => s.setQuickAddOpen);
 
   const keyboardOpen = useKeyboardOpen();
 
-  const resolve = (keys: { key: string }[]) => keys.map((n) => navByKey.get(n.key)).filter((i): i is NavItem => Boolean(i));
-  const primary = resolve(navConfig.filter((n) => n.primary));
-  const more = resolve(navConfig.filter((n) => !n.primary));
-  const moreActive = more.some((m) => isActive(pathname, m.href));
+  const moreActive = MORE_NAV.some((m) => isActive(pathname, m.href));
 
   return (
     <nav
@@ -67,7 +63,7 @@ export function BottomNav() {
       {/* Tabs pill — no `layout` here (it caused a vertical pop on route change);
           the pill slide uses layoutId and each tab animates its own width. */}
       <div className="glass flex items-center gap-1 rounded-full p-1.5 shadow-2xl sm:p-2">
-        {primary.map((item) => (
+        {PRIMARY_NAV.map((item) => (
           <NavButton key={item.key} item={item} active={isActive(pathname, item.href)} />
         ))}
 
@@ -87,7 +83,7 @@ export function BottomNav() {
                   Import
                 </button>
               </DropdownMenu.Item>
-              {more.map((item) => {
+              {MORE_NAV.map((item) => {
                 const Icon = item.icon;
                 return (
                   <DropdownMenu.Item key={item.key} asChild>

@@ -1,5 +1,5 @@
 import { effectiveExpense, includedNet } from "./effectiveExpense";
-import type { Account, Budget, Category, Goal, Tag, Transaction } from "./types";
+import type { Account, Budget, Category, Tag, Transaction } from "./types";
 import { monthKey } from "@/lib/format";
 
 export interface Maps {
@@ -343,31 +343,6 @@ export function budgetForecasts(
   });
 }
 
-export interface GoalProgress {
-  goal: Goal;
-  saved: number;
-  pct: number; // 0..1
-  daysLeft: number | null;
-  onTrack: boolean;
-}
-
-export function goalSaved(goal: Goal, transactions: Transaction[]): number {
-  return transactions.reduce((sum, t) => (t.goalId === goal.id ? sum + Math.abs(t.amount) : sum), goal.baseline);
-}
-
-export function goalProgress(goal: Goal, transactions: Transaction[], today = new Date()): GoalProgress {
-  const saved = goalSaved(goal, transactions);
-  const pct = goal.target > 0 ? saved / goal.target : 0;
-  let daysLeft: number | null = null;
-  if (goal.deadline) {
-    const ms = new Date(goal.deadline).getTime() - today.getTime();
-    daysLeft = Math.round(ms / 86_400_000);
-  }
-  // On track if progress keeps pace with elapsed time toward the deadline.
-  const onTrack = daysLeft === null ? pct >= 1 : pct >= 1 || daysLeft > 0;
-  return { goal, saved, pct, daysLeft, onTrack };
-}
-
 export interface TrendSeries {
   id: string; // "total" or a category id
   label: string;
@@ -458,22 +433,16 @@ export function dailySpend(
 
 const TRANSFER_DAY_WINDOW = 3;
 
-export interface ExistingTransferUpdate { id: string; goalId: string | null }
+export interface ExistingTransferUpdate { id: string }
 export interface TransferDetection { rows: Transaction[]; existingUpdates: ExistingTransferUpdate[] }
 
 /**
  * Detect internal transfers when importing `newRows`, pairing each against `existing`
  * transactions (opposite amount, different account, within TRANSFER_DAY_WINDOW days, not
  * already a transfer). Marks the new row as a transfer and returns updates for the matched
- * existing counterpart. The OUTFLOW leg (amount < 0) links to a goal when the INFLOW's
- * account backs one. Pure — returns new data, mutates nothing.
+ * existing counterpart. Pure — returns new data, mutates nothing.
  */
-export function detectTransfersOnImport(
-  newRows: Transaction[],
-  existing: Transaction[],
-  goals: Pick<Goal, "id" | "accountId">[],
-): TransferDetection {
-  const goalByAccount = new Map(goals.filter((g) => g.accountId).map((g) => [g.accountId as string, g.id]));
+export function detectTransfersOnImport(newRows: Transaction[], existing: Transaction[]): TransferDetection {
   const days = (a: string, b: string) => Math.abs((new Date(a).getTime() - new Date(b).getTime()) / 86_400_000);
   const usedExisting = new Set<string>();
   const existingUpdates: ExistingTransferUpdate[] = [];
@@ -486,16 +455,7 @@ export function detectTransfersOnImport(
     if (!e) return r;
     usedExisting.add(e.id);
     r.kind = "transfer";
-    if (r.amount < 0) {
-      // new row is the outflow; existing is the inflow → dest = existing.accountId
-      const goalId = goalByAccount.get(e.accountId) ?? null;
-      r.goalId = goalId;
-      existingUpdates.push({ id: e.id, goalId: null });
-    } else {
-      // new row is the inflow; existing is the outflow → dest = new row's account
-      const goalId = goalByAccount.get(r.accountId) ?? e.goalId ?? null;
-      existingUpdates.push({ id: e.id, goalId });
-    }
+    existingUpdates.push({ id: e.id });
     return r;
   });
 

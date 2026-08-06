@@ -40,12 +40,12 @@ describe("TransactionDetail", () => {
     expect(screen.getByPlaceholderText("Add a note…")).toBeInTheDocument();
   });
 
-  it("shows a Type control and a goal picker when Transfer is chosen", async () => {
-    const user = userEvent.setup();
+  it("shows a Type control offering expense, income and transfer", () => {
     renderWithData(<TransactionDetail txId="tx-001" />);
     expect(screen.getByText("Type")).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: /transfer/i }));
-    expect(screen.getByText(/Counts toward goal/i)).toBeInTheDocument();
+    for (const kind of ["expense", "income", "transfer"]) {
+      expect(screen.getByRole("button", { name: new RegExp(`^${kind}$`, "i") })).toBeInTheDocument();
+    }
   });
 
   it("shows an Approve button for a needs-review transaction and clears the flag when clicked", async () => {

@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 
-// Curated finance/life set — covers the categories/accounts/goals use cases.
+// Curated finance/life set — covers the categories/accounts use cases.
 const EMOJIS = [
   "🍔", "🍽️", "🛒", "☕", "🍻", "🍕", "🥡",
   "🏠", "⚡", "💡", "🔥", "🚿", "🛋️", "🔧",

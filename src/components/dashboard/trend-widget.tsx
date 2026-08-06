@@ -7,7 +7,7 @@ import { formatSEKAbs, monthLabel } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { spring } from "@/lib/motion";
 import type { TrendSeries } from "@/lib/domain/selectors";
-import type { WidgetSize } from "@/store/ui";
+import type { WidgetSize } from "./registry";
 
 /**
  * 6-month spending trend as a soft area chart, switchable between the Total and

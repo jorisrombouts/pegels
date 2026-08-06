@@ -53,7 +53,6 @@ export function QuickAddModal() {
       needsReview: false,
       tagIds: [],
       kind,
-      goalId: null,
     };
     addTransaction(tx);
     reset();

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { budgetForecasts, budgetStatuses, buildMaps, categorySpendInMonth, categoryTrends, detectTransfersOnImport, earliestDataMonth, goalProgress, goalSaved, latestDataMonth, monthNet, monthProgress, orderCategories, spendBySubcategory, spendByTag, withDelta } from "./selectors";
-import type { Budget, Category, Goal, Tag, Transaction } from "./types";
+import { budgetForecasts, budgetStatuses, buildMaps, categorySpendInMonth, categoryTrends, detectTransfersOnImport, earliestDataMonth, latestDataMonth, monthNet, monthProgress, orderCategories, spendBySubcategory, spendByTag, withDelta } from "./selectors";
+import type { Budget, Category, Tag, Transaction } from "./types";
 
 const food: Category = { id: "food", name: "Food", icon: "🍔", color: "150 60% 45%", parentId: null };
 const maps = buildMaps([food]);
@@ -10,7 +10,7 @@ function tx(amount: number, o: Partial<Transaction> = {}): Transaction {
     id: `t${Math.random()}`, date: "2025-03-10", description: "x", amount, accountId: "a",
     categoryId: "food", predictedCategoryId: "food", categoryConfidence: 0.9, categorySource: "model",
     needsReview: false, tagIds: [],
-    kind: amount < 0 ? "expense" : "income", goalId: null, ...o,
+    kind: amount < 0 ? "expense" : "income", ...o,
   };
 }
 
@@ -42,7 +42,7 @@ describe("categoryTrends subcategories", () => {
   const t2 = (catId: string, amount: number, date: string): Transaction => ({
     id: `t${Math.random()}`, date, description: "x", amount, accountId: "a",
     categoryId: catId, predictedCategoryId: null, categoryConfidence: null, categorySource: "user",
-    needsReview: false, tagIds: [], kind: "expense", goalId: null,
+    needsReview: false, tagIds: [], kind: "expense",
   });
 
   it("emits subcategory series tagged with parentId; total/top-level have none", () => {
@@ -80,44 +80,6 @@ describe("budgetStatuses", () => {
     const oneOff: Budget = { id: "c", categoryId: "food", limit: 100, month: "2025-04" };
     expect(budgetStatuses([oneOff], [], maps, "2025-03")).toHaveLength(0);
     expect(budgetStatuses([oneOff], [], maps, "2025-04")).toHaveLength(1);
-  });
-});
-
-describe("goalProgress", () => {
-  const base: Goal = {
-    id: "g", name: "Trip", icon: "🗾", target: 1000, baseline: 600, accountId: null, deadline: "2025-12-31",
-  };
-
-  it("sums baseline into saved and pct with no linked transfers", () => {
-    const p = goalProgress(base, [], new Date("2025-06-01"));
-    expect(p.saved).toBe(600);
-    expect(p.pct).toBeCloseTo(0.6);
-  });
-
-  it("reports days left and overdue", () => {
-    expect(goalProgress(base, [], new Date("2025-06-01")).daysLeft).toBeGreaterThan(0);
-    expect(goalProgress(base, [], new Date("2026-06-01")).daysLeft).toBeLessThan(0);
-  });
-
-  it("is on track while the deadline is in the future", () => {
-    expect(goalProgress(base, [], new Date("2025-06-01")).onTrack).toBe(true);
-  });
-});
-
-describe("goalSaved / goalProgress (transaction-driven)", () => {
-  const goal = { id: "g", name: "Japan", icon: "🗾", target: 25000, baseline: 6000, deadline: null, accountId: "spar" };
-  const txs = [
-    { ...tx(-3000), id: "t1", goalId: "g", kind: "transfer" as const, date: "2025-03-14" },
-    { ...tx(1000), id: "t2", goalId: "g", kind: "transfer" as const, date: "2025-04-02" },
-    { ...tx(-500), id: "t3", goalId: null, kind: "expense" as const, date: "2025-03-01" },
-  ];
-  it("sums baseline + |amount| of linked transfers", () => {
-    expect(goalSaved(goal as never, txs as never)).toBe(6000 + 3000 + 1000);
-  });
-  it("goalProgress reports saved and pct from transactions", () => {
-    const p = goalProgress(goal as never, txs as never, new Date("2025-05-01"));
-    expect(p.saved).toBe(10000);
-    expect(p.pct).toBeCloseTo(0.4);
   });
 });
 
@@ -175,40 +137,31 @@ describe("categorySpendInMonth", () => {
 });
 
 describe("detectTransfersOnImport", () => {
-  const goals = [{ id: "g-japan", accountId: "spar" }];
-  const mk = (id: string, accountId: string, amount: number, date: string) => ({ id, accountId, amount, date, kind: (amount < 0 ? "expense" : "income") as const, goalId: null });
+  const mk = (id: string, accountId: string, amount: number, date: string) => ({ id, accountId, amount, date, kind: (amount < 0 ? "expense" : "income") as const });
 
   it("marks a new inflow as transfer and updates the existing outflow leg", () => {
     const existing = [mk("seb-out", "seb", -5000, "2025-03-10")];
-    const { rows, existingUpdates } = detectTransfersOnImport([mk("rev-in", "rev", 5000, "2025-03-11")] as never, existing as never, goals as never);
+    const { rows, existingUpdates } = detectTransfersOnImport([mk("rev-in", "rev", 5000, "2025-03-11")] as never, existing as never);
     expect(rows[0].kind).toBe("transfer");
-    expect(existingUpdates).toEqual([{ id: "seb-out", goalId: null }]);
+    expect(existingUpdates).toEqual([{ id: "seb-out" }]);
   });
 
-  it("links the outflow to a goal when the inflow account backs one", () => {
-    const existing = [mk("seb-out", "seb", -3000, "2025-03-10")];
-    const { rows, existingUpdates } = detectTransfersOnImport([mk("spar-in", "spar", 3000, "2025-03-10")] as never, existing as never, goals as never);
-    expect(rows[0].kind).toBe("transfer");
-    expect(existingUpdates).toEqual([{ id: "seb-out", goalId: "g-japan" }]);
-  });
-
-  it("when the NEW row is the outflow, it gets the goal and existing inflow has none", () => {
+  it("marks a new outflow as transfer and updates the existing inflow leg", () => {
     const existing = [mk("spar-in", "spar", 3000, "2025-03-10")];
-    const { rows, existingUpdates } = detectTransfersOnImport([mk("seb-out", "seb", -3000, "2025-03-11")] as never, existing as never, goals as never);
+    const { rows, existingUpdates } = detectTransfersOnImport([mk("seb-out", "seb", -3000, "2025-03-11")] as never, existing as never);
     expect(rows[0].kind).toBe("transfer");
-    expect(rows[0].goalId).toBe("g-japan");
-    expect(existingUpdates).toEqual([{ id: "spar-in", goalId: null }]);
+    expect(existingUpdates).toEqual([{ id: "spar-in" }]);
   });
 
   it("leaves an unmatched inflow as income with no updates", () => {
-    const { rows, existingUpdates } = detectTransfersOnImport([mk("x", "rev", 5000, "2025-03-11")] as never, [] as never, goals as never);
+    const { rows, existingUpdates } = detectTransfersOnImport([mk("x", "rev", 5000, "2025-03-11")] as never, [] as never);
     expect(rows[0].kind).toBe("income");
     expect(existingUpdates).toEqual([]);
   });
 
   it("does not pair same-account rows", () => {
     const existing = [mk("a", "seb", -5000, "2025-03-10")];
-    const { rows, existingUpdates } = detectTransfersOnImport([mk("b", "seb", 5000, "2025-03-10")] as never, existing as never, goals as never);
+    const { rows, existingUpdates } = detectTransfersOnImport([mk("b", "seb", 5000, "2025-03-10")] as never, existing as never);
     expect(rows[0].kind).toBe("income");
     expect(existingUpdates).toEqual([]);
   });
@@ -286,7 +239,7 @@ describe("spendBySubcategory", () => {
   const t = (id: string | null, amount: number): Transaction => ({
     id: `t${Math.random()}`, date: "2025-03-10", description: "x", amount, accountId: "a",
     categoryId: id, predictedCategoryId: null, categoryConfidence: null, categorySource: "user",
-    needsReview: false, tagIds: [], kind: "expense", goalId: null,
+    needsReview: false, tagIds: [], kind: "expense",
   });
   it("groups a parent's spend by immediate subcategory, sorted desc", () => {
     const txs = [t("grocery", -100), t("grocery", -50), t("resto", -200), t("food", -10)];
@@ -308,7 +261,7 @@ describe("spendByTag", () => {
   const t = (amount: number, tagIds: string[]): Transaction => ({
     id: `t${Math.random()}`, date: "2025-03-10", description: "x", amount, accountId: "a",
     categoryId: "c", predictedCategoryId: null, categoryConfidence: null, categorySource: "user",
-    needsReview: false, tagIds, kind: "expense", goalId: null,
+    needsReview: false, tagIds, kind: "expense",
   });
   it("adds a transaction's spend to every tag it carries (overlap)", () => {
     const txs = [t(-100, ["fix", "fun"]), t(-40, ["fun"]), t(-10, [])];

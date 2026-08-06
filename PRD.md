@@ -18,11 +18,11 @@
 
 Pegels lets one person bring their bank transactions into one place, have them **auto-categorized by
 an LLM that learns from their corrections**, and understand their spending through calm, glanceable
-analysis (dashboard, budgets, goals, trends). It is offline-capable, installable, and Swedish-first
+analysis (dashboard, budgets, trends). It is offline-capable, installable, and Swedish-first
 in its money formatting while keeping English UI chrome.
 
 **The problem it solves.** Bank apps show transactions but not *understanding*: no consistent
-categories, no learning, no goal/budget framing, no cross-account view. Manual spreadsheets are
+categories, no learning, no budget framing, no cross-account view. Manual spreadsheets are
 accurate but tedious. Pegels automates categorization, keeps the human in the loop for low-confidence
 guesses, and turns the corrected history into a private training signal.
 
@@ -46,8 +46,8 @@ guesses, and turns the corrected history into a private training signal.
 - G2 — Auto-categorize each transaction (rules → LLM few-shot → keyword fallback) and flag
   low-confidence rows for review.
 - G3 — Learn from every correction and approval so future predictions improve.
-- G4 — Provide budgets, goals, categories, tags, and rules with full CRUD.
-- G5 — Give a customizable, persistent dashboard and a calm spending breakdown/trend view.
+- G4 — Provide budgets, categories, tags, and rules with full CRUD.
+- G5 — Give a focused dashboard and a calm spending breakdown/trend view.
 - G6 — Work as an installable, offline-capable PWA on phone and desktop.
 - G7 — Be private and secure: single-owner sign-in, per-user data isolation.
 
@@ -75,8 +75,8 @@ There are no secondary personas. The app is **single-owner**: exactly one Google
 
 **In scope:** CSV import (SEB + Revolut, incl. localized Revolut exports), FX conversion,
 de-duplication, transfer-pair detection, the categorization pipeline + learning loop, transactions
-(list/filter/detail/edit/split/tag/delete), dashboard with reorderable widgets, budgets, goals,
-categories (nested), tags, rules (+ backfill + suggestions), settings, per-user preference sync,
+(list/filter/detail/edit/split/tag/delete), dashboard, budgets,
+categories (nested), tags, rules (+ backfill + suggestions), settings,
 Google auth with single-owner allowlist, PWA (install + offline shell).
 
 **Out of scope (this version):** Web Push overspend alerts, an offline write queue, a dedicated
@@ -96,13 +96,11 @@ Dates are **ISO `yyyy-mm-dd` strings**.
 | **Account** | `id, name, type, kind('spending'\|'savings'), icon(emoji), color(hsl), balance, accountNumber?, archived` | `savings` never counts toward expenses. A transaction whose description references an `accountNumber` is auto-classified `transfer`. |
 | **Category** | `id, name, icon(emoji), color(hsl), parentId(null=top-level)` | One level of nesting (parent → sub). |
 | **Tag** | `id, name, color(hsl)` | Free-form labels, many-per-transaction. |
-| **Transaction** | `id, date, description, amount(signed SEK), accountId, categoryId?, predictedCategoryId?, categoryConfidence?(0..1), categorySource('model'\|'user'), needsReview, excluded?, tagIds[], splits?[], notes?, kind('expense'\|'income'\|'transfer'), goalId?` | The central entity. `goalId` set only when `kind==='transfer'` (funds a goal). |
+| **Transaction** | `id, date, description, amount(signed SEK), accountId, categoryId?, predictedCategoryId?, categoryConfidence?(0..1), categorySource('model'\|'user'), needsReview, excluded?, tagIds[], splits?[], notes?, kind('expense'\|'income'\|'transfer')` | The central entity. |
 | **Split** | `id, label?, amount(absolute SEK), mine(bool)` | A portion of a transaction; **only `mine` portions count** toward expenses. |
 | **Budget** | `id, categoryId, limit(positive SEK), month('yyyy-mm'\|null)` | `null` month = repeats every month. Targets a top-level or sub category. |
-| **Goal** | `id, name, icon, target, baseline, deadline?, accountId?` | Progress = `baseline + Σ|linked transfers|` (BR-5). |
 | **CategorizationRule** | `id, priority(lower wins), enabled, matchText, matchMode('contains'\|'startsWith'\|'exact'), setCategoryId?, setKind?, addTagIds[], origin('seed'\|'manual'\|'suggested')` | Runs before the LLM at import (BR-3). |
 | **CategorizationExample** | `id, rawDescription, cleanedDescription, amount, predictedKind?, predictedCategoryId?, predictedConfidence?, finalKind, finalCategoryId?, corrected(bool), source('import'\|'detail'), createdAt` | The training set (BR-4). |
-| **UserPreferences** | `userId, layout[], navConfig[], updatedAt` | Dashboard widget layout + bottom-nav config; one row per user. |
 | **Auth (users/accounts/sessions/verificationTokens)** | Auth.js standard shape | `users.id` is the app-wide `userId`. |
 
 Every domain table is scoped by `userId`. Embedded arrays (`tagIds`, `splits`, `addTagIds`,
@@ -121,13 +119,11 @@ Every domain table is scoped by `userId`. Embedded arrays (`tagIds`, `splits`, `
   `new Date()`-parsed in hot loops (timezone-shift + slower).
 - **BR-3 — Categorization order** (see §6.4).
 - **BR-4 — Learning signal** (see §6.4).
-- **BR-5 — Goal progress.** `saved = baseline + Σ |amount|` over transactions whose `kind==='transfer'`
-  and `goalId === goal.id`. `pct = saved / target`.
-- **BR-6 — Budget health.** `pct = spend / limit`; health is `over` (≥1), `warning` (≥0.85), else
+- **BR-5 — Budget health.** `pct = spend / limit`; health is `over` (≥1), `warning` (≥0.85), else
   `under`. Spend uses BR-1 over the budget's category (including subcategories) for the active month.
-- **BR-7 — Duplicate detection.** Two transactions are duplicates iff same
+- **BR-6 — Duplicate detection.** Two transactions are duplicates iff same
   `date | amount | description` within the same account; duplicates are auto-skipped on import.
-- **BR-8 — Colors are HSL token triplets** (`"217 91% 60%"`), composed `hsl(var(--x) / a)`. No raw
+- **BR-7 — Colors are HSL token triplets** (`"217 91% 60%"`), composed `hsl(var(--x) / a)`. No raw
   hex in components.
 
 ---
@@ -157,7 +153,7 @@ after first sign-in. Visiting any authed route while signed out redirects to `/s
 **Story:** *As the owner, my data loads instantly, works offline for reads, and stays consistent.*
 
 - FR-2.1 — A single read/write facade (`useData()`) exposes the whole dataset (accounts, categories,
-  tags, transactions, budgets, goals, rules) and one mutation per operation.
+  tags, transactions, budgets, rules) and one mutation per operation.
 - FR-2.2 — Reads come from one cache entry, **persisted to `localStorage`** for instant + offline
   reads, rehydrated on load.
 - FR-2.3 — Every mutation is **optimistic**: update the cache immediately, persist via a server
@@ -204,7 +200,7 @@ A two-step modal (Upload → Review), opened globally from the nav.
   (e.g. `−251.00 EUR @ 11.45`). The conversion is **currency-agnostic** (EUR, COP, USD, …).
 - FR-3.6 — **Failed rate fetch:** rows in the unfetched currency are **held back** (not importable)
   with a visible notice and a **Retry**; SEK rows still import. (Never import a foreign amount as SEK.)
-- FR-3.7 — **De-duplication** (BR-7): duplicates of existing transactions are flagged and excluded by
+- FR-3.7 — **De-duplication** (BR-6): duplicates of existing transactions are flagged and excluded by
   default; a "Hide duplicates" filter is available.
 - FR-3.8 — **Transfer-pair detection** (`detectTransfersOnImport`): pair new rows against existing
   ones so internal movements between the user's own accounts aren't double-counted; matched existing
@@ -253,8 +249,7 @@ unit-tested as a pure function.
 - FR-6.5.2 — **Master-detail:** sticky side panel on desktop, bottom sheet on mobile.
 - FR-6.5.3 — Detail panel: set category (logs a correction) or **Approve** a low-confidence guess
   (marks user-affirmed → 100%, logs an approval). Both feed BR-4.
-- FR-6.5.4 — Edit tags (add/create), notes, and `kind` (expense/income/transfer; choosing transfer
-  reveals a goal link).
+- FR-6.5.4 — Edit tags (add/create), notes, and `kind` (expense/income/transfer).
 - FR-6.5.5 — **Split** a transaction among N people; only the `mine` portion counts (BR-1).
 - FR-6.5.6 — **Exclude** a transaction ("don't count this") — stays in the list, removed from all
   spending math.
@@ -271,15 +266,14 @@ row from the DB, and closes the panel; a server failure restores the row.
 
 ### 6.6 Dashboard
 
-**Story:** *As the owner, I open the app to a calm, customizable overview of this month.*
+**Story:** *As the owner, I open the app to a calm overview of this month.*
 
 - FR-6.6.1 — Widgets: hero **This month**, **spending breakdown** (Categories | Tags | Accounts
   toggle, ±% vs last month, tap-to-expand subcategories), **trend** (with subcategory drill-down),
-  **budgets**, **goals**, **recent activity**, **calendar heatmap**.
-- FR-6.6.2 — **Drag-to-reorder** widgets and per-widget **S/M/L sizing**; an Edit-layout mode toggles
-  reordering/resizing.
-- FR-6.6.3 — Layout **persists per user** (FR-6.12) and follows the user across devices.
-- FR-6.6.4 — All aggregation is pure (`dashboard/compute`) and memoized on dataset slices.
+  **budgets**, **recent activity**, **calendar heatmap**.
+- FR-6.6.2 — The widget order and per-widget size are **fixed** (`DASHBOARD_LAYOUT` in the registry);
+  the dashboard is not user-arrangeable.
+- FR-6.6.3 — All aggregation is pure (`dashboard/compute`) and memoized on dataset slices.
 
 **AC:** Reordering/resizing persists across reload and devices. Breakdown ±% and trends reflect the
 selected month and active filters. Heatmap is Monday-first.
@@ -304,40 +298,30 @@ uncategorized rather than orphaning or deleting them.
 
 - FR-6.9.1 — Full CRUD; a budget targets a top-level or sub category with a positive monthly `limit`,
   either for a specific `month` or repeating (`month=null`).
-- FR-6.9.2 — Show **health** (BR-6) and a **forecast** (history-blended current-month projection).
+- FR-6.9.2 — Show **health** (BR-5) and a **forecast** (history-blended current-month projection).
 
-### 6.10 Goals
-
-- FR-6.10.1 — Full CRUD; goal progress is **transaction-driven** (BR-5): `baseline + Σ|linked
-  transfers|`, optionally tied to a savings account.
-- FR-6.10.2 — Show progress toward `target` and time remaining to `deadline` (if set).
-
-### 6.11 Rules
+### 6.10 Rules
 
 **Story:** *As the owner, I codify recurring categorizations so the LLM doesn't re-decide them.*
 
-- FR-6.11.1 — `/rules` page: description rules (contains/starts-with/exact) that set category/kind/
+- FR-6.10.1 — `/rules` page: description rules (contains/starts-with/exact) that set category/kind/
   tags, ordered by `priority`, run **before** the LLM at import (FR-4.1).
-- FR-6.11.2 — **Backfill:** apply a rule to existing matching transactions (per-rule and bulk).
-- FR-6.11.3 — **Suggestions:** per-month, mine candidate rules from corrected data; the owner
+- FR-6.10.2 — **Backfill:** apply a rule to existing matching transactions (per-rule and bulk).
+- FR-6.10.3 — **Suggestions:** per-month, mine candidate rules from corrected data; the owner
   approves/edits them. Keep the rule set small — only deterministic cases, not what the LLM can infer.
 
-### 6.12 Settings & per-user preferences
+### 6.11 Settings
 
-- FR-6.12.1 — Settings page: account avatar + sign-out (also in every header), data reset/clear.
-- FR-6.12.2 — **Preference sync:** dashboard **layout** (widget order + size) and **bottom-nav config**
-  persist in a `user_preferences` row keyed by `getUserId()`. The store hydrates on load and
-  debounce-saves edits; **server is source of truth, `localStorage` is the instant/offline cache,
-  last-write-wins.**
-- FR-6.12.3 — `masked` (privacy blur), selected `month`, and `accountFilter` stay **device-local**
+- FR-6.11.1 — Settings page: account avatar + sign-out (also in every header), data reset/clear.
+- FR-6.11.2 — `masked` (privacy blur), selected `month`, and `accountFilter` stay **device-local**
   (not synced).
 
-### 6.13 PWA
+### 6.12 PWA
 
-- FR-6.13.1 — Installable (manifest + icon set) and offline app-shell via a **hand-rolled** service
+- FR-6.12.1 — Installable (manifest + icon set) and offline app-shell via a **hand-rolled** service
   worker (app-shell cache, network-first navigation, stale-while-revalidate — no bundler plugin).
-- FR-6.13.2 — Register the service worker **in production only** (install/test from the deployed URL).
-- FR-6.13.3 — Privacy mask: a toggle blurs all monetary amounts for over-the-shoulder privacy.
+- FR-6.12.2 — Register the service worker **in production only** (install/test from the deployed URL).
+- FR-6.12.3 — Privacy mask: a toggle blurs all monetary amounts for over-the-shoulder privacy.
 
 ---
 
@@ -354,7 +338,7 @@ uncategorized rather than orphaning or deleting them.
   expose ARIA values; interactive controls are labeled; dialogs trap focus (Radix primitives).
 - **NFR-5 Localization of money/dates.** SEK + `sv-SE` formatting; ISO dates; English UI chrome.
   Import parsing tolerates localized bank exports (FR-3.4).
-- **NFR-6 Theming.** Dark-first; HSL semantic tokens only (no raw hex, BR-8); `next-themes`.
+- **NFR-6 Theming.** Dark-first; HSL semantic tokens only (no raw hex, BR-7); `next-themes`.
 - **NFR-7 Testing (TDD).** New behavior gets a failing test first. Pure logic (selectors, fx, rules,
   example selection, parsers, mutations) is unit-tested directly; UI tests render with a seeded
   QueryClient. The suite is the regression net (269 tests in the reference build).
@@ -376,7 +360,6 @@ To reproduce *this* implementation:
 | Motion | `motion` (Framer Motion v12), `<MotionConfig reducedMotion="user">`, spring presets |
 | Data | TanStack Query v5 over a single `['dataset']` entry, persisted to `localStorage`; Drizzle ORM + Neon serverless Postgres |
 | Local state | Zustand v5 |
-| Drag reorder | `@dnd-kit` (dashboard widgets) |
 | Charts | CSS-width bars + inline SVG (no chart dependency) |
 | Auth | Auth.js v5 (`next-auth@5`) + `@auth/drizzle-adapter`, Google, database sessions |
 | LLM | OpenAI `gpt-4o-mini`, structured output |
@@ -394,8 +377,8 @@ auth seam keying every query. UI-local state in `lib`/`store/ui.ts` (Zustand). S
 ## 9. Data model (DDL summary)
 
 Domain tables (each `userId`-scoped, with a `userId` index; `transactions` indexed by `(userId,
-date)`): `accounts`, `categories`, `tags`, `transactions`, `budgets`, `goals`,
-`categorization_rules`, `categorization_examples`, `user_preferences`. Auth tables (Auth.js shape):
+date)`): `accounts`, `categories`, `tags`, `transactions`, `budgets`,
+`categorization_rules`, `categorization_examples`. Auth tables (Auth.js shape):
 `auth_users` (`id` = app `userId`), `auth_accounts`, `auth_sessions`, `auth_verification_tokens`.
 Money columns are `numeric(12,2)`; confidence/priority are `real`; `tagIds`/`splits`/`addTagIds`/
 `layout`/`navConfig` are `jsonb`; dates are `text` ISO strings. Field-level detail is in §5.1 and the
@@ -424,8 +407,8 @@ Bootstrap: `npm install` → `npm run db:push` (sync schema) → `npm run db:see
 A reproduction is "done" when: a SEB and a Revolut (English **and** Dutch) CSV import correctly with
 FX conversion, dedupe, and transfer detection; the categorization pipeline + learning loop work (or
 degrade to keyword fallback without a key); transactions can be reviewed/edited/split/tagged/excluded/
-**deleted-with-confirmation**; budgets/goals/categories/tags/rules have full CRUD with their business
-rules (BR-5/6, detach/strip on delete); the dashboard is reorderable and persists per user; Google
+**deleted-with-confirmation**; budgets/categories/tags/rules have full CRUD with their business
+rules (BR-5, detach/strip on delete); Google
 single-owner auth gates access and claims stub data; the PWA installs and serves an offline shell; and
 the test suite passes with build + lint clean.
 

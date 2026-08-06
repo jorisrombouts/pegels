@@ -5,7 +5,6 @@ import { ArrowDownRight, ArrowUpRight } from "lucide-react";
 import { Card, CardHeader } from "@/components/ui/card";
 import { Ring } from "@/components/ui/ring";
 import { BreakdownWidget } from "./breakdown-widget";
-import { SafeToSpendWidget } from "./safe-to-spend-widget";
 import { TrendWidget } from "./trend-widget";
 import { CalendarHeatmap, type DaySpend } from "./calendar-heatmap";
 import { RecentActivity } from "./recent-activity";
@@ -13,7 +12,8 @@ import type { computeDashboard } from "./compute";
 import { formatSEK, formatSEKAbs, formatSignedPct, monthLabel } from "@/lib/format";
 import type { TrendSeries } from "@/lib/domain/selectors";
 import type { Category, Transaction } from "@/lib/domain/types";
-import type { WidgetSize } from "@/store/ui";
+
+export type WidgetSize = "small" | "medium" | "large";
 
 export interface DashCtx {
   d: ReturnType<typeof computeDashboard>;
@@ -26,17 +26,19 @@ export interface DashCtx {
   onNavigate: (href: string) => void;
 }
 
-/** Title shown in the "Edit layout" picker (and as aria context). */
-export const widgetTitles: Record<string, string> = {
-  total: "This month",
-  pace: "Daily pace",
-  breakdown: "Spending breakdown",
-  trend: "Trend",
-  budgets: "Budgets",
-  goals: "Savings goals",
-  calendar: "Daily spend",
-  recent: "Recent activity",
-};
+/**
+ * The dashboard, in order. Fixed — widgets are no longer user-arrangeable, so the order and
+ * per-widget size live here next to the renderers instead of in persisted UI state.
+ * Mediums are paired so each grid row fills.
+ */
+export const DASHBOARD_LAYOUT: { id: string; size: WidgetSize }[] = [
+  { id: "total", size: "large" },
+  { id: "breakdown", size: "large" },
+  { id: "budgets", size: "medium" },
+  { id: "recent", size: "medium" },
+  { id: "trend", size: "large" },
+  { id: "calendar", size: "medium" },
+];
 
 /**
  * Grid column span per size. The dashboard grid is 1 col on mobile, 2 on md,
@@ -119,14 +121,6 @@ export const widgets: Record<string, (ctx: DashCtx, size: WidgetSize) => React.R
     );
   },
 
-  pace: ({ d, masked }, size) => (
-    <SafeToSpendWidget
-      data={{ spent: d.spent, limit: d.budgetLimitTotal, daysElapsed: d.daysElapsed, daysInMonth: d.daysInMonth }}
-      size={size}
-      masked={masked}
-    />
-  ),
-
   breakdown: (ctx, size) => <BreakdownWidget ctx={ctx} size={size} />,
 
   trend: ({ trend, masked }, size) => <TrendWidget series={trend} size={size} masked={masked} />,
@@ -155,35 +149,6 @@ export const widgets: Record<string, (ctx: DashCtx, size: WidgetSize) => React.R
                 </p>
                 <p className="tnum truncate text-xs text-muted-foreground">
                   {formatSEKAbs(b.spent, masked)} / {formatSEKAbs(b.limit, masked)}
-                </p>
-              </div>
-            </button>
-          ))}
-        </div>
-      )}
-    </Card>
-  ),
-
-  goals: ({ d, masked, onNavigate }, size) => (
-    <Card className="h-full">
-      <CardHeader label="Savings goals" action={<AllLink href="/goals" />} />
-      {d.goals.length === 0 ? (
-        <EmptyHint>No goals yet.</EmptyHint>
-      ) : (
-        <div className={`grid gap-2 ${size === "small" ? "grid-cols-1" : "grid-cols-2"}`}>
-          {d.goals.map((g) => (
-            <button
-              key={g.goal.id}
-              onClick={() => onNavigate(`/goals?goal=${g.goal.id}`)}
-              className="pressable -mx-1 flex min-w-0 items-center gap-3 rounded-xl px-1 py-1 text-left hover:bg-[hsl(var(--muted)/0.45)]"
-            >
-              <Ring pct={g.pct} label={`${Math.round(g.pct * 100)}%`} />
-              <div className="min-w-0">
-                <p className="truncate text-sm font-medium">
-                  {g.goal.icon} {g.goal.name}
-                </p>
-                <p className="tnum truncate text-xs text-muted-foreground">
-                  {formatSEKAbs(g.saved, masked)} / {formatSEKAbs(g.goal.target, masked)}
                 </p>
               </div>
             </button>

@@ -3,7 +3,6 @@ import type {
   Budget,
   Category,
   CategorizationRule,
-  Goal,
   Tag,
   Transaction,
 } from "@/lib/domain/types";
@@ -14,7 +13,6 @@ export interface Dataset {
   tags: Tag[];
   transactions: Transaction[];
   budgets: Budget[];
-  goals: Goal[];
   rules: CategorizationRule[];
 }
 
@@ -93,7 +91,6 @@ function t(
     needsReview: false,
     tagIds: [],
     kind: amount < 0 ? "expense" : "income",
-    goalId: null,
     ...opts,
   };
 }
@@ -160,12 +157,12 @@ export const transactions: Transaction[] = [
   t("2025-01-20", "Netflix", -169, "cat-entertainment", { tagIds: ["tag-subscription"] }),
   t("2025-01-28", "Elräkning Vattenfall", -1020, "cat-electricity"),
 
-  // ── Goal-funding transfers (outflow from Lönekonto into savings goals) ──
-  t("2025-01-31", "Sparande Emergency Fund", -3000, null, { kind: "transfer", goalId: "goal-emergency" }),
-  t("2025-02-28", "Sparande Emergency Fund", -2000, null, { kind: "transfer", goalId: "goal-emergency" }),
-  t("2025-03-14", "Sparande Emergency Fund", -3000, null, { kind: "transfer", goalId: "goal-emergency" }),
-  t("2025-02-15", "Sparande Japan Trip", -1500, null, { kind: "transfer", goalId: "goal-japan" }),
-  t("2025-03-10", "Sparande Japan Trip", -1000, null, { kind: "transfer", goalId: "goal-japan" }),
+  // ── Savings transfers (outflow from Lönekonto into the savings account) ──
+  t("2025-01-31", "Sparande Emergency Fund", -3000, null, { kind: "transfer" }),
+  t("2025-02-28", "Sparande Emergency Fund", -2000, null, { kind: "transfer" }),
+  t("2025-03-14", "Sparande Emergency Fund", -3000, null, { kind: "transfer" }),
+  t("2025-02-15", "Sparande Japan Trip", -1500, null, { kind: "transfer" }),
+  t("2025-03-10", "Sparande Japan Trip", -1000, null, { kind: "transfer" }),
 ];
 
 export const budgets: Budget[] = [
@@ -175,25 +172,5 @@ export const budgets: Budget[] = [
   { id: "bud-groceries", categoryId: "cat-groceries", limit: 3000, month: null },
 ];
 
-export const goals: Goal[] = [
-  {
-    id: "goal-emergency",
-    name: "Emergency Fund",
-    icon: "🛟",
-    target: 50000,
-    baseline: 24000,
-    deadline: "2025-12-31",
-    accountId: "acc-spar",
-  },
-  {
-    id: "goal-japan",
-    name: "Japan Trip",
-    icon: "🗾",
-    target: 25000,
-    baseline: 6000,
-    deadline: "2025-06-02",
-    accountId: "acc-spar",
-  },
-];
 
-export const seedDataset: Dataset = { accounts, categories, tags, transactions, budgets, goals, rules };
+export const seedDataset: Dataset = { accounts, categories, tags, transactions, budgets, rules };

@@ -1,10 +1,9 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import { colSpan, widgets, widgetTitles, type DashCtx } from "./registry";
+import { DASHBOARD_LAYOUT, colSpan, widgets, type DashCtx, type WidgetSize } from "./registry";
 import { computeDashboard } from "./compute";
 import { seedDataset } from "@/data/mock";
 import { buildMaps, categoryTrends, dailySpend } from "@/lib/domain/selectors";
-import { defaultLayout, type WidgetSize } from "@/store/ui";
 
 describe("dashboard registry", () => {
   it("maps size to distinct column widths (small 1/4, medium 1/2, large full)", () => {
@@ -13,18 +12,16 @@ describe("dashboard registry", () => {
     expect(colSpan("large")).toBe("md:col-span-2 lg:col-span-4");
   });
 
-  it("has a renderer and a title for every widget in the default layout", () => {
-    for (const { id } of defaultLayout) {
+  it("has a renderer for every widget in the layout", () => {
+    for (const { id } of DASHBOARD_LAYOUT) {
       expect(widgets[id], `missing renderer for "${id}"`).toBeTypeOf("function");
-      expect(widgetTitles[id], `missing title for "${id}"`).toBeTruthy();
     }
   });
 
-  it("only registers renderers in the default layout (except intentionally-parked widgets)", () => {
-    const layoutIds = new Set(defaultLayout.map((w) => w.id));
-    const parked = new Set(["pace"]); // kept registered, re-addable via Edit layout
+  it("registers no renderer that the layout never renders", () => {
+    const layoutIds = new Set(DASHBOARD_LAYOUT.map((w) => w.id));
     for (const id of Object.keys(widgets)) {
-      expect(layoutIds.has(id) || parked.has(id), `renderer "${id}" not in default layout`).toBe(true);
+      expect(layoutIds.has(id), `renderer "${id}" is not in DASHBOARD_LAYOUT`).toBe(true);
     }
   });
 });
@@ -71,7 +68,7 @@ describe("total widget hero", () => {
 
 describe("every widget renders at every size", () => {
   const ctx = makeCtx();
-  for (const { id } of defaultLayout) {
+  for (const { id } of DASHBOARD_LAYOUT) {
     for (const size of SIZES) {
       it(`${id} @ ${size} renders content without throwing`, () => {
         const { container, unmount } = render(<>{widgets[id](ctx, size)}</>);

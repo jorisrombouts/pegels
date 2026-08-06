@@ -32,7 +32,6 @@ interface DraftRow {
   tagIds: string[];
   include: boolean;
   kind: TransactionKind;
-  goalId: string | null;
   // Original AI prediction, kept separate from the user-editable values above.
   predictedKind: TransactionKind | null;
   predictedCategoryId: string | null;
@@ -49,7 +48,7 @@ const FIELD_LABEL: Record<ColumnField, string> = { date: "Date", description: "D
 
 export function ImportModal() {
   const router = useRouter();
-  const { accounts, categories, transactions, goals, addTransactions, updateTransaction } = useData();
+  const { accounts, categories, transactions, addTransactions, updateTransaction } = useData();
   const importOpen = useUI((s) => s.importOpen);
   const setImportOpen = useUI((s) => s.setImportOpen);
 
@@ -170,18 +169,17 @@ export function ImportModal() {
         tagIds: isTransfer ? [] : res?.addTagIds ?? [],
         include: !isDup && !b.unconverted, // a row with no exchange rate yet can't be imported
         kind: (b.forcedKind ?? res?.kind ?? (b.amount < 0 ? "expense" : "income")) as TransactionKind,
-        goalId: null as string | null,
         predictedKind: (b.forcedKind ?? res?.kind ?? null) as TransactionKind | null,
         predictedCategoryId: isTransfer ? null : res?.categoryId ?? null,
         predictedConfidence: isTransfer ? 1 : res?.confidence ?? null,
       };
     });
     // Pair each new row against existing transactions (the other leg arrived in a prior import).
-    const detected = detectTransfersOnImport(drafts as unknown as Transaction[], transactions, goals);
+    const detected = detectTransfersOnImport(drafts as unknown as Transaction[], transactions);
     setExistingUpdates(detected.existingUpdates);
     return drafts.map((d, i): DraftRow => ({
       date: d.date, description: d.description, amount: d.amount, currency: d.currency, notes: d.notes, unconverted: d.unconverted,
-      categoryId: d.categoryId, confidence: d.confidence, tagIds: d.tagIds, include: d.include, kind: detected.rows[i].kind, goalId: detected.rows[i].goalId,
+      categoryId: d.categoryId, confidence: d.confidence, tagIds: d.tagIds, include: d.include, kind: detected.rows[i].kind,
       predictedKind: d.predictedKind, predictedCategoryId: d.predictedCategoryId, predictedConfidence: d.predictedConfidence,
     }));
   }
@@ -277,7 +275,6 @@ export function ImportModal() {
       needsReview: needsReview(r.confidence),
       tagIds: r.tagIds,
       kind: r.kind,
-      goalId: r.goalId,
       notes: r.notes,
     }));
     addTransactions(txs);
@@ -294,8 +291,8 @@ export function ImportModal() {
         finalCategoryId: r.categoryId,
       })),
     );
-    // Reclassify each matched existing leg as a transfer (and link/unlink its goal).
-    existingUpdates.forEach((u) => updateTransaction(u.id, { kind: "transfer", goalId: u.goalId }));
+    // Reclassify each matched existing leg as a transfer.
+    existingUpdates.forEach((u) => updateTransaction(u.id, { kind: "transfer" }));
     setImportOpen(false);
     reset();
     router.push("/transactions");
