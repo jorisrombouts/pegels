@@ -34,9 +34,11 @@ export async function embedMany(texts: string[]): Promise<(number[] | null)[]> {
   );
 
   let failedChunks = 0;
+  let firstError: unknown;
   for (const s of settled) {
     if (s.status !== "fulfilled") {
       failedChunks += 1;
+      firstError ??= s.reason; // keep the cause — a bare count is undiagnosable
       continue; // this chunk's slots stay null
     }
     const { chunk, res } = s.value;
@@ -44,7 +46,10 @@ export async function embedMany(texts: string[]): Promise<(number[] | null)[]> {
     for (const item of res.data) out[chunk[item.index].index] = item.embedding as number[];
   }
   if (failedChunks > 0) {
-    console.error(`embedMany: ${failedChunks}/${chunks.length} chunks failed; those rows stay unembedded`);
+    console.error(
+      `embedMany: ${failedChunks}/${chunks.length} chunks failed; those rows stay unembedded`,
+      firstError instanceof Error ? firstError.message : firstError,
+    );
   }
   return out;
 }

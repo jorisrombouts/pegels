@@ -42,6 +42,7 @@ export async function prepareDatabase(opts: { dryRun?: boolean } = {}): Promise<
   }
 
   await db.execute(sql`CREATE EXTENSION IF NOT EXISTS vector`);
+  await dropRetiredTables();
   if (!table) return { consolidated: 0, removed: 0, dryRun };
 
   // Add the corpus columns ahead of push so the data migration below has somewhere to write.
@@ -88,6 +89,23 @@ export async function prepareDatabase(opts: { dryRun?: boolean } = {}): Promise<
   }
 
   return { consolidated: plan.keep.length, removed: plan.deleteIds.length, dryRun };
+}
+
+/**
+ * Drop what the savings-goals and layout-editing removal left behind.
+ *
+ * These are gone from `schema.ts`, so push wants to drop them anyway — but it cannot do it
+ * unattended. Seeing tables in the database that aren't in the schema *and* a new table in the
+ * schema that isn't in the database, it can't tell a drop from a rename, and stops to ask
+ * ("is eval_runs a renamed goals?"). Doing the drops explicitly here removes the question, which
+ * is also how they get stated in reviewable code rather than answered at an interactive prompt.
+ *
+ * Idempotent, and a no-op on any database that never had them.
+ */
+async function dropRetiredTables(): Promise<void> {
+  await db.execute(sql`ALTER TABLE transactions DROP COLUMN IF EXISTS goal_id`);
+  await db.execute(sql`DROP TABLE IF EXISTS goals`);
+  await db.execute(sql`DROP TABLE IF EXISTS user_preferences`);
 }
 
 function toLegacy(raw: unknown): LegacyExample[] {
