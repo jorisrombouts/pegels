@@ -5,6 +5,7 @@ import { ArrowDownRight, ArrowUpRight } from "lucide-react";
 import { Card, CardHeader } from "@/components/ui/card";
 import { Ring } from "@/components/ui/ring";
 import { BreakdownWidget } from "./breakdown-widget";
+import { ForecastWidget } from "./forecast-widget";
 import { TrendWidget } from "./trend-widget";
 import { CalendarHeatmap, type DaySpend } from "./calendar-heatmap";
 import { RecentActivity } from "./recent-activity";
@@ -33,7 +34,8 @@ export interface DashCtx {
  */
 export const DASHBOARD_LAYOUT: { id: string; size: WidgetSize }[] = [
   { id: "total", size: "large" },
-  { id: "breakdown", size: "large" },
+  { id: "forecast", size: "medium" },
+  { id: "breakdown", size: "medium" },
   { id: "budgets", size: "medium" },
   { id: "recent", size: "medium" },
   { id: "trend", size: "large" },
@@ -77,6 +79,7 @@ function HeroStat({ label, value, sub, tone }: { label: string; value: string; s
 export const widgets: Record<string, (ctx: DashCtx, size: WidgetSize) => React.ReactNode> = {
   total: ({ d, masked }) => {
     const days = (n: number) => `${n} ${n === 1 ? "day" : "days"}`;
+    const f = d.forecast;
     return (
       <Card className="flex h-full flex-col justify-center">
         <CardHeader label="This month" />
@@ -96,17 +99,31 @@ export const widgets: Record<string, (ctx: DashCtx, size: WidgetSize) => React.R
           </div>
           <p className="mt-1 text-xs text-muted-foreground">spent so far</p>
 
-          {/* Supporting stats: spending pace + where it lands by month end */}
-          <div className="mt-5 flex gap-3">
-            <HeroStat
-              label="Daily pace"
-              value={`${formatSEKAbs(d.avgPerDay, masked)}/day`}
-              sub={`over ${days(d.daysElapsed)}`}
-            />
-            {d.isCurrentMonth && (
+          {/* What's committed vs what you can still steer — the split the projection rests on. */}
+          <p className="tnum mt-3 text-xs text-muted-foreground">
+            {formatSEKAbs(f.recurringLanded, masked)} fixed · {formatSEKAbs(f.variableLanded, masked)} variable
+            {f.recurringExpected > 0 && ` · ${formatSEKAbs(f.recurringExpected, masked)} still to come`}
+          </p>
+
+          {/* Supporting stats: what's left to spend + where the month lands */}
+          <div className="mt-4 flex gap-3">
+            {f.dailyAllowance !== null ? (
+              <HeroStat
+                label="Left to spend"
+                value={`${formatSEKAbs(f.dailyAllowance, masked)}/day`}
+                sub={`${days(d.daysLeft)} left, fixed costs deducted`}
+              />
+            ) : (
+              <HeroStat
+                label="Variable pace"
+                value={`${formatSEKAbs(f.variablePace, masked)}/day`}
+                sub={`over ${days(d.daysElapsed)}`}
+              />
+            )}
+            {f.isProjected && (
               <HeroStat
                 label="Projected"
-                value={formatSEKAbs(d.projected, masked)}
+                value={formatSEKAbs(f.projected, masked)}
                 sub={
                   d.projectedChangePct != null
                     ? `${formatSignedPct(d.projectedChangePct)} vs ${monthLabel(d.prevKey).split(" ")[0]}`
@@ -120,6 +137,10 @@ export const widgets: Record<string, (ctx: DashCtx, size: WidgetSize) => React.R
       </Card>
     );
   },
+
+  forecast: ({ d, masked, onNavigate }) => (
+    <ForecastWidget rows={d.categoryOutlook} masked={masked} onNavigate={onNavigate} />
+  ),
 
   breakdown: (ctx, size) => <BreakdownWidget ctx={ctx} size={size} />,
 

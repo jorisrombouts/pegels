@@ -45,24 +45,45 @@ function makeCtx(): DashCtx {
 const SIZES: WidgetSize[] = ["small", "medium", "large"];
 
 describe("total widget hero", () => {
-  it("shows daily pace and a projection, never the old budget tiles or an Income line", () => {
-    const ctx = makeCtx(); // current month (today = 2025-03-31)
-    render(<>{widgets.total(ctx, "large")}</>);
-    expect(screen.getByText("Daily pace")).toBeInTheDocument();
+  const midMonth: DashCtx = {
+    ...makeCtx(),
+    d: computeDashboard(seedDataset, "2025-03", "all", new Date("2025-03-15T12:00:00Z")),
+  };
+
+  it("offers a forward-looking daily allowance, not a backward-looking average", () => {
+    render(<>{widgets.total(midMonth, "large")}</>);
+    expect(screen.getByText("Left to spend")).toBeInTheDocument();
+    expect(screen.getByText(/days left/)).toBeInTheDocument();
+    expect(screen.queryByText("Daily pace")).not.toBeInTheDocument();
+  });
+
+  it("shows a projection, never the old budget tiles or an Income line", () => {
+    render(<>{widgets.total(midMonth, "large")}</>);
     expect(screen.getByText("Projected")).toBeInTheDocument();
     expect(screen.queryByText("Income")).not.toBeInTheDocument();
     expect(screen.queryByText("Safe to spend")).not.toBeInTheDocument();
     expect(screen.queryByText("Over budget")).not.toBeInTheDocument();
   });
 
+  it("breaks the month down into what is committed and what is discretionary", () => {
+    render(<>{widgets.total(midMonth, "large")}</>);
+    expect(screen.getByText(/fixed ·/)).toBeInTheDocument();
+    expect(screen.getByText(/variable/)).toBeInTheDocument();
+  });
+
+  it("falls back to the variable pace when there is no target to steer towards", () => {
+    // Last day of the month: no days left, so a daily allowance would be meaningless.
+    render(<>{widgets.total(makeCtx(), "large")}</>);
+    expect(screen.getByText("Variable pace")).toBeInTheDocument();
+  });
+
   it("renders the hero even with no budgets (budgets no longer drive it)", () => {
-    const ctx = makeCtx();
     const noBudget: DashCtx = {
-      ...ctx,
-      d: computeDashboard({ ...seedDataset, budgets: [] }, "2025-03", "all", new Date("2025-03-31T12:00:00Z")),
+      ...midMonth,
+      d: computeDashboard({ ...seedDataset, budgets: [] }, "2025-03", "all", new Date("2025-03-15T12:00:00Z")),
     };
     render(<>{widgets.total(noBudget, "large")}</>);
-    expect(screen.getByText("Daily pace")).toBeInTheDocument();
+    expect(screen.getByText("Projected")).toBeInTheDocument();
   });
 });
 

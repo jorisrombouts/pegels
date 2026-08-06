@@ -22,23 +22,47 @@ describe("computeDashboard delta fields", () => {
   });
 });
 
-describe("computeDashboard projection", () => {
-  it("projects end-of-month spend from the daily pace for the live month", () => {
-    const mid = computeDashboard(seedDataset, "2025-03", "all", new Date("2025-03-15T12:00:00Z"));
-    expect(mid.isCurrentMonth).toBe(true);
-    expect(mid.projected).toBeGreaterThan(mid.spent); // half the month elapsed → scaled up
-    expect(mid.projected).toBeCloseTo((mid.spent / mid.daysElapsed) * mid.daysInMonth, 5);
+describe("computeDashboard forecast", () => {
+  const mid = computeDashboard(seedDataset, "2025-03", "all", new Date("2025-03-15T12:00:00Z"));
+
+  it("splits what has landed into a fixed and a variable part that sum to spend", () => {
+    expect(mid.forecast.recurringLanded + mid.forecast.variableLanded).toBeCloseTo(mid.spent);
+  });
+
+  it("projects beyond what has landed while the month is running", () => {
+    expect(mid.forecast.isProjected).toBe(true);
+    expect(mid.forecast.projected).toBeGreaterThan(mid.spent);
+  });
+
+  it("never extrapolates a fixed cost — the projection stays under the naive linear pace", () => {
+    // The old formula was (spent/daysElapsed)*daysInMonth applied to *everything*.
+    const naive = (mid.spent / mid.daysElapsed) * mid.daysInMonth;
+    expect(mid.forecast.projected).toBeLessThanOrEqual(naive);
   });
 
   it("uses actual spend as the projection for a completed month", () => {
     const past = computeDashboard(seedDataset, "2025-03", "all", new Date("2026-06-15T12:00:00Z"));
     expect(past.isCurrentMonth).toBe(false);
-    expect(past.projected).toBe(past.spent);
+    expect(past.forecast.isProjected).toBe(false);
+    expect(past.forecast.projected).toBe(past.spent);
   });
 
   it("computes the projected change vs the previous month", () => {
-    const mid = computeDashboard(seedDataset, "2025-03", "all", new Date("2025-03-15T12:00:00Z"));
     expect(mid.prevSpent).toBeGreaterThan(0);
-    expect(mid.projectedChangePct).toBeCloseTo(((mid.projected - mid.prevSpent) / mid.prevSpent) * 100, 5);
+    expect(mid.projectedChangePct).toBeCloseTo(((mid.forecast.projected - mid.prevSpent) / mid.prevSpent) * 100, 5);
+  });
+
+  it("narrows the forecast to the selected account", () => {
+    const accountId = seedDataset.accounts[0].id;
+    const scoped = computeDashboard(seedDataset, "2025-03", accountId, new Date("2025-03-15T12:00:00Z"));
+    expect(scoped.forecast.landed).toBe(scoped.spent);
+    expect(scoped.forecast.landed).toBeLessThan(mid.forecast.landed);
+  });
+
+  it("exposes a per-category outlook, biggest projection first", () => {
+    expect(mid.categoryOutlook.length).toBeGreaterThan(0);
+    const projections = mid.categoryOutlook.map((c) => c.projected);
+    expect([...projections].sort((a, b) => b - a)).toEqual(projections);
+    for (const row of mid.categoryOutlook) expect(row.category.name).toBeTruthy();
   });
 });

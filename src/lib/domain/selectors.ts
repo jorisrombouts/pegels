@@ -121,6 +121,7 @@ export interface MonthProgress {
   daysElapsed: number;
   daysLeft: number;
   isCurrentMonth: boolean;
+  isFutureMonth: boolean;
 }
 
 /** Where a month sits relative to `today`: total days, days elapsed/left, and whether it's the live month. */
@@ -128,9 +129,12 @@ export function monthProgress(key: string, today = new Date()): MonthProgress {
   const [y, m] = key.split("-").map(Number);
   const daysInMonth = new Date(y, m, 0).getDate();
   const isCurrentMonth = today.getFullYear() === y && today.getMonth() + 1 === m;
-  const daysElapsed = isCurrentMonth ? today.getDate() : daysInMonth;
+  // A future month hasn't started. Reporting it as fully elapsed (the old behaviour) makes any
+  // forecast read it as complete the moment the month switcher moves forward.
+  const isFutureMonth = key > monthKey(today);
+  const daysElapsed = isCurrentMonth ? today.getDate() : isFutureMonth ? 0 : daysInMonth;
   const daysLeft = Math.max(daysInMonth - daysElapsed, 0);
-  return { daysInMonth, daysElapsed, daysLeft, isCurrentMonth };
+  return { daysInMonth, daysElapsed, daysLeft, isCurrentMonth, isFutureMonth };
 }
 
 function accountMatches(tx: Transaction, accountFilter: string): boolean {
@@ -298,50 +302,6 @@ export function budgetStatuses(
     });
 }
 
-export interface BudgetForecast extends BudgetStatus {
-  /** Blended end-of-month projection. Equals `spent` for completed / non-current months. */
-  projected: number;
-  projectedPct: number; // projected / limit
-  forecastHealth: BudgetHealth;
-  overBy: number; // projected - limit (> 0 means trending over)
-  /** True only when the month is in progress, so the UI knows to show the projection. */
-  isProjected: boolean;
-}
-
-/**
- * Per-budget end-of-month projection (PRD forecast). History-blended: weights the category's
- * recent monthly average against the current daily pace, leaning on history early in the month
- * and on actual pace as it fills in. Only an in-progress month is projected; a completed or
- * non-current month returns its actual spend (`isProjected: false`). No model / training needed.
- */
-export function budgetForecasts(
-  budgets: Budget[],
-  transactions: Transaction[],
-  maps: Maps,
-  key: string,
-  today = new Date(),
-  historyCount = 3,
-): BudgetForecast[] {
-  const { daysInMonth, daysElapsed, daysLeft, isCurrentMonth } = monthProgress(key, today);
-  const statuses = budgetStatuses(budgets, transactions, maps, key);
-  const histKeys = trailingKeys(prevMonthKey(key), historyCount);
-
-  return statuses.map((s) => {
-    if (!isCurrentMonth || daysElapsed >= daysInMonth) {
-      return { ...s, projected: s.spent, projectedPct: s.pct, forecastHealth: s.health, overBy: s.spent - s.limit, isProjected: false };
-    }
-    const histVals = histKeys
-      .map((mk) => categorySpendInMonth(transactions, maps, s.budget.categoryId, mk))
-      .filter((v) => v > 0);
-    const historicalAvg = histVals.length ? histVals.reduce((a, b) => a + b, 0) / histVals.length : 0;
-    const linearPace = (s.spent / daysElapsed) * daysInMonth;
-    const w = daysLeft / daysInMonth; // history weight, shrinks toward 0 over the month
-    const projected = historicalAvg > 0 ? w * historicalAvg + (1 - w) * linearPace : linearPace;
-    const projectedPct = s.limit > 0 ? projected / s.limit : 0;
-    const forecastHealth: BudgetHealth = projectedPct >= 1 ? "over" : projectedPct >= 0.85 ? "warning" : "under";
-    return { ...s, projected, projectedPct, forecastHealth, overBy: projected - s.limit, isProjected: true };
-  });
-}
 
 export interface TrendSeries {
   id: string; // "total" or a category id

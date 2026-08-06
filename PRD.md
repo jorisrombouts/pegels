@@ -121,9 +121,16 @@ Every domain table is scoped by `userId`. Embedded arrays (`tagIds`, `splits`, `
 - **BR-4 — Learning signal** (see §6.4).
 - **BR-5 — Budget health.** `pct = spend / limit`; health is `over` (≥1), `warning` (≥0.85), else
   `under`. Spend uses BR-1 over the budget's category (including subcategories) for the active month.
-- **BR-6 — Duplicate detection.** Two transactions are duplicates iff same
+- **BR-6 — Forecast (fixed vs variable).** A charge is **recurring** when it appears in ≥3 distinct
+  months of the trailing 6 completed months, ~once a month, with amount spread `MAD/median ≤ 0.25`
+  and day-of-month `MAD ≤ 4`. Projection is
+  `landed + recurringExpected + variableProjected`, where only the **variable** component is
+  extrapolated and only across the **remaining** days. A charge that hasn't landed stays in
+  `recurringExpected` even when overdue. `dailyAllowance = (target − landed − recurringExpected) /
+  daysLeft`, and is `null` for a category that is ≥90% fixed.
+- **BR-7 — Duplicate detection.** Two transactions are duplicates iff same
   `date | amount | description` within the same account; duplicates are auto-skipped on import.
-- **BR-7 — Colors are HSL token triplets** (`"217 91% 60%"`), composed `hsl(var(--x) / a)`. No raw
+- **BR-8 — Colors are HSL token triplets** (`"217 91% 60%"`), composed `hsl(var(--x) / a)`. No raw
   hex in components.
 
 ---
@@ -270,13 +277,16 @@ row from the DB, and closes the panel; a server failure restores the row.
 
 - FR-6.6.1 — Widgets: hero **This month**, **spending breakdown** (Categories | Tags | Accounts
   toggle, ±% vs last month, tap-to-expand subcategories), **trend** (with subcategory drill-down),
+  **where you'll land** (per-category projection, verdict and daily allowance — BR-6),
   **budgets**, **recent activity**, **calendar heatmap**.
 - FR-6.6.2 — The widget order and per-widget size are **fixed** (`DASHBOARD_LAYOUT` in the registry);
   the dashboard is not user-arrangeable.
-- FR-6.6.3 — All aggregation is pure (`dashboard/compute`) and memoized on dataset slices.
+- FR-6.6.3 — The hero reports **what is left to spend per day** with fixed costs deducted, plus
+  the month's fixed/variable split — never a backward-looking daily average.
+- FR-6.6.4 — All aggregation is pure (`dashboard/compute`) and memoized on dataset slices.
 
-**AC:** Reordering/resizing persists across reload and devices. Breakdown ±% and trends reflect the
-selected month and active filters. Heatmap is Monday-first.
+**AC:** A fixed cost landing on the 1st is counted once, not extrapolated across the month.
+Breakdown ±% and trends reflect the selected month and active filters. Heatmap is Monday-first.
 
 ### 6.7 Categories
 
@@ -298,7 +308,7 @@ uncategorized rather than orphaning or deleting them.
 
 - FR-6.9.1 — Full CRUD; a budget targets a top-level or sub category with a positive monthly `limit`,
   either for a specific `month` or repeating (`month=null`).
-- FR-6.9.2 — Show **health** (BR-5) and a **forecast** (history-blended current-month projection).
+- FR-6.9.2 — Show **health** (BR-5) and a **forecast** (BR-6, shared with the dashboard).
 
 ### 6.10 Rules
 
@@ -430,7 +440,6 @@ Deferred (verified against the code; tracked in `PLAN.md` / `BACKLOG.md`):
 - **Overspend alerts via Web Push** — the only substantial remaining PWA work (no push handlers/
   subscription/trigger yet).
 - **Local-dev DB isolation** — repoint `.env.local` at a Neon `dev` branch; code-side bypass is done.
-- **Dashboard forecast widget** — reuse the existing budget forecast.
 - **Light-theme polish**, **offline write queue/replay**, and an optional **`/spending` explorer**
   page (only if the dashboard breakdown proves insufficient).
 - **Cleanup:** drop unused deps; keep `README.md` aligned with the run instructions.

@@ -172,6 +172,7 @@ src/
     ui/               Radix + cva primitives (button, select, dialog, …)
   lib/
     domain/           types + effectiveExpense (the spending invariant) + selectors
+    forecast/         recurrence detection + fixed/variable projection (pure, date-injected)
     ai/               categorize-openai, select-examples (few-shot selection)
     db/               schema, queries, map (row<->domain), claim, index
     rules.ts fx.ts parse-csv.ts parse-revolut.ts categorize.ts format.ts auth*.ts
@@ -218,8 +219,6 @@ funnel) — they graduate here once scoped into a design spec.
   with the "Running it" section above.
 
 **P2 — nice-to-haves**
-- **Dashboard forecast widget** — `budgetForecasts()` (history-blended, current-month projection)
-  exists and is surfaced on `/budgets`; a dashboard widget would reuse it.
 - **Light-theme ("Silver Slate") polish** — the light theme exists in `globals.css` but was tuned
   less than dark; a polish pass is deferred.
 - **Offline write queue/replay** — reads work offline (localStorage cache); writes need the network
@@ -237,12 +236,14 @@ funnel) — they graduate here once scoped into a design spec.
 A quick map of what's done, for orientation. Details + rationale are in the design specs.
 
 - **Dashboard** — a fixed set of widgets (`DASHBOARD_LAYOUT` in the registry): hero "This month",
-  spending breakdown (Categories | Tags | Accounts toggle, ±% vs last month, tap-to-expand
-  subcategories), budgets, recent activity, trend (with subcategory drill-down), calendar heatmap.
+  where you'll land (per-category projection + verdict + daily allowance), spending breakdown
+  (Categories | Tags | Accounts toggle, ±% vs last month, tap-to-expand subcategories), budgets,
+  recent activity, trend (with subcategory drill-down), calendar heatmap.
 - **Transactions** — search + filters (category/account/tag/needs-review/has-splits), month nav with
   filtered count + Spent, master-detail (desktop sticky panel + mobile sheet). Detail panel: category
   + **Approve**, tags, split (among N people; only `mine` counts), kind, exclude, notes.
-- **Budgets / Categories / Tags / Accounts** — full CRUD; budgets have health + forecast;
+- **Budgets / Categories / Tags / Accounts** — full CRUD; budgets have health + forecast (the
+  shared engine, not their own maths);
   categories nest (parent/sub).
 - **Rules** — `/rules` page: description rules set category/kind/tags, run before the LLM at import,
   with per-rule and bulk backfill; per-month suggestions mined from corrected data.

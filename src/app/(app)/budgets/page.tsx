@@ -14,7 +14,8 @@ import { useUI } from "@/store/ui";
 import { useMediaQuery } from "@/lib/use-media-query";
 import { spring } from "@/lib/motion";
 import { MonthSwitcher } from "@/components/month-switcher";
-import { budgetForecasts, buildMaps, type BudgetHealth } from "@/lib/domain/selectors";
+import { buildMaps, type BudgetHealth } from "@/lib/domain/selectors";
+import { budgetForecasts } from "@/lib/forecast/budget-forecast";
 import { formatSEKAbs } from "@/lib/format";
 import { cn } from "@/lib/utils";
 

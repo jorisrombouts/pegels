@@ -11,6 +11,8 @@ import {
   spendByTag,
   withDelta,
 } from "@/lib/domain/selectors";
+import { categoryForecasts, monthForecast } from "@/lib/forecast/category-forecast";
+import { detectRecurring } from "@/lib/forecast/recurring";
 import type { Dataset } from "@/data/mock";
 import type { Account, Category, Tag } from "@/lib/domain/types";
 
@@ -25,13 +27,17 @@ export function computeDashboard(data: Dataset, month: string, accountFilter: st
   const { daysInMonth, daysElapsed, daysLeft, isCurrentMonth } = monthProgress(month, today);
 
   const budgets = budgetStatuses(data.budgets, data.transactions, maps, month);
-  const budgetLimitTotal = budgets.reduce((s, b) => s + b.limit, 0);
 
-  const avgPerDay = daysElapsed > 0 ? spent / daysElapsed : 0;
-  // End-of-month projection: scale the current daily pace across the whole month. A completed /
-  // non-current month is already final, so its projection is just its actual spend.
-  const projected = isCurrentMonth ? avgPerDay * daysInMonth : spent;
-  const projectedChangePct = prevSpent > 0 ? ((projected - prevSpent) / prevSpent) * 100 : null;
+  // Scope the forecast to the selected account so the hero agrees with the breakdown below it.
+  // Recurrence detection runs on the same slice, which is what makes "your rent" mean your rent.
+  const forecastTxs =
+    accountFilter === "all" ? data.transactions : data.transactions.filter((t) => t.accountId === accountFilter);
+  const recurring = detectRecurring(forecastTxs, month);
+  const forecastOpts = { today, recurring, budgets: data.budgets };
+  const forecast = monthForecast(forecastTxs, maps, month, forecastOpts);
+  const categoryOutlook = categoryForecasts(forecastTxs, maps, data.categories, month, forecastOpts);
+
+  const projectedChangePct = prevSpent > 0 ? ((forecast.projected - prevSpent) / prevSpent) * 100 : null;
 
   const byCategoryDelta = withDelta<Category>(
     spendByRootCategory(data.transactions, maps, data.categories, month, accountFilter).map((r) => ({ item: r.category, amount: r.amount })),
@@ -64,15 +70,14 @@ export function computeDashboard(data: Dataset, month: string, accountFilter: st
     daysElapsed,
     daysLeft,
     isCurrentMonth,
-    avgPerDay,
-    projected,
+    forecast,
+    categoryOutlook,
     projectedChangePct,
     byCategoryDelta,
     byTagDelta,
     byAccountDelta,
     subcategoryDeltas,
     budgets,
-    budgetLimitTotal,
     capital: capitalSummary(data.accounts),
   };
 }
