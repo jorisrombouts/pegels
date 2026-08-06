@@ -33,29 +33,10 @@ beforeEach(() => {
       { id: "cat-mortgage", name: "Mortgage" },
     ],
     tags: [{ id: "tag-fixed", name: "Fixed cost" }],
-    rules: [
-      { id: "r-ica", priority: 10, enabled: true, matchText: "ica", matchMode: "contains", setCategoryId: "cat-groceries", setKind: null, addTagIds: ["tag-fixed"], origin: "manual" },
-      { id: "r-revolut", priority: 20, enabled: true, matchText: "revolut", matchMode: "contains", setCategoryId: null, setKind: "transfer", addTagIds: [], origin: "manual" },
-      { id: "r-avanza", priority: 21, enabled: true, matchText: "avanza", matchMode: "contains", setCategoryId: null, setKind: "transfer", addTagIds: [], origin: "manual" },
-      { id: "r-lon", priority: 22, enabled: true, matchText: "lön", matchMode: "contains", setCategoryId: null, setKind: "income", addTagIds: [], origin: "manual" },
-      { id: "r-bolan", priority: 23, enabled: true, matchText: "bolån", matchMode: "contains", setCategoryId: "cat-mortgage", setKind: null, addTagIds: [], origin: "manual" },
-    ],
   });
 });
 
 describe("categorizeTransactions", () => {
-  it("applies deterministic rules without calling OpenAI", async () => {
-    categorizeWithOpenAIMock.mockResolvedValue([]);
-    const out = await categorizeTransactions([
-      { index: 0, description: "REVOLUT TOPUP", amount: -500 },
-      { index: 1, description: "LÖN ACME AB", amount: 30000 },
-      { index: 2, description: "BOLÅN RÄNTA", amount: -4000 },
-    ]);
-    expect(categorizeWithOpenAIMock).not.toHaveBeenCalled();
-    expect(out[0]).toMatchObject({ index: 0, kind: "transfer", categoryId: null, confidence: 1 });
-    expect(out[1]).toMatchObject({ index: 1, kind: "income", categoryId: null, confidence: 1 });
-    expect(out[2]).toMatchObject({ index: 2, kind: "expense", categoryId: "cat-mortgage", confidence: 1 });
-  });
 
   it("classifies a row referencing an own account number as a transfer", async () => {
     categorizeWithOpenAIMock.mockResolvedValue([]);
@@ -66,19 +47,29 @@ describe("categorizeTransactions", () => {
     expect(out[0]).toMatchObject({ index: 0, kind: "transfer", categoryId: null, confidence: 1 });
   });
 
-  it("merges OpenAI results for non-ruled rows", async () => {
+  it("merges OpenAI results alongside own-account transfers", async () => {
     categorizeWithOpenAIMock.mockResolvedValue([
       { index: 1, kind: "expense", categoryId: "cat-groceries", tagIds: [], confidence: 0.9 },
     ]);
     const out = await categorizeTransactions([
-      { index: 0, description: "AVANZA", amount: -1000 },
+      { index: 0, description: "Överföring 99887766554", amount: -1000 },
       { index: 1, description: "KVANTUM", amount: -350 },
     ]);
     expect(categorizeWithOpenAIMock).toHaveBeenCalledOnce();
-    expect(out[0]).toMatchObject({ kind: "transfer", categoryId: null }); // rule
+    expect(out[0]).toMatchObject({ kind: "transfer", categoryId: null });
     // Confidence is re-anchored on the retrieval evidence, so it isn't asserted here — see the
     // clamp tests below.
     expect(out[1]).toMatchObject({ kind: "expense", categoryId: "cat-groceries" });
+  });
+
+  it("sends every row to the model now that only own-account detection precedes it", async () => {
+    categorizeWithOpenAIMock.mockResolvedValue([]);
+    await categorizeTransactions([
+      { index: 0, description: "REVOLUT TOPUP", amount: -500 },
+      { index: 1, description: "LÖN ACME AB", amount: 30000 },
+    ]);
+    // These used to be resolved by seeded rules; their knowledge now lives in the prompt priors.
+    expect(retrieveMock.mock.calls[0][1].map((r: { index: number }) => r.index)).toEqual([0, 1]);
   });
 
   it("fails loudly when OpenAI is unreachable instead of guessing from keywords", async () => {
@@ -90,12 +81,14 @@ describe("categorizeTransactions", () => {
     ).rejects.toThrow(/401/);
   });
 
-  it("still resolves rule-matched rows without reaching OpenAI at all", async () => {
-    // A total API outage must not block the rows that were never going to need the model.
+  it("still resolves an own-account transfer during a total API outage", async () => {
     categorizeWithOpenAIMock.mockRejectedValue(new Error("down"));
-    const out = await categorizeTransactions([{ index: 0, description: "REVOLUT TOPUP", amount: -500 }]);
+    const out = await categorizeTransactions([
+      { index: 0, description: "Överföring 99887766554", amount: 5000 },
+    ]);
     expect(out[0]).toMatchObject({ kind: "transfer", confidence: 1 });
   });
+
 
   it("nulls out categoryIds that are not valid for the user", async () => {
     categorizeWithOpenAIMock.mockResolvedValue([
@@ -135,12 +128,6 @@ describe("categorizeTransactions", () => {
     expect(out[0].kind).toBe("transfer");
   });
 
-  it("applies a matching rule deterministically and skips the LLM, carrying tags", async () => {
-    categorizeWithOpenAIMock.mockResolvedValue([]);
-    const out = await categorizeTransactions([{ index: 0, description: "ICA Maxi", amount: -200 }]);
-    expect(categorizeWithOpenAIMock).not.toHaveBeenCalled();
-    expect(out[0]).toMatchObject({ index: 0, kind: "expense", categoryId: "cat-groceries", confidence: 1, tagIds: ["tag-fixed"] });
-  });
 
   it("passes retrieved corpus examples to the model as evidence, resolved to names", async () => {
     retrieveMock.mockResolvedValue(
@@ -160,14 +147,6 @@ describe("categorizeTransactions", () => {
     ]);
   });
 
-  it("only sends the model rows that rules did not already resolve", async () => {
-    categorizeWithOpenAIMock.mockResolvedValue([]);
-    await categorizeTransactions([
-      { index: 0, description: "REVOLUT TOPUP", amount: -500 },
-      { index: 1, description: "MYSTERY", amount: -10 },
-    ]);
-    expect(retrieveMock.mock.calls[0][1].map((r: { index: number }) => r.index)).toEqual([1]);
-  });
 
   it("classifies without evidence rather than failing the import when retrieval breaks", async () => {
     retrieveMock.mockRejectedValue(new Error("pgvector down"));
@@ -200,11 +179,4 @@ describe("categorizeTransactions", () => {
     expect(out[0].confidence).toBeGreaterThanOrEqual(0.95);
   });
 
-  it("keeps the tags a tag-only rule contributes on top of the model's own", async () => {
-    categorizeWithOpenAIMock.mockResolvedValue([
-      { index: 0, kind: "expense", categoryId: "cat-groceries", tagIds: ["tag-fixed"], confidence: 0.8 },
-    ]);
-    const out = await categorizeTransactions([{ index: 0, description: "MYSTERY", amount: -10 }]);
-    expect(out[0].tagIds).toEqual(["tag-fixed"]);
-  });
 });

@@ -1,5 +1,5 @@
 import { pgTable, text, numeric, real, boolean, jsonb, index, timestamp, integer, primaryKey, uniqueIndex, vector } from "drizzle-orm/pg-core";
-import type { AccountKind, CategorySource, MatchMode, RuleOrigin, Split, TransactionKind } from "../domain/types";
+import type { AccountKind, CategorySource, Split, TransactionKind } from "../domain/types";
 import type { EvalMetrics, EvalMistake } from "../eval/types";
 
 /** Whether an example participates in retrieval. Only `approved` is trusted evidence. */
@@ -88,23 +88,6 @@ export const budgets = pgTable(
   (t) => [index("budgets_user_idx").on(t.userId)],
 );
 
-export const categorizationRules = pgTable(
-  "categorization_rules",
-  {
-    id: text("id").primaryKey(),
-    userId: text("user_id").notNull(),
-    priority: real("priority").notNull(),
-    enabled: boolean("enabled").notNull(),
-    matchText: text("match_text").notNull(),
-    matchMode: text("match_mode").$type<MatchMode>().notNull(),
-    setCategoryId: text("set_category_id"),
-    setKind: text("set_kind").$type<TransactionKind>(),
-    addTagIds: jsonb("add_tag_ids").$type<string[]>().notNull(),
-    origin: text("origin").$type<RuleOrigin>().notNull(),
-    createdAt: text("created_at").notNull(),
-  },
-  (t) => [index("rules_user_idx").on(t.userId)],
-);
 
 /**
  * The categorization corpus — what the model retrieves from, and what the /training page curates.

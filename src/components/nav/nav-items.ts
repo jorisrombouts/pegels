@@ -5,7 +5,6 @@ import {
   PiggyBank,
   Landmark,
   Tag,
-  Wand2,
   GraduationCap,
   Settings,
   type LucideIcon,
@@ -29,7 +28,6 @@ export const NAV_REGISTRY: NavItem[] = [
   { key: "accounts", href: "/accounts", label: "Accounts", icon: Landmark, primary: false },
   { key: "tags", href: "/tags", label: "Tags", icon: Tag, primary: false },
   { key: "training", href: "/training", label: "Training", icon: GraduationCap, primary: false },
-  { key: "rules", href: "/rules", label: "Rules", icon: Wand2, primary: false },
   { key: "settings", href: "/settings", label: "Settings", icon: Settings, primary: false },
 ];
 

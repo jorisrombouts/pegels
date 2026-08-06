@@ -106,6 +106,10 @@ async function dropRetiredTables(): Promise<void> {
   await db.execute(sql`ALTER TABLE transactions DROP COLUMN IF EXISTS goal_id`);
   await db.execute(sql`DROP TABLE IF EXISTS goals`);
   await db.execute(sql`DROP TABLE IF EXISTS user_preferences`);
+  // Rules are replaced by retrieval over the corpus. Safe to drop only because the personal ones
+  // were first migrated into the corpus as approved examples — a rule naming a *person* is
+  // knowledge no prompt prior could reconstruct.
+  await db.execute(sql`DROP TABLE IF EXISTS categorization_rules`);
 }
 
 function toLegacy(raw: unknown): LegacyExample[] {

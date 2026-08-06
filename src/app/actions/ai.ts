@@ -1,10 +1,9 @@
 "use server";
 
 import { getUserId } from "@/lib/auth";
-import { getDataset, upsertTransaction } from "@/lib/db/queries";
+import { getDataset } from "@/lib/db/queries";
 import { matchesOwnAccount } from "@/lib/domain/own-account";
 import { reconcileKindWithSign } from "@/lib/ai/reconcile";
-import { applyRules, planRuleBackfill, selectRulesForBackfill } from "@/lib/rules";
 import {
   PROMPT_VERSION,
   categorizeWithOpenAI,
@@ -46,30 +45,17 @@ export async function categorizeTransactions(rows: AiRow[]): Promise<AiResult[]>
   const categoryName = new Map(taxonomy.categories.map((c) => [c.id, c.name]));
   const tagName = new Map(taxonomy.tags.map((t) => [t.id, t.name]));
 
-  // 1) deterministic: own-account transfers, then user rules
+  // 1) The only non-LLM step left: a description naming one of the user's own account numbers is
+  //    a transfer between their accounts. That is account *identity*, not a categorization rule.
   const ownNumbers = data.accounts.map((a) => a.accountNumber).filter((n): n is string => !!n);
   const ruled = new Map<number, AiResult>();
-  const ruleTags = new Map<number, string[]>(); // tags from a non-resolving rule, merged after the LLM
   const remaining: AiRow[] = [];
   for (const r of rows) {
     if (matchesOwnAccount(r.description, ownNumbers)) {
       ruled.set(r.index, { index: r.index, kind: "transfer", categoryId: null, confidence: 1, tagIds: [] });
       continue;
     }
-    const outcome = applyRules(r.description, data.rules);
-    const resolves = outcome && (outcome.categoryId != null || outcome.kind === "income" || outcome.kind === "transfer");
-    if (outcome && resolves) {
-      ruled.set(r.index, {
-        index: r.index,
-        kind: outcome.kind ?? (r.amount < 0 ? "expense" : "income"),
-        categoryId: outcome.categoryId ?? null,
-        confidence: 1,
-        tagIds: outcome.addTagIds,
-      });
-    } else {
-      if (outcome) ruleTags.set(r.index, outcome.addTagIds); // tag-only rule: still LLM-categorize, but keep tags
-      remaining.push(r);
-    }
+    remaining.push(r);
   }
 
   // 2) retrieve confirmed examples, then classify. Retrieval failing must not fail the import —
@@ -128,9 +114,7 @@ export async function categorizeTransactions(rows: AiRow[]): Promise<AiResult[]>
         },
         res.categoryId,
       );
-      // A tag-only rule still contributes its tags on top of whatever the model chose.
-      const fromRule = ruleTags.get(r.index) ?? [];
-      res.tagIds = [...new Set([...(res.tagIds ?? []), ...fromRule])];
+      res.tagIds = res.tagIds ?? [];
     }
     out.push(res);
   }
@@ -142,23 +126,4 @@ function categoryIdOf(name: string | null, byId: Map<string, string>): string | 
   if (!name) return null;
   for (const [id, n] of byId) if (n === name) return id;
   return null;
-}
-
-export async function previewRuleBackfill(ruleId?: string): Promise<{ count: number; samples: { description: string }[] }> {
-  const userId = await getUserId();
-  const data = await getDataset(userId);
-  const plan = planRuleBackfill(data.transactions, selectRulesForBackfill(data.rules, ruleId));
-  return { count: plan.length, samples: plan.slice(0, 8).map((p) => ({ description: p.description })) };
-}
-
-export async function applyRuleBackfill(ruleId?: string): Promise<number> {
-  const userId = await getUserId();
-  const data = await getDataset(userId);
-  const plan = planRuleBackfill(data.transactions, selectRulesForBackfill(data.rules, ruleId));
-  const byId = new Map(data.transactions.map((t) => [t.id, t]));
-  for (const change of plan) {
-    const tx = byId.get(change.id)!;
-    await upsertTransaction(userId, { ...tx, ...change.patch, categorySource: "model" });
-  }
-  return plan.length;
 }

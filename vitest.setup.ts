@@ -34,8 +34,6 @@ vi.mock("@/app/actions/data", async () => {
 // not at call time, and takes the whole test file with it.
 vi.mock("@/app/actions/ai", () => ({
   categorizeTransactions: async () => [],
-  previewRuleBackfill: async () => ({ count: 0, samples: [] }),
-  applyRuleBackfill: async () => 0,
 }));
 
 vi.mock("@/app/actions/corpus", () => ({

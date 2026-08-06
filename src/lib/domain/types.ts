@@ -48,20 +48,7 @@ export type CategorySource = "model" | "user";
 
 export type TransactionKind = "expense" | "income" | "transfer";
 
-export type MatchMode = "contains" | "startsWith" | "exact";
-export type RuleOrigin = "seed" | "manual" | "suggested";
 
-export interface CategorizationRule {
-  id: string;
-  priority: number; // lower wins first; also defines list order
-  enabled: boolean;
-  matchText: string; // matched case-insensitively against the description
-  matchMode: MatchMode;
-  setCategoryId: string | null;
-  setKind: TransactionKind | null;
-  addTagIds: string[]; // union'd into the transaction's tags
-  origin: RuleOrigin;
-}
 
 export interface Transaction {
   id: string;

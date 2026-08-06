@@ -43,10 +43,11 @@ guesses, and turns the corrected history into a private training signal.
 **Goals**
 - G1 — Import bank CSV exports (SEB and Revolut), de-duplicated, with foreign currency converted to
   SEK at import time.
-- G2 — Auto-categorize each transaction (rules → retrieval-grounded LLM) and flag low-confidence
+- G2 — Auto-categorize each transaction (retrieval-grounded LLM) and flag low-confidence
   rows for review. A failure is surfaced, never papered over with a guess.
 - G3 — Learn from every correction and approval so future predictions improve.
-- G4 — Provide budgets, categories, tags, and rules with full CRUD.
+- G4 — Provide budgets, categories and tags with full CRUD, and a page for curating what the
+  categorizer has learned.
 - G5 — Give a focused dashboard and a calm spending breakdown/trend view.
 - G6 — Work as an installable, offline-capable PWA on phone and desktop.
 - G7 — Be private and secure: single-owner sign-in, per-user data isolation.
@@ -76,7 +77,7 @@ There are no secondary personas. The app is **single-owner**: exactly one Google
 **In scope:** CSV import (SEB + Revolut, incl. localized Revolut exports), FX conversion,
 de-duplication, transfer-pair detection, the categorization pipeline + learning loop, transactions
 (list/filter/detail/edit/split/tag/delete), dashboard, budgets,
-categories (nested), tags, rules (+ backfill + suggestions), settings,
+categories (nested), tags, corpus curation + accuracy measurement, settings,
 Google auth with single-owner allowlist, PWA (install + offline shell).
 
 **Out of scope (this version):** Web Push overspend alerts, an offline write queue, a dedicated
@@ -99,7 +100,6 @@ Dates are **ISO `yyyy-mm-dd` strings**.
 | **Transaction** | `id, date, description, amount(signed SEK), accountId, categoryId?, predictedCategoryId?, categoryConfidence?(0..1), categorySource('model'\|'user'), needsReview, excluded?, tagIds[], splits?[], notes?, kind('expense'\|'income'\|'transfer')` | The central entity. |
 | **Split** | `id, label?, amount(absolute SEK), mine(bool)` | A portion of a transaction; **only `mine` portions count** toward expenses. |
 | **Budget** | `id, categoryId, limit(positive SEK), month('yyyy-mm'\|null)` | `null` month = repeats every month. Targets a top-level or sub category. |
-| **CategorizationRule** | `id, priority(lower wins), enabled, matchText, matchMode('contains'\|'startsWith'\|'exact'), setCategoryId?, setKind?, addTagIds[], origin('seed'\|'manual'\|'suggested')` | Runs before the LLM at import (BR-3). |
 | **CategorizationExample** | `id, rawDescription, cleanedDescription, amount, predictedKind?, predictedCategoryId?, predictedConfidence?, finalKind, finalCategoryId?, corrected(bool), source('import'\|'detail'), createdAt` | The training set (BR-4). |
 | **Auth (users/accounts/sessions/verificationTokens)** | Auth.js standard shape | `users.id` is the app-wide `userId`. |
 
@@ -160,7 +160,7 @@ after first sign-in. Visiting any authed route while signed out redirects to `/s
 **Story:** *As the owner, my data loads instantly, works offline for reads, and stays consistent.*
 
 - FR-2.1 — A single read/write facade (`useData()`) exposes the whole dataset (accounts, categories,
-  tags, transactions, budgets, rules) and one mutation per operation.
+  tags, transactions, budgets) and one mutation per operation.
 - FR-2.2 — Reads come from one cache entry, **persisted to `localStorage`** for instant + offline
   reads, rehydrated on load.
 - FR-2.3 — Every mutation is **optimistic**: update the cache immediately, persist via a server
@@ -229,8 +229,6 @@ correct or approve one.*
 
 - FR-4.1 — **BR-3 Pipeline order**, per imported row:
   1. **Own-account transfer** — description references one of the user's `accountNumber`s → `transfer`.
-  2. **User rules** (`rules`) — contains/starts-with/exact, by `priority`; a resolving match sets
-     category/kind/tags and **skips the LLM**.
   3. **Retrieval + OpenAI** (`gpt-4o-mini`, structured output →
      `{kind, categoryId, tagIds, confidence}`) for the rest, grounded in examples retrieved from
      the owner's own confirmations.
@@ -316,28 +314,18 @@ uncategorized rather than orphaning or deleting them.
   either for a specific `month` or repeating (`month=null`).
 - FR-6.9.2 — Show **health** (BR-5) and a **forecast** (BR-6, shared with the dashboard).
 
-### 6.10 Rules
+### 6.10 Settings
 
-**Story:** *As the owner, I codify recurring categorizations so the LLM doesn't re-decide them.*
-
-- FR-6.10.1 — `/rules` page: description rules (contains/starts-with/exact) that set category/kind/
-  tags, ordered by `priority`, run **before** the LLM at import (FR-4.1).
-- FR-6.10.2 — **Backfill:** apply a rule to existing matching transactions (per-rule and bulk).
-- FR-6.10.3 — **Suggestions:** per-month, mine candidate rules from corrected data; the owner
-  approves/edits them. Keep the rule set small — only deterministic cases, not what the LLM can infer.
-
-### 6.11 Settings
-
-- FR-6.11.1 — Settings page: account avatar + sign-out (also in every header), data reset/clear.
-- FR-6.11.2 — `masked` (privacy blur), selected `month`, and `accountFilter` stay **device-local**
+- FR-6.10.1 — Settings page: account avatar + sign-out (also in every header), data reset/clear.
+- FR-6.10.2 — `masked` (privacy blur), selected `month`, and `accountFilter` stay **device-local**
   (not synced).
 
-### 6.12 PWA
+### 6.11 PWA
 
-- FR-6.12.1 — Installable (manifest + icon set) and offline app-shell via a **hand-rolled** service
+- FR-6.11.1 — Installable (manifest + icon set) and offline app-shell via a **hand-rolled** service
   worker (app-shell cache, network-first navigation, stale-while-revalidate — no bundler plugin).
-- FR-6.12.2 — Register the service worker **in production only** (install/test from the deployed URL).
-- FR-6.12.3 — Privacy mask: a toggle blurs all monetary amounts for over-the-shoulder privacy.
+- FR-6.11.2 — Register the service worker **in production only** (install/test from the deployed URL).
+- FR-6.11.3 — Privacy mask: a toggle blurs all monetary amounts for over-the-shoulder privacy.
 
 ---
 
@@ -355,7 +343,7 @@ uncategorized rather than orphaning or deleting them.
 - **NFR-5 Localization of money/dates.** SEK + `sv-SE` formatting; ISO dates; English UI chrome.
   Import parsing tolerates localized bank exports (FR-3.4).
 - **NFR-6 Theming.** Dark-first; HSL semantic tokens only (no raw hex, BR-7); `next-themes`.
-- **NFR-7 Testing (TDD).** New behavior gets a failing test first. Pure logic (selectors, fx, rules,
+- **NFR-7 Testing (TDD).** New behavior gets a failing test first. Pure logic (selectors, fx, retrieval,
   example selection, parsers, mutations) is unit-tested directly; UI tests render with a seeded
   QueryClient. The suite is the regression net (269 tests in the reference build).
 - **NFR-8 Resilience.** FX failures degrade gracefully (held-back rows + retry) and a retrieval
@@ -396,7 +384,7 @@ auth seam keying every query. UI-local state in `lib`/`store/ui.ts` (Zustand). S
 
 Domain tables (each `userId`-scoped, with a `userId` index; `transactions` indexed by `(userId,
 date)`): `accounts`, `categories`, `tags`, `transactions`, `budgets`,
-`categorization_rules`, `categorization_examples`. Auth tables (Auth.js shape):
+`categorization_examples`, `eval_runs`. Auth tables (Auth.js shape):
 `auth_users` (`id` = app `userId`), `auth_accounts`, `auth_sessions`, `auth_verification_tokens`.
 Money columns are `numeric(12,2)`; confidence/priority are `real`; `tagIds`/`splits`/`addTagIds`/
 `layout`/`navConfig` are `jsonb`; dates are `text` ISO strings. Field-level detail is in §5.1 and the
@@ -425,7 +413,7 @@ Bootstrap: `npm install` → `npm run db:push` (sync schema) → `npm run db:see
 A reproduction is "done" when: a SEB and a Revolut (English **and** Dutch) CSV import correctly with
 FX conversion, dedupe, and transfer detection; the categorization pipeline + learning loop work
 (and fail visibly without a key); transactions can be reviewed/edited/split/tagged/excluded/
-**deleted-with-confirmation**; budgets/categories/tags/rules have full CRUD with their business
+**deleted-with-confirmation**; budgets/categories/tags have full CRUD with their business
 rules (BR-5, detach/strip on delete); Google
 single-owner auth gates access and claims stub data; the PWA installs and serves an offline shell; and
 the test suite passes with build + lint clean.

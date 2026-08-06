@@ -43,7 +43,7 @@ With `DEV_USER_ID` set you can run locally without configuring Google at all (th
 |---|---|
 | `npm run dev` | Dev server (Turbopack) |
 | `npm run build` / `start` | Production build / serve |
-| `npm test` | Vitest suite (454 tests) |
+| `npm test` | Vitest suite (440 tests) |
 | `npm run lint` | ESLint — fails on unused imports/vars |
 | `npm run lint:fix` | ESLint with autofix |
 | `npm run check:docs` | Verify markdown links + source-path references resolve |
@@ -63,7 +63,7 @@ A Husky pre-commit hook runs `lint-staged` (ESLint + autofix on staged files) an
   optimistic update backed by a server action.
 - **Spending math** lives only in `effectiveExpense` (`src/lib/domain/`) — a tx counts iff
   `kind === "expense"`, not excluded, `amount < 0` (split → your share). Never sum `amount` directly.
-- **Categorization** runs own-account-transfer detection → user rules → retrieval + OpenAI. There is
+- **Categorization** runs own-account-transfer detection → retrieval + OpenAI. There is
   no fallback: if the model is unreachable the import says so instead of guessing. Retrieval is
   hybrid — pgvector cosine plus lexical merchant-token overlap — over a **corpus built from your own
   corrections**, one row per merchant. Curate it at `/training`; measure it with `npm run eval`.

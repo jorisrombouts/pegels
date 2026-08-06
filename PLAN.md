@@ -5,7 +5,7 @@
 > analysis (budgets, trends). Built with Next.js 16 (App Router) + Neon Postgres + OpenAI,
 > deployed on Vercel.
 >
-> **Status — 2026-08-06:** live on Vercel, 454 tests passing, build + lint clean. Every feature
+> **Status — 2026-08-06:** live on Vercel, 440 tests passing, build + lint clean. Every feature
 > screen, the import + categorization pipeline, auth, and per-user sync are shipped. What remains
 > is a short, optional roadmap (see the end of this file).
 >
@@ -23,7 +23,7 @@ npm run db:seed          # load the Swedish sample dataset
 npm run corpus:backfill  # seed the categorization corpus from your own corrections
 npm run eval             # score categorization against the hold-out
 npm run dev              # http://localhost:3000
-npm test                 # vitest (454 tests)
+npm test                 # vitest (440 tests)
 npm run build            # production build (Turbopack)
 ```
 
@@ -58,7 +58,7 @@ The app is a **client-side SPA** backed by server actions, not a set of server-r
   queries (`queries.ts`). `src/app/actions/data.ts` exposes one server action per mutation.
 - **`useData()`** (`src/store/data.ts`) is the single read/write facade. It's a TanStack Query
   wrapper over one `['dataset']` entry (the whole user dataset: accounts, categories, tags,
-  transactions, budgets, rules). Reads are **persisted to `localStorage`** (instant + offline
+  transactions, budgets). Reads are **persisted to `localStorage`** (instant + offline
   reads). Each mutation updates the cache **optimistically**, persists via a server action, and
   **rolls back + resyncs on failure**.
 - **`getUserId()`** (`src/lib/auth.ts`) is the auth seam every query is keyed by — the real session
@@ -83,9 +83,7 @@ Money is decimal throughout (`numeric(12,2)`), displayed in Swedish notation (`1
 
 For each imported row, in order:
 1. **Own-account transfers** — description references one of the user's `accountNumber`s → `transfer`.
-2. **User rules** (`src/lib/rules.ts`) — contains / starts-with / exact rules set category/kind/tags
-   and run **before the LLM**; a resolving match skips inference.
-3. **Retrieval + OpenAI** (`gpt-4o-mini`, structured output → `{kind, categoryId, tagIds,
+2. **Retrieval + OpenAI** (`gpt-4o-mini`, structured output → `{kind, categoryId, tagIds,
    confidence}`, `src/lib/ai/categorize-openai.ts`) for the rest.
 
 There is deliberately **no fallback**. If the model is unreachable, categorization fails and the
@@ -186,7 +184,7 @@ roadmap.)
 src/
   app/
     (app)/            authed routes: dashboard (page.tsx), transactions, budgets,
-                      categories, accounts, tags, rules, settings; layout = auth gate
+                      categories, accounts, tags, training, settings; layout = auth gate
     actions/          server actions: data (CRUD), ai (categorize + training log), fx, auth
     layout.tsx        root: fonts, Providers, metadata; manifest.ts; apple-icon.png
   components/
@@ -200,7 +198,10 @@ src/
     forecast/         recurrence detection + fixed/variable projection (pure, date-injected)
     ai/               categorize-openai, select-examples (few-shot selection)
     db/               schema, queries, map (row<->domain), claim, index
-    rules.ts fx.ts parse-csv.ts parse-revolut.ts categorize.ts format.ts auth*.ts
+    corpus/           the categorization corpus: capture, backfill, consolidation
+    eval/             hold-out scoring (npm run eval)
+    text/             shared description tokenisers
+    fx.ts parse-csv.ts parse-revolut.ts format.ts auth*.ts
   store/              data.ts (TanStack Query facade) + ui.ts (Zustand)
   data/mock.ts        seed dataset (24 categories, sample accounts/transactions)
 docs/superpowers/     design specs + implementation plans (the decision record)
@@ -213,7 +214,7 @@ public/               sw.js, icons, mock-imports/
 ## Conventions
 
 - **TDD.** New behavior gets a failing test first (the suite is the regression net). Pure logic
-  (selectors, fx, rules, example selection, parsers) is unit-tested directly; UI tests render with
+  (selectors, fx, retrieval fusion, corpus planning, eval metrics, parsers) is unit-tested directly; UI tests render with
   `src/test/render.tsx` (`renderWithData` seeds a QueryClient).
 - **Spending math only via `effectiveExpense`** — never sum `amount`.
 - **Money is decimal** (`numeric(12,2)`), displayed `sv-SE`; parse `100,75`.
@@ -270,11 +271,11 @@ A quick map of what's done, for orientation. Details + rationale are in the desi
 - **Budgets / Categories / Tags / Accounts** — full CRUD; budgets have health + forecast (the
   shared engine, not their own maths);
   categories nest (parent/sub).
-- **Rules** — `/rules` page: description rules set category/kind/tags, run before the LLM at import,
-  with per-rule and bulk backfill; per-month suggestions mined from corrected data.
+- **Training** — `/training` page: review queue ordered most-seen-first, approved corpus with
+  search and hold-out toggles, and a one-click seed from your own corrections.
 - **Import** — SEB + Revolut CSV, non-SEK→SEK conversion, dedupe, transfer-pair detection, editable
   review with kind/category/confidence and a filter bar.
-- **AI categorization + learning loop** — rules → hybrid retrieval (pgvector + lexical) over a
+- **AI categorization + learning loop** — hybrid retrieval (pgvector + lexical) over a
   curated corpus of your corrections → OpenAI. No fallback. Curate at `/training`, measure with
   `npm run eval`.
 - **Auth** — Google sign-in (Auth.js v5), single-owner allowlist, stub-data claim, dev bypass.
