@@ -1,19 +1,16 @@
 "use server";
 
 import { getUserId } from "@/lib/auth";
-import {
-  deleteExample,
-  loadCurationRows,
-  updateExample,
-  upsertExamples,
-  type CurationRow,
-} from "@/lib/db/corpus-queries";
+import { deleteExample, loadCurationRows, updateExample, upsertExamples } from "@/lib/db/corpus-queries";
 import { runCorpusBackfill } from "@/lib/corpus/backfill-run";
-import { planExampleWrites, type ExampleInput } from "@/lib/corpus/record";
+import { planExampleWrites } from "@/lib/corpus/record";
+import type { ExampleInput, CurationRow } from "@/lib/corpus/types";
 import type { ExampleSource, ExampleStatus } from "@/lib/db/schema";
 import type { TransactionKind } from "@/lib/domain/types";
 
-export type { ExampleInput, CurationRow };
+// NOTE: a "use server" module may only export async functions — Next turns every export into an
+// action reference, so re-exporting a type here is a runtime ReferenceError on every page that
+// loads the actions bundle. Shared types live in @/lib/corpus/types.
 
 /**
  * The single capture API for everything the user tells us about a categorization.

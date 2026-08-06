@@ -1,21 +1,10 @@
 import { dedupKeyFor } from "@/lib/ai/normalize";
 import { isGoldByHash } from "@/lib/ai/hash";
 import type { ExampleSource, ExampleStatus } from "@/lib/db/schema";
-import type { TransactionKind } from "@/lib/domain/types";
+import type { ExampleInput } from "./types";
 
-/** What a capture site knows about one row. */
-export interface ExampleInput {
-  rawDescription: string;
-  cleanedDescription: string;
-  amount: number;
-  predictedKind: TransactionKind | null;
-  predictedCategoryId: string | null;
-  predictedTagIds: string[] | null;
-  predictedConfidence: number | null;
-  finalKind: TransactionKind;
-  finalCategoryId: string | null;
-  finalTagIds: string[];
-}
+export type { ExampleInput };
+
 
 /**
  * `affirm` overwrites the labels and approves the row; `touch` only bumps the sighting counters.

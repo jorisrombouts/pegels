@@ -6,7 +6,7 @@ import { Card, CardHeader } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { orderCategories } from "@/lib/domain/selectors";
 import { formatSEKAbs } from "@/lib/format";
-import type { CurationRow } from "@/app/actions/corpus";
+import type { CurationRow } from "@/lib/corpus/types";
 import type { Category } from "@/lib/domain/types";
 import type { CorpusEdit } from "@/store/corpus";
 

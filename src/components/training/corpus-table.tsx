@@ -6,7 +6,7 @@ import { Card, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { merchantTokens } from "@/lib/text/merchant-tokens";
-import type { CurationRow } from "@/app/actions/corpus";
+import type { CurationRow } from "@/lib/corpus/types";
 import type { Category, Tag } from "@/lib/domain/types";
 
 /**

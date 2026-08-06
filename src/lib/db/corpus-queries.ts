@@ -2,20 +2,11 @@ import { and, desc, eq, isNull, ne, sql, type SQL } from "drizzle-orm";
 import { db } from "./index";
 import { categorizationExamples, evalRuns, EMBED_DIMS, type ExampleStatus } from "./schema";
 import type { PlannedExample } from "../corpus/record";
+import type { CorpusRow, CurationRow } from "../corpus/types";
+
+export type { CorpusRow, CurationRow };
 import type { TransactionKind } from "../domain/types";
 
-/** A corpus row as retrieval and the prompt need it — never carries the embedding. */
-export interface CorpusRow {
-  id: string;
-  dedupKey: string;
-  cleanedDescription: string;
-  amount: number;
-  finalKind: TransactionKind;
-  finalCategoryId: string | null;
-  finalTagIds: string[];
-  hitCount: number;
-  lastSeenAt: string;
-}
 
 /**
  * The one place `gold = false` is enforced.
@@ -183,14 +174,6 @@ export async function upsertExamples(rows: PlannedExample[]): Promise<void> {
   await db.batch(ops as [(typeof ops)[number], ...typeof ops]);
 }
 
-/** A corpus row as the curation page shows it — everything except the embedding. */
-export interface CurationRow extends CorpusRow {
-  status: ExampleStatus;
-  gold: boolean;
-  source: string;
-  createdAt: string;
-  embedded: boolean;
-}
 
 /** The whole corpus for curation, most-seen first — the highest-leverage review order. */
 export async function loadCurationRows(userId: string): Promise<CurationRow[]> {

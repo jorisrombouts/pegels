@@ -2,7 +2,7 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { CandidateQueue } from "./candidate-queue";
-import type { CurationRow } from "@/app/actions/corpus";
+import type { CurationRow } from "@/lib/corpus/types";
 import type { Category } from "@/lib/domain/types";
 
 const CATEGORIES: Category[] = [

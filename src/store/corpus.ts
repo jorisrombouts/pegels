@@ -3,7 +3,7 @@
 import { useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import * as api from "@/app/actions/corpus";
-import type { CurationRow } from "@/app/actions/corpus";
+import type { CurationRow } from "@/lib/corpus/types";
 import type { TransactionKind } from "@/lib/domain/types";
 
 /**
