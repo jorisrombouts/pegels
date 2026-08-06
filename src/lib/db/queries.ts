@@ -73,8 +73,9 @@ export async function upsertTransactions(userId: string, txs: Transaction[]): Pr
 }
 
 export async function insertTransactions(userId: string, txs: Transaction[]): Promise<void> {
-  if (txs.length === 0) return;
-  await db.insert(transactions).values(txs.map((t) => transactionToRow(t, userId)));
+  for (const part of chunked(txs, TX_CHUNK)) {
+    await db.insert(transactions).values(part.map((t) => transactionToRow(t, userId)));
+  }
 }
 
 export async function removeTransaction(userId: string, id: string): Promise<void> {

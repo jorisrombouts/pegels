@@ -7,7 +7,7 @@ import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Field, Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useData } from "@/store/data";
+import { IMPORT_BATCH, useData } from "@/store/data";
 import { useUI } from "@/store/ui";
 import { parseCsv, parseAmount, parseDate, cleanDescription, type ColumnField, type ParsedCsv } from "@/lib/parse-csv";
 import { isRevolutCsv, normalizeRevolut } from "@/lib/parse-revolut";
@@ -285,18 +285,20 @@ export function ImportModal() {
     }));
     addTransactions(txs);
     // Log the AI's prediction vs. the user's final choice for the feedback loop (fire-and-forget).
-    void logImportExamples(
-      included.map((r) => ({
-        rawDescription: r.description,
-        cleanedDescription: r.description,
-        amount: r.amount,
-        predictedKind: r.predictedKind,
-        predictedCategoryId: r.predictedCategoryId,
-        predictedConfidence: r.predictedConfidence,
-        finalKind: r.kind,
-        finalCategoryId: r.categoryId,
-      })),
-    ).catch((e) => console.error("Failed to log import examples", e));
+    const examples = included.map((r) => ({
+      rawDescription: r.description,
+      cleanedDescription: r.description,
+      amount: r.amount,
+      predictedKind: r.predictedKind,
+      predictedCategoryId: r.predictedCategoryId,
+      predictedConfidence: r.predictedConfidence,
+      finalKind: r.kind,
+      finalCategoryId: r.categoryId,
+    }));
+    // Batched for the same body limit as addTransactions above.
+    for (let i = 0; i < examples.length; i += IMPORT_BATCH) {
+      void logImportExamples(examples.slice(i, i + IMPORT_BATCH)).catch((e) => console.error("Failed to log import examples", e));
+    }
     // Reclassify each matched existing leg as a transfer (and link/unlink its goal).
     existingUpdates.forEach((u) => updateTransaction(u.id, { kind: "transfer", goalId: u.goalId }));
     setImportOpen(false);

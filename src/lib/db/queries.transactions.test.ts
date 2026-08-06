@@ -14,7 +14,7 @@ vi.mock("./index", async () => {
   return { db: drizzle(client as never) };
 });
 
-import { upsertTransactions } from "./queries";
+import { insertTransactions, upsertTransactions } from "./queries";
 
 const tx = (over: Partial<Transaction>): Transaction => ({
   id: "t1", date: "2026-01-10", description: "ICA Maxi", amount: -100, accountId: "acc-lon",
@@ -63,6 +63,23 @@ describe("upsertTransactions", () => {
   it("issues no statement at all for an empty plan", async () => {
     sent.length = 0;
     await upsertTransactions("u1", []);
+    expect(sent).toEqual([]);
+  });
+});
+
+describe("insertTransactions", () => {
+  it("splits an import larger than one chunk into whole statements", async () => {
+    sent.length = 0;
+    // 4,223 rows is past the 3,855-row bind-parameter cap, so an unchunked insert would be rejected.
+    await insertTransactions("u1", Array.from({ length: 4223 }, (_, i) => tx({ id: `t${i}` })));
+
+    expect(sent.map((s) => s.params.length / 17)).toEqual([2000, 2000, 223]);
+    expect(Math.max(...sent.map((s) => s.params.length))).toBeLessThan(65535);
+  });
+
+  it("issues no statement at all for an empty import", async () => {
+    sent.length = 0;
+    await insertTransactions("u1", []);
     expect(sent).toEqual([]);
   });
 });
