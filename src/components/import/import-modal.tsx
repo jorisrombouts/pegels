@@ -75,6 +75,7 @@ export function ImportModal() {
   const [search, setSearch] = useState("");
   const [fx, setFx] = useState<FxInfo | null>(null);
   const [retryingFx, setRetryingFx] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   function reset() {
     setStep("upload");
@@ -84,6 +85,7 @@ export function ImportModal() {
     setExistingUpdates([]);
     setCategorizing(false);
     setFx(null);
+    setError(null);
   }
 
   function loadText(text: string, name: string) {
@@ -190,10 +192,19 @@ export function ImportModal() {
 
   async function handleContinue() {
     setCategorizing(true);
+    setError(null);
     try {
       const built = await buildRows();
       setRows(built);
       setStep("review");
+    } catch (e) {
+      // Categorization no longer degrades to a keyword guess, so a failure here is real and has
+      // to be visible — a silent fallback is how an expired API key went unnoticed.
+      console.error("import: categorization failed", e);
+      setError(
+        "Couldn't categorize these transactions — the AI service didn't respond. " +
+          "Check that OPENAI_API_KEY is valid, then try again.",
+      );
     } finally {
       setCategorizing(false);
     }
@@ -362,6 +373,16 @@ export function ImportModal() {
                     </SelectContent>
                   </Select>
                 </Field>
+
+                {error && (
+                  <p
+                    role="alert"
+                    className="rounded-xl px-3 py-2 text-sm"
+                    style={{ backgroundColor: "hsl(var(--negative) / 0.12)", color: "hsl(var(--negative))" }}
+                  >
+                    {error}
+                  </p>
+                )}
 
                 <div className="flex justify-end">
                   <Button onClick={handleContinue} disabled={!accountId || categorizing}>

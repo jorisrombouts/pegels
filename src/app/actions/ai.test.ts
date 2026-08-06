@@ -81,14 +81,20 @@ describe("categorizeTransactions", () => {
     expect(out[1]).toMatchObject({ kind: "expense", categoryId: "cat-groceries" });
   });
 
-  it("falls back to keyword categorize when OpenAI throws", async () => {
-    categorizeWithOpenAIMock.mockRejectedValue(new Error("no key"));
-    const out = await categorizeTransactions([
-      { index: 0, description: "HEMKÖP SUPERMARKET", amount: -200 },
-      { index: 1, description: "MYSTERY DEPOSIT", amount: 500 },
-    ]);
-    expect(out[0]).toMatchObject({ kind: "expense", categoryId: "cat-groceries" });
-    expect(out[1]).toMatchObject({ kind: "income" }); // positive amount → income
+  it("fails loudly when OpenAI is unreachable instead of guessing from keywords", async () => {
+    // The old keyword fallback produced plausible-looking categories on every failure, which is
+    // how an expired API key went unnoticed across an unknown number of imports.
+    categorizeWithOpenAIMock.mockRejectedValue(new Error("401 Incorrect API key provided"));
+    await expect(
+      categorizeTransactions([{ index: 0, description: "HEMKÖP SUPERMARKET", amount: -200 }]),
+    ).rejects.toThrow(/401/);
+  });
+
+  it("still resolves rule-matched rows without reaching OpenAI at all", async () => {
+    // A total API outage must not block the rows that were never going to need the model.
+    categorizeWithOpenAIMock.mockRejectedValue(new Error("down"));
+    const out = await categorizeTransactions([{ index: 0, description: "REVOLUT TOPUP", amount: -500 }]);
+    expect(out[0]).toMatchObject({ kind: "transfer", confidence: 1 });
   });
 
   it("nulls out categoryIds that are not valid for the user", async () => {

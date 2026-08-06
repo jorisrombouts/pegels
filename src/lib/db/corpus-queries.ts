@@ -218,14 +218,17 @@ export async function nearestByVector(
       vs.map((v, i) => sql`(${i}::int, ${JSON.stringify(v)}::vector(${sql.raw(String(EMBED_DIMS))}))`),
       sql`, `,
     );
+    // No table alias inside the LATERAL: `where` comes from corpusFilter, which references the
+    // table by its real name, and an alias would put those references out of scope.
     return db.execute(sql`
-      SELECT q.idx AS "queryIndex", e.id AS "id", 1 - (e.embedding <=> q.v) AS "similarity"
+      SELECT q.idx AS "queryIndex", e.id AS "id", 1 - (e.dist) AS "similarity"
       FROM (VALUES ${values}) AS q(idx, v)
       CROSS JOIN LATERAL (
-        SELECT ce.id, ce.embedding
-        FROM ${categorizationExamples} ce
-        WHERE ${where} AND ce.embedding IS NOT NULL
-        ORDER BY ce.embedding <=> q.v
+        SELECT ${categorizationExamples.id} AS id,
+               ${categorizationExamples.embedding} <=> q.v AS dist
+        FROM ${categorizationExamples}
+        WHERE ${where} AND ${categorizationExamples.embedding} IS NOT NULL
+        ORDER BY ${categorizationExamples.embedding} <=> q.v
         LIMIT ${k}
       ) e
     `);

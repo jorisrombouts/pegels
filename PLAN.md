@@ -85,7 +85,11 @@ For each imported row, in order:
    and run **before the LLM**; a resolving match skips inference.
 3. **Retrieval + OpenAI** (`gpt-4o-mini`, structured output → `{kind, categoryId, tagIds,
    confidence}`, `src/lib/ai/categorize-openai.ts`) for the rest.
-4. **Keyword fallback** (`src/lib/categorize.ts`) if OpenAI errors.
+
+There is deliberately **no fallback**. If the model is unreachable, categorization fails and the
+import surfaces the error. The keyword table that used to stand in produced plausible-looking
+categories on every failure, which is precisely how an expired API key went unnoticed. Rows already
+resolved by steps 1–2 are unaffected by an outage.
 
 Low confidence (`< 0.6`) sets `needsReview`.
 

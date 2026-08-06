@@ -26,6 +26,19 @@ export interface RetrievalRow {
 /** Lexical candidates considered per query before fusion. */
 const LEXICAL_K = 8;
 
+/**
+ * Cosine similarity below which a vector hit is noise, not evidence.
+ *
+ * The vector arm returns its top k however distant they are, so without a floor an unrecognised
+ * merchant still comes back with "neighbours" — which both misleads the model and, worse, stops
+ * `clampConfidence` from flagging it for review.
+ *
+ * Measured against the real corpus with text-embedding-3-small: an exact merchant scores 1.00 and
+ * a true match ~0.61, while unrelated merchants and outright nonsense top out around 0.48. 0.55
+ * sits in that gap. Short merchant strings embed poorly — the lexical arm is what carries those.
+ */
+const MIN_VECTOR_SIMILARITY = 0.55;
+
 
 /**
  * Retrieve the confirmed examples most likely to settle each row, hybrid.
@@ -84,7 +97,9 @@ export async function retrieveNeighbours(
       else grouped.set(h.queryIndex, [h]);
     }
     embedded.forEach((e, i) => {
-      const list = (grouped.get(i) ?? []).sort((a, b) => b.similarity - a.similarity);
+      const list = (grouped.get(i) ?? [])
+        .filter((h) => h.similarity >= MIN_VECTOR_SIMILARITY)
+        .sort((a, b) => b.similarity - a.similarity);
       vectorHitsByQuery.set(e.q.key, list.map((h) => h.id));
     });
   }

@@ -2,7 +2,6 @@
 
 import { getUserId } from "@/lib/auth";
 import { getDataset, upsertTransaction } from "@/lib/db/queries";
-import { categorize } from "@/lib/categorize";
 import { matchesOwnAccount } from "@/lib/domain/own-account";
 import { reconcileKindWithSign } from "@/lib/ai/reconcile";
 import { applyRules, planRuleBackfill, selectRulesForBackfill } from "@/lib/rules";
@@ -99,14 +98,10 @@ export async function categorizeTransactions(rows: AiRow[]): Promise<AiResult[]>
       console.error("retrieval failed; classifying without evidence", e);
     }
 
-    try {
-      aiResults = await categorizeWithOpenAI(remaining, taxonomy, neighbours, cacheKeyFor(userId, taxonomy));
-    } catch {
-      aiResults = remaining.map((r) => {
-        const g = categorize(r.description);
-        return { index: r.index, kind: r.amount < 0 ? "expense" : "income", categoryId: g.categoryId, tagIds: [], confidence: g.confidence };
-      });
-    }
+    // Deliberately no fallback. A hardcoded keyword table silently produced plausible-looking
+    // categories whenever the API failed, which is how an expired API key went unnoticed for an
+    // unknown number of imports. Failing loudly is the only way the user finds out.
+    aiResults = await categorizeWithOpenAI(remaining, taxonomy, neighbours, cacheKeyFor(userId, taxonomy));
   }
 
   // 3) merge, defensively null out unknown categoryIds, and re-anchor confidence on the evidence

@@ -112,6 +112,34 @@ describe("retrieveNeighbours", () => {
     expect(out.get(0)).toEqual([]);
   });
 
+  it("ignores vector hits that are merely the nearest, not actually similar", async () => {
+    // The vector arm always returns its top k however far away they are. Measured against the
+    // real corpus, genuine matches score >= 0.6 while unrelated merchants — and outright
+    // nonsense — top out around 0.48, so anything under the floor is noise.
+    loadCorpus.mockResolvedValue([corpusRow("far", "HELT ANNAT STÄLLE")]);
+    nearestByVector.mockResolvedValue([{ queryIndex: 0, id: "far", similarity: 0.42 }]);
+    const out = await retrieveNeighbours("u1", [{ index: 0, description: "QWERTY ZXCVB", amount: -50 }]);
+    expect(out.get(0)).toEqual([]);
+  });
+
+  it("keeps a vector hit that clears the similarity floor", async () => {
+    loadCorpus.mockResolvedValue([corpusRow("near", "HELT ANNAT STÄLLE")]);
+    nearestByVector.mockResolvedValue([{ queryIndex: 0, id: "near", similarity: 0.72 }]);
+    const out = await retrieveNeighbours("u1", [{ index: 0, description: "QWERTY ZXCVB", amount: -50 }]);
+    expect(out.get(0)!.map((n) => n.id)).toEqual(["near"]);
+  });
+
+  it("leaves an unrecognised merchant with no neighbours, so its confidence gets capped", async () => {
+    // This is the cold-start mechanism: no evidence -> clampConfidence forces needs-review.
+    loadCorpus.mockResolvedValue([corpusRow("a", "ICA MAXI"), corpusRow("b", "SPOTIFY AB")]);
+    nearestByVector.mockResolvedValue([
+      { queryIndex: 0, id: "a", similarity: 0.35 },
+      { queryIndex: 0, id: "b", similarity: 0.31 },
+    ]);
+    const out = await retrieveNeighbours("u1", [{ index: 0, description: "HELT OKÄND BUTIK XYZ", amount: -99 }]);
+    expect(out.get(0)).toEqual([]);
+  });
+
   it("widens to unreviewed candidates while the approved corpus is thin", async () => {
     countApproved.mockResolvedValue(3);
     await retrieveNeighbours("u1", [{ index: 0, description: "ICA", amount: -100 }]);
