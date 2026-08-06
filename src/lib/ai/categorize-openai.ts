@@ -2,7 +2,7 @@ import OpenAI from "openai";
 import type { TransactionKind } from "@/lib/domain/types";
 
 /** Bump when the prompt template changes — it feeds the cache key so a stale prefix isn't reused. */
-export const PROMPT_VERSION = "3";
+export const PROMPT_VERSION = "4";
 
 export interface AiRow {
   index: number;
@@ -72,6 +72,12 @@ const PRIORS = [
   "Card-bill payments and top-ups are transfers: SEB Kort, American Express / Amex, Revolut, Avanza,",
   "Nordnet. Lines containing lån, bolån or amortering are the mortgage — an expense, not a transfer.",
   "",
+  "TRAVEL",
+  "A merchant that is clearly not Swedish — a foreign city or country in the name, an airport or",
+  "station code (ARL = Arlanda, CPH, LHR), an unfamiliar non-Nordic name — is usually spending",
+  "while travelling, and belongs in the travel category rather than a literal one. A supermarket",
+  "abroad is travel, not groceries.",
+  "",
   "PAYMENT INTERMEDIARIES — these hide the real merchant",
   "Swish is Sweden's instant person-to-person transfer. Between the user's own accounts it is a",
   "transfer; to another person it is usually an expense whose real category is unknowable from the",
@@ -122,7 +128,11 @@ export function buildMessages(rows: AiRow[], taxonomy: PromptTaxonomy, neighbour
     "- expense: everything the user actually buys (amount is negative).",
     "",
     "Set categoryId to null when no category fits or when the kind is income or transfer.",
-    "Use tagIds only for tags that clearly apply; an empty list is the right answer most of the time.",
+    "Reach for a generic \"Other\" category only as a last resort — an unfamiliar merchant name",
+    "usually still says what it sells (a workshop, a clinic, a bakery), so infer from the words.",
+    "",
+    "Leave tagIds empty unless a tag clearly applies. Tags mark a property the user tracks",
+    "deliberately, not a restatement of the category — most rows should have none.",
     "",
     "confidence is the probability the user would pick this categoryId:",
     "- 0.9 or above when a confirmed example below matches this row's merchant.",
