@@ -115,8 +115,10 @@ export function planRuleBackfill(transactions: Transaction[], rules: Categorizat
     const outcome = applyRules(t.description, rules);
     if (!outcome) continue;
     const patch: RuleBackfillChange["patch"] = {};
-    if (outcome.categoryId) patch.categoryId = outcome.categoryId;
-    if (outcome.kind) patch.kind = outcome.kind;
+    // Only emit a field the row doesn't already carry, so a re-run over settled data plans nothing
+    // and the dialog's "N would change" count is honest.
+    if (outcome.categoryId && outcome.categoryId !== t.categoryId) patch.categoryId = outcome.categoryId;
+    if (outcome.kind && outcome.kind !== t.kind) patch.kind = outcome.kind;
     if (outcome.addTagIds.length) {
       const merged = Array.from(new Set([...t.tagIds, ...outcome.addTagIds]));
       if (merged.length !== t.tagIds.length) patch.tagIds = merged;

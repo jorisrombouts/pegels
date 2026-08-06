@@ -6,7 +6,7 @@ import {
   insertCategorizationExamples,
   recentCategorizationExamples,
   affirmedExamples,
-  upsertTransaction,
+  upsertTransactions,
 } from "@/lib/db/queries";
 import { categorize, matchesOwnAccount } from "@/lib/categorize";
 import { applyRules, planRuleBackfill, selectRulesForBackfill } from "@/lib/rules";
@@ -124,10 +124,7 @@ export async function applyRuleBackfill(ruleId?: string): Promise<number> {
   const data = await getDataset(userId);
   const plan = planRuleBackfill(data.transactions, selectRulesForBackfill(data.rules, ruleId));
   const byId = new Map(data.transactions.map((t) => [t.id, t]));
-  for (const change of plan) {
-    const tx = byId.get(change.id)!;
-    await upsertTransaction(userId, { ...tx, ...change.patch, categorySource: "model" });
-  }
+  await upsertTransactions(userId, plan.map((c) => ({ ...byId.get(c.id)!, ...c.patch, categorySource: "model" as const })));
   return plan.length;
 }
 

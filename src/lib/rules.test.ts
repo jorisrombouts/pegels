@@ -129,4 +129,15 @@ describe("planRuleBackfill", () => {
     expect(plan.map((p) => p.id)).toEqual(["a"]);
     expect(plan[0].patch).toMatchObject({ categoryId: "cat-groceries", tagIds: ["tag-fixed"] });
   });
+
+  it("plans nothing on a re-run over rows the rule already settled", () => {
+    const settled = [tx({ id: "a", description: "ICA Maxi", categoryId: "cat-groceries", categorySource: "model", tagIds: ["tag-fixed"] })];
+    expect(planRuleBackfill(settled, rules)).toEqual([]);
+  });
+
+  it("still patches the one field that is stale", () => {
+    const kindRule = [{ ...rules[0], setKind: "transfer" as const, addTagIds: [] }];
+    const txs = [tx({ id: "a", description: "ICA Maxi", categoryId: "cat-groceries", kind: "expense", categorySource: "model", tagIds: [] })];
+    expect(planRuleBackfill(txs, kindRule)[0].patch).toEqual({ kind: "transfer" }); // categoryId already correct
+  });
 });

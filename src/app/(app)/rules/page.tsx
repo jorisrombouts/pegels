@@ -104,11 +104,10 @@ export default function RulesPage() {
             ) : null}
             <div className="flex justify-end gap-2">
               <DialogClose asChild><Button variant="ghost" size="sm">Cancel</Button></DialogClose>
-              <DialogClose asChild>
-                <Button size="sm" disabled={!backfill?.count} onClick={async () => { await applyRuleBackfill(backfill?.ruleId); await qc.invalidateQueries({ queryKey: DATASET_KEY }); setBackfill(null); }}>
-                  Apply to {backfill?.count ?? 0}
-                </Button>
-              </DialogClose>
+              {/* Not wrapped in DialogClose: the dialog stays up until the backfill actually lands. */}
+              <Button size="sm" disabled={!backfill?.count} onClick={async () => { await applyRuleBackfill(backfill?.ruleId); await qc.invalidateQueries({ queryKey: DATASET_KEY }); setBackfill(null); }}>
+                Apply to {backfill?.count ?? 0}
+              </Button>
             </div>
           </div>
         </DialogContent>

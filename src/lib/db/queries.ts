@@ -12,6 +12,16 @@ import type { Dataset } from "../../data/mock";
 type Batchable = Parameters<typeof db.batch>[0][number];
 const batch = (ops: Batchable[]) => db.batch(ops as [Batchable, ...Batchable[]]);
 
+/** Split a list into fixed-size slices, so one multi-row statement stays under a parameter ceiling. */
+function chunked<T>(xs: T[], size: number): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < xs.length; i += size) out.push(xs.slice(i, i + size));
+  return out;
+}
+
+// Postgres caps bind parameters at 65,535 and transactionToRow emits 17 columns → 3,855 rows/statement. 2,000 leaves headroom.
+const TX_CHUNK = 2000;
+
 // ── Reads ──
 
 export async function getDataset(userId: string): Promise<Dataset> {
@@ -41,6 +51,25 @@ export async function getDataset(userId: string): Promise<Dataset> {
 export async function upsertTransaction(userId: string, tx: Transaction): Promise<void> {
   const row = transactionToRow(tx, userId);
   await db.insert(transactions).values(row).onConflictDoUpdate({ target: transactions.id, set: row });
+}
+
+/** Upsert many transactions as one multi-row statement per chunk (~3 round-trips at 4k rows, not 4k). */
+export async function upsertTransactions(userId: string, txs: Transaction[]): Promise<void> {
+  // `set` lists every column transactionToRow writes except the `id` conflict target, so an updated
+  // row keeps exactly the values the caller passed — same as upsertTransaction's `set: row`.
+  for (const part of chunked(txs, TX_CHUNK)) {
+    await db.insert(transactions).values(part.map((t) => transactionToRow(t, userId))).onConflictDoUpdate({
+      target: transactions.id,
+      set: {
+        userId: sql`excluded.user_id`, date: sql`excluded.date`, description: sql`excluded.description`,
+        amount: sql`excluded.amount`, accountId: sql`excluded.account_id`, categoryId: sql`excluded.category_id`,
+        predictedCategoryId: sql`excluded.predicted_category_id`, categoryConfidence: sql`excluded.category_confidence`,
+        categorySource: sql`excluded.category_source`, needsReview: sql`excluded.needs_review`,
+        excluded: sql`excluded.excluded`, kind: sql`excluded.kind`, goalId: sql`excluded.goal_id`,
+        tagIds: sql`excluded.tag_ids`, splits: sql`excluded.splits`, notes: sql`excluded.notes`,
+      },
+    });
+  }
 }
 
 export async function insertTransactions(userId: string, txs: Transaction[]): Promise<void> {
