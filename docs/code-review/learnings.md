@@ -125,11 +125,11 @@ reasoning looked. Reason about *proportion of measured total*, never about absol
 **Also:** "there is no `useMemo` here" is an observation, not a finding. Unmemoized cheap work is fine.
 
 ### R8 · "There is no error boundary anywhere, so any throw takes down the screen"
-**Hypothesis:** no `error.tsx`, `global-error.tsx`, `not-found.tsx`, or React boundary exists, while
-`requireUserId` throws from inside every server action.
+**Hypothesis:** no **error**, **global-error**, or **not-found** route file exists, and no React
+boundary, while `requireUserId` throws from inside every server action.
 
 **Why it was wrong:** Next 16.2.6 **ships a default global error boundary**, wired at build time
-(`next-app-loader/index.js:128` → `builtin/global-error.js`; `app-router.js:456-459` installs it as
+(in next-app-loader, pointing at Next's builtin global-error component, which app-router installs as
 the final fallback). It renders a styled, theme-aware page with Reload/Back and an error digest.
 `/_not-found` is auto-generated too.
 
@@ -146,9 +146,9 @@ Before filing "X is missing", establish what happens without X — in a *product
 Note the docs did NOT state this default; it took reading framework source. When docs are silent,
 that is not evidence of absence.
 
-**Useful byproduct:** if an `error.tsx` is ever added, it must live at `src/app/error.tsx`, not
-`src/app/(app)/error.tsx` — per the Next docs, `error.js` does not wrap the `layout.js` in its own
-segment, so the segment-level file would not catch an `AppLayout` throw.
+**Useful byproduct:** if an **error** route file is ever added, it must live at the app root, not in
+the `(app)` segment — per the Next docs, an error file does not wrap the layout in its own segment, so
+a segment-level one would not catch an `AppLayout` throw.
 
 ---
 
@@ -195,8 +195,9 @@ client and *does* seed the query cache — verified by instrumenting `loadDatase
 follow-up fetch on a cold visit. The data is used.
 
 The real defect is narrower: the layout `await`s with no Suspense boundary above it, so no HTML byte
-flushes until the query resolves, and `loading.tsx` provably cannot cover it (Next docs: `loading.js`
-does not wrap `layout.js` in the same segment). Measured TTFB 496ms → 4ms at a realistic 450ms query.
+flushes until the query resolves, and the route's **loading** file provably cannot cover it (Next
+docs: a loading file does not wrap the layout in the same segment). Measured TTFB 496ms → 4ms at a
+realistic 450ms query.
 
 **Lesson:** verify the *mechanism*, not just the symptom. "The work is wasted" and "the work blocks"
 are different defects with different fixes; only the second was real. Trace where a value is actually
@@ -232,7 +233,7 @@ keeping this file:
 - **`applyRuleBackfill` idempotency.** Already written into issue #3 as both root cause and fix — a
   duplicate, not a finding.
 
-Verified in round 2: silent async failures, missing error boundaries, `budgets/page.tsx`
+Verified in round 2: silent async failures, missing error boundaries, `src/app/(app)/budgets/page.tsx`
 memoization, motion bundle + per-route chunk duplication, import row-render cost, and
 `detectTransfersOnImport` complexity.
 
@@ -241,7 +242,7 @@ memoization, motion bundle + per-route chunk duplication, import row-render cost
 Concrete leads surfaced *by the verifiers* while refuting round 1 — each still needs a hypothesis and
 its own adversarial check:
 
-- **`budgets/page.tsx` has no memoization at all.** `buildMaps` + `budgetForecasts` measured **1.59ms**
+- **`src/app/(app)/budgets/page.tsx` has no memoization at all.** `buildMaps` + `budgetForecasts` measured **1.59ms**
   and re-run on every render including purely local `setSelectedId`. Same root cause family as #5.
 - **`applyRuleBackfill` is not idempotent.** `planRuleBackfill` sets `categoryId`/`kind`
   unconditionally without comparing to the current value (the `tagIds` branch *does* guard), so
