@@ -137,6 +137,12 @@ export async function upsertExamples(rows: PlannedExample[]): Promise<void> {
     hitCount: p.hitCount,
   });
 
+  /** A backfill replays history, so re-running it must be a no-op rather than a doubling. */
+  const hitCountExpr = (p: PlannedExample) =>
+    p.hitCountMode === "seed"
+      ? sql`GREATEST(${categorizationExamples.hitCount}, ${p.hitCount})`
+      : sql`${categorizationExamples.hitCount} + ${p.hitCount}`;
+
   const target = [categorizationExamples.userId, categorizationExamples.dedupKey];
   const ops = rows.map((p) => {
     const row = toRow(p);
@@ -157,7 +163,7 @@ export async function upsertExamples(rows: PlannedExample[]): Promise<void> {
             // An explicit correction un-rejects: the user just told us what this should be.
             status: "approved",
             lastSeenAt: row.lastSeenAt,
-            hitCount: sql`${categorizationExamples.hitCount} + ${row.hitCount}`,
+            hitCount: hitCountExpr(p),
             // The embedding depends only on the description, so a re-label never invalidates it.
           },
         });

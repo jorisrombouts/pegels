@@ -24,6 +24,14 @@ export interface ExampleInput {
  */
 export type WriteMode = "affirm" | "touch";
 
+/**
+ * How a repeat write combines with the stored count.
+ *
+ * `add` counts a new sighting. `seed` takes the larger of the two — a backfill re-run must be a
+ * true no-op, not a doubling, or the curation queue's "most-seen first" ordering quietly rots.
+ */
+export type HitCountMode = "add" | "seed";
+
 export interface PlannedExample extends ExampleInput {
   id: string;
   userId: string;
@@ -36,6 +44,7 @@ export interface PlannedExample extends ExampleInput {
   lastSeenAt: string;
   hitCount: number;
   mode: WriteMode;
+  hitCountMode: HitCountMode;
 }
 
 export interface PlanOptions {
@@ -100,6 +109,8 @@ export function planExampleWrites(
         lastSeenAt: opts.now,
         hitCount: 1,
         mode,
+        // A backfill replays history, so it must not add to counts on a re-run.
+        hitCountMode: source === "backfill" ? "seed" : "add",
       });
       continue;
     }
