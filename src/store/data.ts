@@ -11,6 +11,9 @@ import type { Account, Budget, Category, CategorizationRule, Goal, Tag, Transact
 export { DATASET_KEY } from "./dataset-key";
 import { DATASET_KEY } from "./dataset-key";
 
+/** Rows per Server Action call. Measured worst case (Revolut) is 355 B/row, so 500 ≈ 17% of Next's 1 MB body limit. */
+export const IMPORT_BATCH = 500;
+
 /**
  * Same shape as the old Zustand store (6 arrays + 15 mutations), so consumers are
  * unchanged — but backed by TanStack Query over Neon. Reads come from the `['dataset']`
@@ -45,7 +48,10 @@ export function useData() {
           },
         ),
       addTransaction: (tx: Transaction) => run((d) => M.applyAddTransaction(d, tx), () => api.upsertTransaction(tx)),
-      addTransactions: (txs: Transaction[]) => run((d) => M.applyAddTransactions(d, txs), () => api.addTransactions(txs)),
+      // A whole CSV import comes through here; one call would blow the body limit past ~2,900 rows.
+      addTransactions: (txs: Transaction[]) => run((d) => M.applyAddTransactions(d, txs), async () => {
+        for (let i = 0; i < txs.length; i += IMPORT_BATCH) await api.addTransactions(txs.slice(i, i + IMPORT_BATCH));
+      }),
       removeTransaction: (id: string) => run((d) => M.applyRemoveTransaction(d, id), () => api.removeTransaction(id)),
 
       upsertCategory: (c: Category) => run((d) => M.applyUpsertCategory(d, c), () => api.upsertCategory(c)),
