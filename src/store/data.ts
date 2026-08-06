@@ -5,6 +5,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { Dataset } from "@/data/mock";
 import * as api from "@/app/actions/data";
 import * as M from "./dataset-mutations";
+import { useUI } from "./ui";
 import type { Account, Budget, Category, CategorizationRule, Goal, Tag, Transaction } from "@/lib/domain/types";
 
 export { DATASET_KEY } from "./dataset-key";
@@ -26,7 +27,9 @@ export function useData() {
       const prev = qc.getQueryData<Dataset>(DATASET_KEY) ?? M.emptyDataset;
       const next = mutate(prev);
       qc.setQueryData(DATASET_KEY, next);
-      void persist(next).catch(() => {
+      void persist(next).catch((e) => {
+        console.error("Failed to save your change", e);
+        useUI.setState({ saveFailed: true }); // surfaces the dismissible SaveFailedBanner
         qc.setQueryData(DATASET_KEY, prev); // rollback the optimistic change
         void qc.invalidateQueries({ queryKey: DATASET_KEY }); // resync server truth
       });
