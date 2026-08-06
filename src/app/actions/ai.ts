@@ -1,19 +1,24 @@
 "use server";
 
 import { getUserId } from "@/lib/auth";
-import {
-  getDataset,
-  insertCategorizationExamples,
-  recentCategorizationExamples,
-  affirmedExamples,
-  upsertTransaction,
-} from "@/lib/db/queries";
+import { getDataset, insertCategorizationExamples, upsertTransaction } from "@/lib/db/queries";
 import { categorize } from "@/lib/categorize";
 import { matchesOwnAccount } from "@/lib/domain/own-account";
 import { reconcileKindWithSign } from "@/lib/ai/reconcile";
 import { applyRules, planRuleBackfill, selectRulesForBackfill } from "@/lib/rules";
-import { categorizeWithOpenAI, type AiExample, type AiResult, type AiRow } from "@/lib/ai/categorize-openai";
-import { selectExamples } from "@/lib/ai/select-examples";
+import {
+  PROMPT_VERSION,
+  categorizeWithOpenAI,
+  type AiNeighbour,
+  type AiResult,
+  type AiRow,
+  type NeighboursByRow,
+  type PromptTaxonomy,
+} from "@/lib/ai/categorize-openai";
+import { retrieveNeighbours } from "@/lib/ai/retrieve";
+import { merchantTokens, tokenOverlap } from "@/lib/text/merchant-tokens";
+import { clampConfidence } from "@/lib/ai/confidence";
+import { stableHash } from "@/lib/ai/hash";
 import type { TransactionKind } from "@/lib/domain/types";
 
 interface CorrectionInput {
@@ -27,19 +32,31 @@ interface CorrectionInput {
   finalCategoryId: string | null;
 }
 
+/**
+ * Routing hint for OpenAI's prompt cache. It must change whenever the stable system message does,
+ * or a request routes to a machine whose cached prefix no longer matches.
+ */
+function cacheKeyFor(userId: string, taxonomy: PromptTaxonomy): string {
+  const signature = [
+    ...taxonomy.categories.map((c) => `${c.id}=${c.name}`),
+    ...taxonomy.tags.map((t) => `${t.id}=${t.name}`),
+    PROMPT_VERSION,
+  ]
+    .sort()
+    .join("|");
+  return `cat:${userId}:${stableHash(signature)}`;
+}
+
 export async function categorizeTransactions(rows: AiRow[]): Promise<AiResult[]> {
   const userId = await getUserId();
   const data = await getDataset(userId);
-  const categories = data.categories.map((c) => ({ id: c.id, name: c.name }));
-  const validIds = new Set(categories.map((c) => c.id));
-
-  // Feedback loop: build the few-shot from the user's past corrections (high-signal), with recent
-  // rows as a cold-start top-up. The relevance-matched selection happens once `remaining` is known.
-  const categoryName = new Map(categories.map((c) => [c.id, c.name]));
-  const [affirmed, recent] = await Promise.all([
-    affirmedExamples(userId, 60),
-    recentCategorizationExamples(userId, 40),
-  ]);
+  const taxonomy: PromptTaxonomy = {
+    categories: data.categories.map((c) => ({ id: c.id, name: c.name })),
+    tags: data.tags.map((t) => ({ id: t.id, name: t.name })),
+  };
+  const validIds = new Set(taxonomy.categories.map((c) => c.id));
+  const categoryName = new Map(taxonomy.categories.map((c) => [c.id, c.name]));
+  const tagName = new Map(taxonomy.tags.map((t) => [t.id, t.name]));
 
   // 1) deterministic: own-account transfers, then user rules
   const ownNumbers = data.accounts.map((a) => a.accountNumber).filter((n): n is string => !!n);
@@ -48,7 +65,7 @@ export async function categorizeTransactions(rows: AiRow[]): Promise<AiResult[]>
   const remaining: AiRow[] = [];
   for (const r of rows) {
     if (matchesOwnAccount(r.description, ownNumbers)) {
-      ruled.set(r.index, { index: r.index, kind: "transfer", categoryId: null, confidence: 1, addTagIds: [] });
+      ruled.set(r.index, { index: r.index, kind: "transfer", categoryId: null, confidence: 1, tagIds: [] });
       continue;
     }
     const outcome = applyRules(r.description, data.rules);
@@ -59,7 +76,7 @@ export async function categorizeTransactions(rows: AiRow[]): Promise<AiResult[]>
         kind: outcome.kind ?? (r.amount < 0 ? "expense" : "income"),
         categoryId: outcome.categoryId ?? null,
         confidence: 1,
-        addTagIds: outcome.addTagIds,
+        tagIds: outcome.addTagIds,
       });
     } else {
       if (outcome) ruleTags.set(r.index, outcome.addTagIds); // tag-only rule: still LLM-categorize, but keep tags
@@ -67,37 +84,80 @@ export async function categorizeTransactions(rows: AiRow[]): Promise<AiResult[]>
     }
   }
 
-  // 2) OpenAI for the rest; on any failure, fall back to keyword categorize + sign-based kind
+  // 2) retrieve confirmed examples, then classify. Retrieval failing must not fail the import —
+  //    an empty neighbour map degrades to the model's own prior plus the priors in the prompt.
   let aiResults: AiResult[] = [];
+  let neighbours: NeighboursByRow = new Map();
   if (remaining.length) {
-    const exampleList: AiExample[] = selectExamples({ rows: remaining, corrected: affirmed, recent }).map((e) => ({
-      description: e.cleanedDescription,
-      kind: e.finalKind,
-      categoryName: e.finalCategoryId ? categoryName.get(e.finalCategoryId) ?? null : null,
-    }));
     try {
-      aiResults = await categorizeWithOpenAI(remaining, categories, exampleList, `cat:${userId}`);
+      const retrieved = await retrieveNeighbours(userId, remaining);
+      neighbours = new Map(
+        [...retrieved].map(([index, list]) => [
+          index,
+          list.map(
+            (n): AiNeighbour => ({
+              id: n.id,
+              description: n.cleanedDescription,
+              kind: n.finalKind,
+              categoryName: n.finalCategoryId ? categoryName.get(n.finalCategoryId) ?? null : null,
+              tagNames: n.finalTagIds.map((id) => tagName.get(id)).filter((x): x is string => !!x),
+              approved: n.approved,
+            }),
+          ),
+        ]),
+      );
+    } catch (e) {
+      console.error("retrieval failed; classifying without evidence", e);
+    }
+
+    try {
+      aiResults = await categorizeWithOpenAI(remaining, taxonomy, neighbours, cacheKeyFor(userId, taxonomy));
     } catch {
       aiResults = remaining.map((r) => {
         const g = categorize(r.description);
-        return { index: r.index, kind: r.amount < 0 ? "expense" : "income", categoryId: g.categoryId, confidence: g.confidence } as AiResult;
+        return { index: r.index, kind: r.amount < 0 ? "expense" : "income", categoryId: g.categoryId, tagIds: [], confidence: g.confidence };
       });
     }
   }
 
-  // 3) merge, defensively null out unknown categoryIds
+  // 3) merge, defensively null out unknown categoryIds, and re-anchor confidence on the evidence
+  const byIndex = new Map(rows.map((r) => [r.index, r]));
   const out: AiResult[] = [];
   for (const r of rows) {
     const res =
       ruled.get(r.index) ??
       aiResults.find((a) => a.index === r.index) ??
-      ({ index: r.index, kind: r.amount < 0 ? "expense" : "income", categoryId: null, confidence: 0.4 } as AiResult);
+      ({ index: r.index, kind: r.amount < 0 ? "expense" : "income", categoryId: null, tagIds: [], confidence: 0.4 } as AiResult);
     reconcileKindWithSign(res, r.amount); // the data model forbids income<0 / expense>0; the sign wins
     if (res.categoryId && !validIds.has(res.categoryId)) res.categoryId = null;
-    if (!ruled.has(r.index)) res.addTagIds = ruleTags.get(r.index) ?? [];
+
+    if (!ruled.has(r.index)) {
+      const near = neighbours.get(r.index) ?? [];
+      const top = near[0];
+      const queryTokens = new Set(merchantTokens(byIndex.get(r.index)!.description));
+      res.confidence = clampConfidence(
+        res.confidence,
+        {
+          neighbourCount: near.length,
+          topOverlap: top ? tokenOverlap(queryTokens, merchantTokens(top.description)) : 0,
+          topNeighbourCategoryId: top ? categoryIdOf(top.categoryName, categoryName) : null,
+        },
+        res.categoryId,
+      );
+      // A tag-only rule still contributes its tags on top of whatever the model chose.
+      const fromRule = ruleTags.get(r.index) ?? [];
+      res.tagIds = [...new Set([...(res.tagIds ?? []), ...fromRule])];
+    }
     out.push(res);
   }
   return out;
+}
+
+/** The prompt renders neighbours by category *name*; map back for the agreement check. */
+function categoryIdOf(name: string | null, byId: Map<string, string>): string | null {
+  if (!name) return null;
+  for (const [id, n] of byId) if (n === name) return id;
+  return null;
 }
 
 export async function previewRuleBackfill(ruleId?: string): Promise<{ count: number; samples: { description: string }[] }> {
@@ -152,7 +212,7 @@ export async function logDetailCorrection(ex: CorrectionInput): Promise<void> {
 }
 
 /** Log a detail-panel approval: the user confirmed the AI's guess (final == predicted). Not a
- *  correction, but still an explicit affirmation — it feeds the few-shot via affirmedExamples. */
+ *  correction, but still an explicit affirmation — it becomes approved corpus evidence. */
 export async function logDetailApproval(ex: CorrectionInput): Promise<void> {
   await insertCategorizationExamples(await getUserId(), [toExampleRow(ex, "detail", false)]);
 }

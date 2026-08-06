@@ -1,11 +1,12 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 
-const { getDatasetMock, categorizeWithOpenAIMock, recentExamplesMock, affirmedExamplesMock, insertExamplesMock } = vi.hoisted(() => ({
+const { getDatasetMock, categorizeWithOpenAIMock, recentExamplesMock, affirmedExamplesMock, insertExamplesMock, retrieveMock } = vi.hoisted(() => ({
   getDatasetMock: vi.fn(),
   categorizeWithOpenAIMock: vi.fn(),
   recentExamplesMock: vi.fn(),
   affirmedExamplesMock: vi.fn(),
   insertExamplesMock: vi.fn(),
+  retrieveMock: vi.fn(),
 }));
 
 vi.mock("@/lib/db/queries", () => ({
@@ -14,7 +15,13 @@ vi.mock("@/lib/db/queries", () => ({
   affirmedExamples: affirmedExamplesMock,
   insertCategorizationExamples: insertExamplesMock,
 }));
-vi.mock("@/lib/ai/categorize-openai", () => ({ categorizeWithOpenAIMock, categorizeWithOpenAI: categorizeWithOpenAIMock }));
+vi.mock("@/lib/ai/categorize-openai", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  categorizeWithOpenAI: categorizeWithOpenAIMock,
+}));
+// Retrieval reaches the database, so this must be a full factory — importOriginal would pull in
+// Neon and throw on the missing connection string.
+vi.mock("@/lib/ai/retrieve", () => ({ retrieveNeighbours: retrieveMock }));
 // vitest.setup.ts stubs @/app/actions/ai globally (Neon import guard); test the real module.
 vi.unmock("@/app/actions/ai");
 
@@ -29,6 +36,8 @@ beforeEach(() => {
   recentExamplesMock.mockResolvedValue([]);
   affirmedExamplesMock.mockResolvedValue([]);
   insertExamplesMock.mockResolvedValue(undefined);
+  retrieveMock.mockReset();
+  retrieveMock.mockResolvedValue(new Map());
   getDatasetMock.mockResolvedValue({
     accounts: [
       { id: "acc-spar", name: "SEB Savings", accountNumber: "99887766554" },
@@ -37,6 +46,7 @@ beforeEach(() => {
       { id: "cat-groceries", name: "Groceries" },
       { id: "cat-mortgage", name: "Mortgage" },
     ],
+    tags: [{ id: "tag-fixed", name: "Fixed cost" }],
     rules: [
       { id: "r-ica", priority: 10, enabled: true, matchText: "ica", matchMode: "contains", setCategoryId: "cat-groceries", setKind: null, addTagIds: ["tag-fixed"], origin: "manual" },
       { id: "r-revolut", priority: 20, enabled: true, matchText: "revolut", matchMode: "contains", setCategoryId: null, setKind: "transfer", addTagIds: [], origin: "manual" },
@@ -72,7 +82,7 @@ describe("categorizeTransactions", () => {
 
   it("merges OpenAI results for non-ruled rows", async () => {
     categorizeWithOpenAIMock.mockResolvedValue([
-      { index: 1, kind: "expense", categoryId: "cat-groceries", confidence: 0.9 },
+      { index: 1, kind: "expense", categoryId: "cat-groceries", tagIds: [], confidence: 0.9 },
     ]);
     const out = await categorizeTransactions([
       { index: 0, description: "AVANZA", amount: -1000 },
@@ -80,7 +90,9 @@ describe("categorizeTransactions", () => {
     ]);
     expect(categorizeWithOpenAIMock).toHaveBeenCalledOnce();
     expect(out[0]).toMatchObject({ kind: "transfer", categoryId: null }); // rule
-    expect(out[1]).toMatchObject({ kind: "expense", categoryId: "cat-groceries", confidence: 0.9 });
+    // Confidence is re-anchored on the retrieval evidence, so it isn't asserted here — see the
+    // clamp tests below.
+    expect(out[1]).toMatchObject({ kind: "expense", categoryId: "cat-groceries" });
   });
 
   it("falls back to keyword categorize when OpenAI throws", async () => {
@@ -135,39 +147,73 @@ describe("categorizeTransactions", () => {
     categorizeWithOpenAIMock.mockResolvedValue([]);
     const out = await categorizeTransactions([{ index: 0, description: "ICA Maxi", amount: -200 }]);
     expect(categorizeWithOpenAIMock).not.toHaveBeenCalled();
-    expect(out[0]).toMatchObject({ index: 0, kind: "expense", categoryId: "cat-groceries", confidence: 1, addTagIds: ["tag-fixed"] });
+    expect(out[0]).toMatchObject({ index: 0, kind: "expense", categoryId: "cat-groceries", confidence: 1, tagIds: ["tag-fixed"] });
   });
 
-  it("feeds recent corrections back to OpenAI as few-shot examples", async () => {
-    recentExamplesMock.mockResolvedValue([
-      { cleanedDescription: "ICA KVANTUM", finalKind: "expense", finalCategoryId: "cat-groceries" },
-      { cleanedDescription: "REVOLUT", finalKind: "transfer", finalCategoryId: null },
-      { cleanedDescription: "UNKNOWN CAT", finalKind: "expense", finalCategoryId: "cat-gone" },
-    ]);
+  it("passes retrieved corpus examples to the model as evidence, resolved to names", async () => {
+    retrieveMock.mockResolvedValue(
+      new Map([[0, [
+        { id: "e1", cleanedDescription: "ICA KVANTUM", finalKind: "expense", finalCategoryId: "cat-groceries", finalTagIds: ["tag-fixed"], approved: true },
+        { id: "e2", cleanedDescription: "UNKNOWN CAT", finalKind: "expense", finalCategoryId: "cat-gone", finalTagIds: ["tag-gone"], approved: false },
+      ]]]),
+    );
     categorizeWithOpenAIMock.mockResolvedValue([]);
     await categorizeTransactions([{ index: 0, description: "MYSTERY", amount: -10 }]);
-    expect(recentExamplesMock).toHaveBeenCalledWith("user-stub", 40);
-    const examples = categorizeWithOpenAIMock.mock.calls[0][2];
-    expect(examples).toEqual([
-      { description: "ICA KVANTUM", kind: "expense", categoryName: "Groceries" },
-      { description: "REVOLUT", kind: "transfer", categoryName: null },
-      { description: "UNKNOWN CAT", kind: "expense", categoryName: null }, // unknown id → null name
+
+    const neighbours = categorizeWithOpenAIMock.mock.calls[0][2] as Map<number, unknown[]>;
+    expect(neighbours.get(0)).toEqual([
+      { id: "e1", description: "ICA KVANTUM", kind: "expense", categoryName: "Groceries", tagNames: ["Fixed cost"], approved: true },
+      // Ids the user no longer has resolve to nothing rather than leaking a dangling id.
+      { id: "e2", description: "UNKNOWN CAT", kind: "expense", categoryName: null, tagNames: [], approved: false },
     ]);
   });
 
-  it("prioritizes a relevant correction over recent examples in the few-shot", async () => {
-    // "zalando" matches no rule, so the row reaches the LLM and the few-shot is built.
-    affirmedExamplesMock.mockResolvedValue([
-      { cleanedDescription: "ZALANDO STHLM", finalKind: "expense", finalCategoryId: "cat-groceries" },
-    ]);
-    recentExamplesMock.mockResolvedValue([
-      { cleanedDescription: "SPOTIFY", finalKind: "expense", finalCategoryId: "cat-groceries" },
-    ]);
+  it("only sends the model rows that rules did not already resolve", async () => {
     categorizeWithOpenAIMock.mockResolvedValue([]);
-    await categorizeTransactions([{ index: 0, description: "ZALANDO BERLIN", amount: -50 }]);
-    expect(affirmedExamplesMock).toHaveBeenCalledWith("user-stub", 60);
-    const examples = categorizeWithOpenAIMock.mock.calls[0][2];
-    expect(examples[0]).toEqual({ description: "ZALANDO STHLM", kind: "expense", categoryName: "Groceries" });
+    await categorizeTransactions([
+      { index: 0, description: "REVOLUT TOPUP", amount: -500 },
+      { index: 1, description: "MYSTERY", amount: -10 },
+    ]);
+    expect(retrieveMock.mock.calls[0][1].map((r: { index: number }) => r.index)).toEqual([1]);
+  });
+
+  it("classifies without evidence rather than failing the import when retrieval breaks", async () => {
+    retrieveMock.mockRejectedValue(new Error("pgvector down"));
+    categorizeWithOpenAIMock.mockResolvedValue([
+      { index: 0, kind: "expense", categoryId: "cat-groceries", tagIds: [], confidence: 0.8 },
+    ]);
+    const out = await categorizeTransactions([{ index: 0, description: "MYSTERY", amount: -10 }]);
+    expect(categorizeWithOpenAIMock).toHaveBeenCalledOnce();
+    expect(out[0].categoryId).toBe("cat-groceries");
+  });
+
+  it("caps confidence for a row retrieval found nothing for, so it lands in review", async () => {
+    categorizeWithOpenAIMock.mockResolvedValue([
+      { index: 0, kind: "expense", categoryId: "cat-groceries", tagIds: [], confidence: 0.95 },
+    ]);
+    const out = await categorizeTransactions([{ index: 0, description: "AldrigSedd", amount: -10 }]);
+    expect(out[0].confidence).toBeLessThan(0.6);
+  });
+
+  it("promotes confidence when a near-identical merchant agrees with the model", async () => {
+    retrieveMock.mockResolvedValue(
+      new Map([[0, [
+        { id: "e1", cleanedDescription: "ICA MAXI HANINGE", finalKind: "expense", finalCategoryId: "cat-groceries", finalTagIds: [], approved: true },
+      ]]]),
+    );
+    categorizeWithOpenAIMock.mockResolvedValue([
+      { index: 0, kind: "expense", categoryId: "cat-groceries", tagIds: [], confidence: 0.7 },
+    ]);
+    const out = await categorizeTransactions([{ index: 0, description: "ICA MAXI HANINGE", amount: -487 }]);
+    expect(out[0].confidence).toBeGreaterThanOrEqual(0.95);
+  });
+
+  it("keeps the tags a tag-only rule contributes on top of the model's own", async () => {
+    categorizeWithOpenAIMock.mockResolvedValue([
+      { index: 0, kind: "expense", categoryId: "cat-groceries", tagIds: ["tag-fixed"], confidence: 0.8 },
+    ]);
+    const out = await categorizeTransactions([{ index: 0, description: "MYSTERY", amount: -10 }]);
+    expect(out[0].tagIds).toEqual(["tag-fixed"]);
   });
 });
 

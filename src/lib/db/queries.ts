@@ -1,4 +1,4 @@
-import { and, desc, eq, or } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { db } from "./index";
 import { accounts, categories, tags, transactions, budgets, categorizationExamples, categorizationRules } from "./schema";
 import {
@@ -128,43 +128,7 @@ export async function insertCategorizationExamples(
   await db.insert(categorizationExamples).values(rows.map((r) => ({ ...r, userId })));
 }
 
-export async function recentCategorizationExamples(userId: string, limit = 40) {
-  const rows = await db
-    .select()
-    .from(categorizationExamples)
-    .where(eq(categorizationExamples.userId, userId))
-    .orderBy(desc(categorizationExamples.createdAt))
-    .limit(limit);
-  return rows.map((r) => ({
-    cleanedDescription: r.cleanedDescription,
-    finalKind: r.finalKind,
-    finalCategoryId: r.finalCategoryId,
-  }));
-}
 
-/**
- * The user's explicit affirmations — the high-signal few-shot source: every correction (corrected=true,
- * incl. import edits) plus detail-panel approvals (source='detail', corrected=false). Excludes passive
- * import-keeps (the AI agreeing with itself).
- */
-export async function affirmedExamples(userId: string, limit = 60) {
-  const rows = await db
-    .select()
-    .from(categorizationExamples)
-    .where(
-      and(
-        eq(categorizationExamples.userId, userId),
-        or(eq(categorizationExamples.corrected, true), eq(categorizationExamples.source, "detail")),
-      ),
-    )
-    .orderBy(desc(categorizationExamples.createdAt))
-    .limit(limit);
-  return rows.map((r) => ({
-    cleanedDescription: r.cleanedDescription,
-    finalKind: r.finalKind,
-    finalCategoryId: r.finalCategoryId,
-  }));
-}
 
 // ── Bulk ──
 

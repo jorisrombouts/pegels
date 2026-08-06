@@ -10,7 +10,7 @@ import {
 import { EMBED_MODEL, embedMany } from "./embed";
 import { NEIGHBOURS_PER_ROW, W_LEXICAL, W_VECTOR, diversify, rrf, sameMagnitude, AMOUNT_BONUS } from "./fuse";
 import { normalizeMerchant } from "./normalize";
-import { merchantTokens } from "./select-examples";
+import { merchantTokens, tokenOverlap } from "@/lib/text/merchant-tokens";
 
 export interface Neighbour extends CorpusRow {
   /** True when this came from the approved corpus rather than the unreviewed candidate pool. */
@@ -26,15 +26,6 @@ export interface RetrievalRow {
 /** Lexical candidates considered per query before fusion. */
 const LEXICAL_K = 8;
 
-/** Jaccard overlap of merchant tokens — the lexical arm's score. */
-function overlap(a: Set<string>, b: string[]): number {
-  if (a.size === 0 || b.length === 0) return 0;
-  const bSet = new Set(b);
-  let shared = 0;
-  for (const t of bSet) if (a.has(t)) shared += 1;
-  if (shared === 0) return 0;
-  return shared / (a.size + bSet.size - shared);
-}
 
 /**
  * Retrieve the confirmed examples most likely to settle each row, hybrid.
@@ -103,7 +94,7 @@ export async function retrieveNeighbours(
   for (const q of distinct) {
     const queryTokens = new Set(merchantTokens(q.key));
     const lexical = corpusTokens
-      .map(({ row, tokens }) => ({ row, score: overlap(queryTokens, tokens) }))
+      .map(({ row, tokens }) => ({ row, score: tokenOverlap(queryTokens, tokens) }))
       .filter((c) => c.score > 0)
       .sort((a, b) => b.score - a.score || b.row.hitCount - a.row.hitCount || b.row.lastSeenAt.localeCompare(a.row.lastSeenAt))
       .slice(0, LEXICAL_K)

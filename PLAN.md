@@ -83,19 +83,26 @@ For each imported row, in order:
 1. **Own-account transfers** — description references one of the user's `accountNumber`s → `transfer`.
 2. **User rules** (`src/lib/rules.ts`) — contains / starts-with / exact rules set category/kind/tags
    and run **before the LLM**; a resolving match skips inference.
-3. **OpenAI** (`gpt-4o-mini`, structured output → `{kind, categoryId, confidence}`,
-   `src/lib/ai/categorize-openai.ts`) for the rest, with a **few-shot built from the user's
-   affirmations**.
+3. **Retrieval + OpenAI** (`gpt-4o-mini`, structured output → `{kind, categoryId, tagIds,
+   confidence}`, `src/lib/ai/categorize-openai.ts`) for the rest.
 4. **Keyword fallback** (`src/lib/categorize.ts`) if OpenAI errors.
 
 Low confidence (`< 0.6`) sets `needsReview`.
 
-**The learning loop:** every correction/approval is logged to `categorization_examples`.
-`affirmedExamples()` returns the high-signal set — corrections (`corrected = true`) **plus**
-detail-panel approvals (`source = 'detail'`) — excluding passive import-keeps. `selectExamples()`
-(`src/lib/ai/select-examples.ts`, pure) then **relevance-matches** those to the batch's merchants
-(your past "ICA" fixes steer new "ICA" rows), dedupes, and caps, with recent rows as a cold-start
-top-up. So both **correcting** and **approving** a category sharpen future predictions.
+**The learning loop.** Corrections and approvals land in `categorization_examples`, which is a
+**curated corpus** — one row per merchant (`dedupKey`), not one per event, so a merchant corrected
+forty times is one row with `hitCount = 40` rather than forty chances to flood retrieval.
+
+`retrieveNeighbours()` (`src/lib/ai/retrieve.ts`) then finds the examples most likely to settle each
+row, using two arms fused by reciprocal rank: **pgvector** cosine over `normalizeMerchant`
+embeddings, and **lexical** merchant-token overlap. The lexical arm is deliberately independent of
+embeddings, so an embeddings outage degrades quality without breaking import. `gold` rows are
+excluded from every retrieval path by one shared predicate — they belong to the eval hold-out.
+
+The prompt splits into a **stable, cacheable system message** (instructions, priors, both
+taxonomies) and a volatile user message carrying a deduplicated evidence table. `clampConfidence()`
+re-anchors the model's self-reported confidence on what retrieval actually found, so the review
+queue means *"the system has never seen this merchant"*.
 
 ### Import pipeline (`src/components/import/import-modal.tsx`)
 
