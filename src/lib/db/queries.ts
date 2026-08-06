@@ -1,4 +1,4 @@
-import { and, desc, eq, or } from "drizzle-orm";
+import { and, desc, eq, or, sql } from "drizzle-orm";
 import { db } from "./index";
 import { accounts, categories, tags, transactions, budgets, goals, categorizationExamples, categorizationRules, userPreferences } from "./schema";
 import {
@@ -107,12 +107,11 @@ export async function removeCategory(userId: string, id: string): Promise<void> 
 
 /** Delete a tag and strip it from every transaction's tagIds, atomically. */
 export async function removeTag(userId: string, id: string): Promise<void> {
-  const rows = await db.select().from(transactions).where(eq(transactions.userId, userId));
-  const ops: Batchable[] = rows
-    .filter((r) => (r.tagIds ?? []).includes(id))
-    .map((r) => db.update(transactions).set({ tagIds: r.tagIds.filter((x) => x !== id) }).where(eq(transactions.id, r.id)));
-  ops.push(db.delete(tags).where(and(eq(tags.userId, userId), eq(tags.id, id))));
-  await batch(ops);
+  // The `::text` cast is load-bearing: it picks `jsonb - text` (drop matching elements), not `jsonb - integer` (drop by index).
+  await batch([
+    db.update(transactions).set({ tagIds: sql`${transactions.tagIds} - ${id}::text` }).where(and(eq(transactions.userId, userId), sql`${transactions.tagIds} ? ${id}`)),
+    db.delete(tags).where(and(eq(tags.userId, userId), eq(tags.id, id))),
+  ]);
 }
 
 export async function removeAccount(userId: string, id: string): Promise<void> {
