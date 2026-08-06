@@ -80,6 +80,20 @@ export function inMonth(tx: Transaction, key: string): boolean {
   return monthKey(tx.date) === key;
 }
 
+/**
+ * One pass: transactions grouped by month key, for the keys asked for. Callers that read the
+ * same months through several selectors partition once here and hand each selector its month's
+ * rows, instead of every selector re-scanning the whole array.
+ */
+export function bucketByMonth(transactions: Transaction[], keys: string[]): Map<string, Transaction[]> {
+  const buckets = new Map(keys.map((k) => [k, [] as Transaction[]]));
+  for (const tx of transactions) {
+    const b = buckets.get(monthKey(tx.date));
+    if (b) b.push(tx);
+  }
+  return buckets;
+}
+
 /** Net of *included* transactions in a month (PRD §6.2): excluded rows omitted. */
 export function monthNet(transactions: Transaction[], key: string): number {
   return transactions.reduce((sum, tx) => (inMonth(tx, key) ? sum + includedNet(tx) : sum), 0);
@@ -403,12 +417,13 @@ export function categoryTrends(
   maxCategories = 6,
 ): TrendSeries[] {
   const keys = trailingKeys(key, count);
+  const buckets = bucketByMonth(transactions, keys);
   const total: TrendSeries = {
     id: "total",
     label: "Total",
     icon: null,
     color: "primary",
-    points: keys.map((mk) => ({ key: mk, amount: monthSpend(transactions, maps, mk) })),
+    points: keys.map((mk) => ({ key: mk, amount: monthSpend(buckets.get(mk)!, maps, mk) })),
   };
 
   const perCategory = categories
@@ -416,7 +431,7 @@ export function categoryTrends(
     .map((c) => {
       const points = keys.map((mk) => ({
         key: mk,
-        amount: categorySpendInMonth(transactions, maps, c.id, mk),
+        amount: categorySpendInMonth(buckets.get(mk)!, maps, c.id, mk),
       }));
       return { id: c.id, label: c.name, icon: c.icon, color: c.color, points, sum: points.reduce((s, p) => s + p.amount, 0) };
     })
@@ -429,7 +444,7 @@ export function categoryTrends(
   const subSeries: TrendSeries[] = [];
   for (const parent of perCategory) {
     for (const child of categories.filter((c) => c.parentId === parent.id)) {
-      const points = keys.map((mk) => ({ key: mk, amount: categorySpendInMonth(transactions, maps, child.id, mk) }));
+      const points = keys.map((mk) => ({ key: mk, amount: categorySpendInMonth(buckets.get(mk)!, maps, child.id, mk) }));
       if (points.some((p) => p.amount > 0)) {
         subSeries.push({ id: child.id, label: child.name, icon: child.icon, color: child.color, points, parentId: parent.id });
       }
