@@ -74,6 +74,41 @@ describe("buildMessages — the cached prefix", () => {
     // The priors must lose to real evidence, or they are rules by another name.
     expect(system).toMatch(/confirmed example/i);
   });
+
+  it("grounds the model in where these transactions come from", () => {
+    // Without this the model has to infer the country from merchant names alone.
+    const system = buildMessages([row(0, "ICA")], taxonomy, new Map())[0].content;
+    expect(system).toMatch(/Swed/i);
+    expect(system).toMatch(/Stockholm/);
+    expect(system).toMatch(/SEK|kronor/i);
+  });
+
+  it("expands Swedish abbreviations rather than just asserting a category", () => {
+    // "SL" is meaningless on its own; the expansion is what lets the model generalise to
+    // SL Månadskort, SL Access, SL Reskassa without each being listed.
+    const system = buildMessages([row(0, "SL")], taxonomy, new Map())[0].content;
+    expect(system).toMatch(/Storstockholms Lokaltrafik/i);
+  });
+
+  it("warns that bank descriptions arrive truncated", () => {
+    // Real corpus entries include "ica supermar" and "apple com/bi" — cut mid-word by the bank.
+    const system = buildMessages([row(0, "ICA SUPERMAR")], taxonomy, new Map())[0].content;
+    expect(system).toMatch(/truncat/i);
+  });
+
+  it("explains the payment intermediaries that hide the real merchant", () => {
+    const system = buildMessages([row(0, "SWISH")], taxonomy, new Map())[0].content;
+    expect(system).toMatch(/Swish/i);
+    expect(system).toMatch(/Klarna/i);
+    expect(system).toMatch(/Zettle/i);
+  });
+
+  it("covers the merchants that actually appear in Swedish statements", () => {
+    const system = buildMessages([row(0, "X")], taxonomy, new Map())[0].content;
+    for (const m of ["Willys", "Systembolaget", "Apoteket", "Pressbyrån", "Espresso House", "Telia", "Vattenfall", "Clas Ohlson"]) {
+      expect(system, `missing prior for ${m}`).toContain(m);
+    }
+  });
 });
 
 describe("buildMessages — the evidence table", () => {

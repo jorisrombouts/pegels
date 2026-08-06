@@ -2,7 +2,7 @@ import OpenAI from "openai";
 import type { TransactionKind } from "@/lib/domain/types";
 
 /** Bump when the prompt template changes — it feeds the cache key so a stale prefix isn't reused. */
-export const PROMPT_VERSION = "2";
+export const PROMPT_VERSION = "3";
 
 export interface AiRow {
   index: number;
@@ -50,14 +50,51 @@ export type NeighboursByRow = Map<number, AiNeighbour[]>;
  * costs almost nothing after the first call, and — unlike `String.includes` — the model generalises
  * from "ICA" to ICA Nära, ICA Kvantum, ICA Supermarket. Crucially it is overridable: a confirmed
  * example always wins, so the corpus can correct any prior here.
+ *
+ * Expansions matter as much as the categories. Telling the model that SL means Storstockholms
+ * Lokaltrafik lets it reason about SL Månadskort, SL Access and SL Reskassa without each being
+ * listed; "SL is transit" alone would not.
+ *
+ * This block carries most of the weight while the corpus is still small. As approved examples
+ * accumulate, retrieval takes over — and the eval harness is what should decide whether any of
+ * this still earns its tokens.
  */
 const PRIORS = [
+  "CONTEXT",
+  "These are transactions on a Swedish bank account, mostly in and around Stockholm. Amounts are",
+  "in kronor (SEK). Descriptions are Swedish, often abbreviated, and the bank frequently truncates",
+  "them mid-word — \"ICA SUPERMAR\", \"APPLE COM/BI\", \"STORA COOP V\" are all normal. Match on the",
+  "recognisable prefix rather than expecting a complete name. \"AB\" is the Swedish company suffix",
+  "(aktiebolag), not part of a merchant's identity.",
+  "",
+  "KIND",
   "Salary lines (LÖN, LÖNEUTBET, LÖNEUTBETALNING) are income.",
-  "Card-bill payments and top-ups are transfers: SEB Kort, American Express / Amex, Revolut, Avanza.",
-  "Lines containing lån, bolån or amortering are the mortgage — an expense, not a transfer.",
-  "Common Swedish merchants: ICA / Coop / Hemköp / Willys / Lidl are groceries; SL is public transit;",
-  "  Apoteket and Apotek Hjärtat are health; OKQ8 / Circle K / Preem / St1 are fuel;",
-  "  Systembolaget is alcohol; Klarna is the underlying purchase, not a transfer.",
+  "Card-bill payments and top-ups are transfers: SEB Kort, American Express / Amex, Revolut, Avanza,",
+  "Nordnet. Lines containing lån, bolån or amortering are the mortgage — an expense, not a transfer.",
+  "",
+  "PAYMENT INTERMEDIARIES — these hide the real merchant",
+  "Swish is Sweden's instant person-to-person transfer. Between the user's own accounts it is a",
+  "transfer; to another person it is usually an expense whose real category is unknowable from the",
+  "description alone — prefer a low confidence over a guess.",
+  "Klarna is buy-now-pay-later: categorise the underlying purchase, not Klarna itself.",
+  "Zettle, iZettle and SumUp are card readers used by small independent merchants — often cafés,",
+  "market stalls and salons.",
+  "",
+  "COMMON SWEDISH MERCHANTS",
+  "Groceries: ICA (Nära, Kvantum, Maxi, Supermarket), Coop (Konsum, Extra, Forum, Stora Coop),",
+  "  Hemköp, Willys, Lidl, City Gross, Mathem.",
+  "Transit: SL = Storstockholms Lokaltrafik, Stockholm's public transport (Månadskort, Access,",
+  "  Reskassa); SJ = national rail; Flygbussarna = airport coaches; Arlanda Express; Västtrafik.",
+  "Fuel: OKQ8, Circle K, Preem, St1, Ingo, Tanka.",
+  "Health & pharmacy: Apoteket, Apotek Hjärtat, Kronans Apotek, Folktandvården.",
+  "Alcohol: Systembolaget — the state alcohol monopoly, so always alcohol.",
+  "Café & fika: Espresso House, Wayne's Coffee, Gateau, Fabrique.",
+  "Restaurants & fast food: Max, Sibylla, O'Learys; Pressbyrån and 7-Eleven are convenience kiosks.",
+  "Shopping: H&M, Lindex, Åhléns, Stadium, XXL, Elgiganten, NetOnNet, Kjell & Company, Clas Ohlson.",
+  "Home & DIY: IKEA, Jysk, Mio, EM Home, Bauhaus, Hornbach, Byggmax, Rusta, Jula, Biltema.",
+  "Entertainment: SF Bio / Filmstaden, Spotify, Netflix, HBO, Viaplay, Storytel.",
+  "Telecom: Telia, Tele2, Tre, Telenor, Comviq, Bahnhof.",
+  "Utilities: Vattenfall, Ellevio, Fortum, E.ON, Stockholm Exergi.",
 ].join("\n");
 
 /**
