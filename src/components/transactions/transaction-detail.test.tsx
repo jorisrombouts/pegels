@@ -1,9 +1,16 @@
-import { screen } from "@testing-library/react";
+import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderWithData } from "@/test/render";
 import { seedDataset } from "@/data/mock";
 import { TransactionDetail, DetailEmpty } from "./transaction-detail";
+import { recordExamples } from "@/app/actions/corpus";
+
+// vitest.setup.ts stubs the corpus action globally; spy on it to assert what gets captured.
+vi.mock("@/app/actions/corpus", () => ({ recordExamples: vi.fn(async () => {}) }));
+const recorded = vi.mocked(recordExamples);
+
+beforeEach(() => recorded.mockClear());
 
 // Uses the real (seeded) Zustand store. tx-001 = "Hyra Mars" (Rent, 97% model confidence).
 describe("TransactionDetail", () => {
@@ -38,6 +45,39 @@ describe("TransactionDetail", () => {
   it("exposes a notes field", () => {
     renderWithData(<TransactionDetail txId="tx-001" />);
     expect(screen.getByPlaceholderText("Add a note…")).toBeInTheDocument();
+  });
+
+  it("captures a tag edit as corpus evidence", async () => {
+    // This hook never existed: TagEditor only wrote the transaction, so every tag correction was
+    // invisible to the learning loop.
+    const user = userEvent.setup();
+    const tx = seedDataset.transactions.find((t) => t.id === "tx-001")!;
+    const existing = seedDataset.tags.find((t) => !tx.tagIds.includes(t.id))!;
+    renderWithData(<TransactionDetail txId="tx-001" />);
+
+    await user.click(screen.getByRole("button", { name: /^Add$/ }));
+    await user.click(await screen.findByRole("button", { name: existing.name }));
+
+    await waitFor(() => expect(recorded).toHaveBeenCalled(), { timeout: 2000 });
+    const [rows, source] = recorded.mock.calls.at(-1)!;
+    expect(source).toBe("detail");
+    expect(rows[0].finalTagIds).toContain(existing.id);
+  });
+
+  it("captures an approval as corpus evidence, carrying the merchant and its label", async () => {
+    const user = userEvent.setup();
+    const dataset = {
+      ...seedDataset,
+      transactions: seedDataset.transactions.map((t) => (t.id === "tx-001" ? { ...t, needsReview: true } : t)),
+    };
+    renderWithData(<TransactionDetail txId="tx-001" />, { dataset });
+    await user.click(screen.getByRole("button", { name: /approve/i }));
+
+    await waitFor(() => expect(recorded).toHaveBeenCalled());
+    const [rows, source] = recorded.mock.calls.at(-1)!;
+    expect(source).toBe("detail");
+    expect(rows[0].cleanedDescription).toBe("Hyra Mars");
+    expect(rows[0].finalCategoryId).toBe("cat-rent");
   });
 
   it("shows a Type control offering expense, income and transfer", () => {

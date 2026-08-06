@@ -1,6 +1,7 @@
 import { and, eq, isNull, ne, sql, type SQL } from "drizzle-orm";
 import { db } from "./index";
 import { categorizationExamples, EMBED_DIMS, type ExampleStatus } from "./schema";
+import type { PlannedExample } from "../corpus/record";
 import type { TransactionKind } from "../domain/types";
 
 /** A corpus row as retrieval and the prompt need it — never carries the embedding. */
@@ -97,6 +98,82 @@ export async function saveEmbeddings(
       .set({ embedding: r.embedding, embeddingModel: r.model })
       .where(eq(categorizationExamples.id, r.id)),
   );
+  await db.batch(ops as [(typeof ops)[number], ...typeof ops]);
+}
+
+/**
+ * Write captured rows into the corpus.
+ *
+ * Two conflict clauses, deliberately not one clause with CASE logic, because they encode two
+ * invariants that must not be accidentally merged:
+ *
+ *  - **`rejected` is sticky.** No passive path may resurrect a merchant the user dismissed, or
+ *    every import re-floods the curation queue with the same rejects.
+ *  - **`approved` never downgrades.** A passive sighting touches only the counters; it can never
+ *    overwrite labels the user vouched for.
+ */
+export async function upsertExamples(rows: PlannedExample[]): Promise<void> {
+  if (!rows.length) return;
+
+  const toRow = (p: PlannedExample) => ({
+    id: p.id,
+    userId: p.userId,
+    dedupKey: p.dedupKey,
+    rawDescription: p.rawDescription,
+    cleanedDescription: p.cleanedDescription,
+    amount: String(p.amount),
+    predictedKind: p.predictedKind,
+    predictedCategoryId: p.predictedCategoryId,
+    predictedConfidence: p.predictedConfidence,
+    finalKind: p.finalKind,
+    finalCategoryId: p.finalCategoryId,
+    finalTagIds: p.finalTagIds,
+    status: p.status,
+    gold: p.gold,
+    corrected: p.corrected,
+    source: p.source,
+    createdAt: p.createdAt,
+    lastSeenAt: p.lastSeenAt,
+    hitCount: p.hitCount,
+  });
+
+  const target = [categorizationExamples.userId, categorizationExamples.dedupKey];
+  const ops = rows.map((p) => {
+    const row = toRow(p);
+    if (p.mode === "affirm") {
+      return db
+        .insert(categorizationExamples)
+        .values(row)
+        .onConflictDoUpdate({
+          target,
+          set: {
+            finalKind: row.finalKind,
+            finalCategoryId: row.finalCategoryId,
+            finalTagIds: row.finalTagIds,
+            predictedKind: row.predictedKind,
+            predictedCategoryId: row.predictedCategoryId,
+            predictedConfidence: row.predictedConfidence,
+            corrected: true,
+            // An explicit correction un-rejects: the user just told us what this should be.
+            status: "approved",
+            lastSeenAt: row.lastSeenAt,
+            hitCount: sql`${categorizationExamples.hitCount} + ${row.hitCount}`,
+            // The embedding depends only on the description, so a re-label never invalidates it.
+          },
+        });
+    }
+    return db
+      .insert(categorizationExamples)
+      .values(row)
+      .onConflictDoUpdate({
+        target,
+        set: {
+          lastSeenAt: row.lastSeenAt,
+          hitCount: sql`${categorizationExamples.hitCount} + ${row.hitCount}`,
+        },
+      });
+  });
+
   await db.batch(ops as [(typeof ops)[number], ...typeof ops]);
 }
 

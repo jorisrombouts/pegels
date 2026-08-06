@@ -14,7 +14,8 @@ import { isRevolutCsv, normalizeRevolut } from "@/lib/parse-revolut";
 import { convertRowsToSEK, foreignCurrencies } from "@/lib/fx";
 import { fetchRatesToSEK } from "@/app/actions/fx";
 import { needsReview } from "@/lib/domain/review";
-import { categorizeTransactions, logImportExamples } from "@/app/actions/ai";
+import { categorizeTransactions } from "@/app/actions/ai";
+import { recordExamples } from "@/app/actions/corpus";
 import { detectTransfersOnImport, orderCategories, type ExistingTransferUpdate } from "@/lib/domain/selectors";
 import { formatSEK } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -35,6 +36,7 @@ interface DraftRow {
   // Original AI prediction, kept separate from the user-editable values above.
   predictedKind: TransactionKind | null;
   predictedCategoryId: string | null;
+  predictedTagIds: string[] | null;
   predictedConfidence: number | null;
 }
 
@@ -171,6 +173,7 @@ export function ImportModal() {
         kind: (b.forcedKind ?? res?.kind ?? (b.amount < 0 ? "expense" : "income")) as TransactionKind,
         predictedKind: (b.forcedKind ?? res?.kind ?? null) as TransactionKind | null,
         predictedCategoryId: isTransfer ? null : res?.categoryId ?? null,
+        predictedTagIds: isTransfer ? [] : res?.tagIds ?? null,
         predictedConfidence: isTransfer ? 1 : res?.confidence ?? null,
       };
     });
@@ -180,7 +183,8 @@ export function ImportModal() {
     return drafts.map((d, i): DraftRow => ({
       date: d.date, description: d.description, amount: d.amount, currency: d.currency, notes: d.notes, unconverted: d.unconverted,
       categoryId: d.categoryId, confidence: d.confidence, tagIds: d.tagIds, include: d.include, kind: detected.rows[i].kind,
-      predictedKind: d.predictedKind, predictedCategoryId: d.predictedCategoryId, predictedConfidence: d.predictedConfidence,
+      predictedKind: d.predictedKind, predictedCategoryId: d.predictedCategoryId,
+      predictedTagIds: d.predictedTagIds, predictedConfidence: d.predictedConfidence,
     }));
   }
 
@@ -278,18 +282,22 @@ export function ImportModal() {
       notes: r.notes,
     }));
     addTransactions(txs);
-    // Log the AI's prediction vs. the user's final choice for the feedback loop (fire-and-forget).
-    void logImportExamples(
+    // The AI's prediction vs. what the user actually kept (fire-and-forget). Rows the user edited
+    // become approved corpus evidence; untouched rows are only counted as sightings.
+    void recordExamples(
       included.map((r) => ({
         rawDescription: r.description,
         cleanedDescription: r.description,
         amount: r.amount,
         predictedKind: r.predictedKind,
         predictedCategoryId: r.predictedCategoryId,
+        predictedTagIds: r.predictedTagIds,
         predictedConfidence: r.predictedConfidence,
         finalKind: r.kind,
         finalCategoryId: r.categoryId,
+        finalTagIds: r.tagIds,
       })),
+      "import",
     );
     // Reclassify each matched existing leg as a transfer.
     existingUpdates.forEach((u) => updateTransaction(u.id, { kind: "transfer" }));

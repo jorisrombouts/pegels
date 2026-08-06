@@ -1,7 +1,7 @@
 "use server";
 
 import { getUserId } from "@/lib/auth";
-import { getDataset, insertCategorizationExamples, upsertTransaction } from "@/lib/db/queries";
+import { getDataset, upsertTransaction } from "@/lib/db/queries";
 import { categorize } from "@/lib/categorize";
 import { matchesOwnAccount } from "@/lib/domain/own-account";
 import { reconcileKindWithSign } from "@/lib/ai/reconcile";
@@ -19,18 +19,7 @@ import { retrieveNeighbours } from "@/lib/ai/retrieve";
 import { merchantTokens, tokenOverlap } from "@/lib/text/merchant-tokens";
 import { clampConfidence } from "@/lib/ai/confidence";
 import { stableHash } from "@/lib/ai/hash";
-import type { TransactionKind } from "@/lib/domain/types";
 
-interface CorrectionInput {
-  rawDescription: string;
-  cleanedDescription: string;
-  amount: number;
-  predictedKind: TransactionKind | null;
-  predictedCategoryId: string | null;
-  predictedConfidence: number | null;
-  finalKind: TransactionKind;
-  finalCategoryId: string | null;
-}
 
 /**
  * Routing hint for OpenAI's prompt cache. It must change whenever the stable system message does,
@@ -177,42 +166,4 @@ export async function applyRuleBackfill(ruleId?: string): Promise<number> {
     await upsertTransaction(userId, { ...tx, ...change.patch, categorySource: "model" });
   }
   return plan.length;
-}
-
-function toExampleRow(ex: CorrectionInput, source: "import" | "detail", corrected: boolean) {
-  return {
-    id: `ex-${crypto.randomUUID()}`,
-    rawDescription: ex.rawDescription,
-    cleanedDescription: ex.cleanedDescription,
-    amount: String(ex.amount),
-    predictedKind: ex.predictedKind,
-    predictedCategoryId: ex.predictedCategoryId,
-    predictedConfidence: ex.predictedConfidence,
-    finalKind: ex.finalKind,
-    finalCategoryId: ex.finalCategoryId,
-    corrected,
-    source,
-    createdAt: new Date().toISOString(),
-  };
-}
-
-/** Log every imported row: predicted = the AI's original guess, final = what the user kept/edited. */
-export async function logImportExamples(rows: CorrectionInput[]): Promise<void> {
-  if (!rows.length) return;
-  const examples = rows.map((ex) => {
-    const corrected = ex.predictedKind !== ex.finalKind || ex.predictedCategoryId !== ex.finalCategoryId;
-    return toExampleRow(ex, "import", corrected);
-  });
-  await insertCategorizationExamples(await getUserId(), examples);
-}
-
-/** Log a single detail-panel correction (always corrected). */
-export async function logDetailCorrection(ex: CorrectionInput): Promise<void> {
-  await insertCategorizationExamples(await getUserId(), [toExampleRow(ex, "detail", true)]);
-}
-
-/** Log a detail-panel approval: the user confirmed the AI's guess (final == predicted). Not a
- *  correction, but still an explicit affirmation — it becomes approved corpus evidence. */
-export async function logDetailApproval(ex: CorrectionInput): Promise<void> {
-  await insertCategorizationExamples(await getUserId(), [toExampleRow(ex, "detail", false)]);
 }

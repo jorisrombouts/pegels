@@ -9,15 +9,46 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { TagEditor } from "./tag-editor";
 import { SplitEditor } from "./split-editor";
-import { logDetailCorrection, logDetailApproval } from "@/app/actions/ai";
+import { recordExamples, type ExampleInput } from "@/app/actions/corpus";
 import { useData } from "@/store/data";
 import { useUI } from "@/store/ui";
 import { formatSEK, dayLabel } from "@/lib/format";
 import { orderCategories } from "@/lib/domain/selectors";
+import type { Transaction } from "@/lib/domain/types";
 import { cn } from "@/lib/utils";
 
 function Label({ children }: { children: React.ReactNode }) {
   return <span className="text-xs font-medium text-muted-foreground">{children}</span>;
+}
+
+/** One corpus example describing this transaction, with `overrides` as the user's new answer. */
+function example(tx: Transaction, overrides: Partial<ExampleInput> = {}): ExampleInput {
+  return {
+    rawDescription: tx.description,
+    cleanedDescription: tx.description,
+    amount: tx.amount,
+    predictedKind: tx.kind,
+    predictedCategoryId: tx.predictedCategoryId,
+    predictedTagIds: tx.tagIds,
+    predictedConfidence: tx.categoryConfidence,
+    finalKind: tx.kind,
+    finalCategoryId: tx.categoryId,
+    finalTagIds: tx.tagIds,
+    ...overrides,
+  };
+}
+
+/**
+ * TagEditor fires once per tag added or removed, so a three-tag edit would be three writes to the
+ * same corpus row. They're idempotent upserts, but chatty — settle first, then record the final set.
+ */
+const TAG_CAPTURE_DELAY_MS = 400;
+let tagCaptureTimer: ReturnType<typeof setTimeout> | undefined;
+function queueTagCapture(tx: Transaction, finalTagIds: string[]) {
+  clearTimeout(tagCaptureTimer);
+  tagCaptureTimer = setTimeout(() => {
+    void recordExamples([example(tx, { finalTagIds })], "detail");
+  }, TAG_CAPTURE_DELAY_MS);
 }
 
 /** Empty state shown when no transaction is selected. */
@@ -91,16 +122,7 @@ export function TransactionDetail({ txId, onDeleted }: { txId: string; onDeleted
         <Select
           value={tx.categoryId ?? ""}
           onValueChange={(v) => {
-            void logDetailCorrection({
-              rawDescription: tx.description,
-              cleanedDescription: tx.description,
-              amount: tx.amount,
-              predictedKind: tx.kind,
-              predictedCategoryId: tx.predictedCategoryId,
-              predictedConfidence: tx.categoryConfidence,
-              finalKind: tx.kind,
-              finalCategoryId: v,
-            });
+            void recordExamples([example(tx, { finalCategoryId: v })], "detail");
             updateTransaction(tx.id, { categoryId: v, categorySource: "user", needsReview: false });
           }}
         >
@@ -128,17 +150,8 @@ export function TransactionDetail({ txId, onDeleted }: { txId: string; onDeleted
             type="button"
             onClick={() => {
               updateTransaction(tx.id, { needsReview: false, categorySource: "user" });
-              // Feed the confirmed guess back as a positive few-shot example (final == predicted).
-              void logDetailApproval({
-                rawDescription: tx.description,
-                cleanedDescription: tx.description,
-                amount: tx.amount,
-                predictedKind: tx.kind,
-                predictedCategoryId: tx.predictedCategoryId ?? null,
-                predictedConfidence: tx.categoryConfidence ?? null,
-                finalKind: tx.kind,
-                finalCategoryId: tx.categoryId,
-              });
+              // An explicit approval is evidence too — the user confirmed this merchant's label.
+              void recordExamples([example(tx)], "detail");
             }}
             className="pressable mt-1 inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold"
             style={{ backgroundColor: "hsl(var(--positive) / 0.15)", color: "hsl(var(--positive))" }}
@@ -151,7 +164,15 @@ export function TransactionDetail({ txId, onDeleted }: { txId: string; onDeleted
       {/* Tags */}
       <div className="space-y-2">
         <Label>Tags</Label>
-        <TagEditor tagIds={tx.tagIds} onChange={(tagIds) => updateTransaction(tx.id, { tagIds })} />
+        <TagEditor
+          tagIds={tx.tagIds}
+          onChange={(tagIds) => {
+            updateTransaction(tx.id, { tagIds });
+            // Previously this only wrote the transaction, so every tag correction was lost to the
+            // learning loop. Debounced because TagEditor fires once per add/remove.
+            queueTagCapture(tx, tagIds);
+          }}
+        />
       </div>
 
       {/* Split */}
@@ -169,16 +190,7 @@ export function TransactionDetail({ txId, onDeleted }: { txId: string; onDeleted
               key={k}
               type="button"
               onClick={() => {
-                void logDetailCorrection({
-                  rawDescription: tx.description,
-                  cleanedDescription: tx.description,
-                  amount: tx.amount,
-                  predictedKind: tx.kind,
-                  predictedCategoryId: tx.predictedCategoryId,
-                  predictedConfidence: tx.categoryConfidence,
-                  finalKind: k,
-                  finalCategoryId: tx.categoryId,
-                });
+                void recordExamples([example(tx, { finalKind: k })], "detail");
                 updateTransaction(tx.id, { kind: k });
               }}
               className={cn(
