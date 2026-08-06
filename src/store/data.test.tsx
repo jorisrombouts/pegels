@@ -1,8 +1,10 @@
 import type { ReactNode } from "react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { renderHook, act } from "@testing-library/react";
 import { QueryClientProvider } from "@tanstack/react-query";
+import * as api from "@/app/actions/data";
 import { useData, DATASET_KEY } from "./data";
+import { useUI } from "./ui";
 import { makeTestClient } from "@/test/render";
 import type { Dataset } from "@/data/mock";
 
@@ -44,6 +46,22 @@ describe("useData facade", () => {
     act(() => result.current.clearData());
     expect(cache().transactions).toHaveLength(0);
     expect(cache().accounts).toHaveLength(0);
+  });
+
+  it("signals a failed persist instead of rolling back silently", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.spyOn(api, "upsertCategory").mockRejectedValueOnce(new Error("network down"));
+    useUI.setState({ saveFailed: false });
+    const { result, cache } = setup();
+    const before = cache().categories.length;
+    await act(async () => {
+      result.current.upsertCategory({ id: "cat-doomed", name: "Doomed", icon: "💥", color: "0 0% 50%", parentId: null });
+    });
+    expect(cache().categories).toHaveLength(before); // rolled back, as before
+    expect(consoleError).toHaveBeenCalled();
+    expect(useUI.getState().saveFailed).toBe(true);
+    consoleError.mockRestore();
+    useUI.setState({ saveFailed: false });
   });
 
   it("resetData repopulates the cache with the lazily-loaded sample dataset", async () => {

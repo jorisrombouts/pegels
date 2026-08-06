@@ -80,6 +80,11 @@ interface UIState {
   moveNavItem: (key: string, dir: -1 | 1) => void;
   resetNav: () => void;
 
+  /** Transient: a data write failed and its optimistic change was rolled back (see run() in
+   *  src/store/data.ts). Drives the dismissible SaveFailedBanner. */
+  saveFailed: boolean;
+  setSaveFailed: (failed: boolean) => void;
+
   /** Transient: whether the Import modal is open (not persisted). */
   importOpen: boolean;
   setImportOpen: (open: boolean) => void;
@@ -126,6 +131,9 @@ export const useUI = create<UIState>()(
           return { navConfig: next };
         }),
       resetNav: () => set({ navConfig: defaultNavConfig }),
+
+      saveFailed: false,
+      setSaveFailed: (failed) => set({ saveFailed: failed }),
 
       importOpen: false,
       setImportOpen: (open) => set({ importOpen: open }),

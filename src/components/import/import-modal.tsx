@@ -293,7 +293,7 @@ export function ImportModal() {
         finalKind: r.kind,
         finalCategoryId: r.categoryId,
       })),
-    );
+    ).catch((e) => console.error("Failed to log import examples", e));
     // Reclassify each matched existing leg as a transfer (and link/unlink its goal).
     existingUpdates.forEach((u) => updateTransaction(u.id, { kind: "transfer", goalId: u.goalId }));
     setImportOpen(false);

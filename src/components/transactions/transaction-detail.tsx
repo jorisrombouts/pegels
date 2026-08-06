@@ -100,7 +100,7 @@ export function TransactionDetail({ txId, onDeleted }: { txId: string; onDeleted
               predictedConfidence: tx.categoryConfidence,
               finalKind: tx.kind,
               finalCategoryId: v,
-            });
+            }).catch((e) => console.error("Failed to log category correction", e));
             updateTransaction(tx.id, { categoryId: v, categorySource: "user", needsReview: false });
           }}
         >
@@ -138,7 +138,7 @@ export function TransactionDetail({ txId, onDeleted }: { txId: string; onDeleted
                 predictedConfidence: tx.categoryConfidence ?? null,
                 finalKind: tx.kind,
                 finalCategoryId: tx.categoryId,
-              });
+              }).catch((e) => console.error("Failed to log category approval", e));
             }}
             className="pressable mt-1 inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold"
             style={{ backgroundColor: "hsl(var(--positive) / 0.15)", color: "hsl(var(--positive))" }}
@@ -178,7 +178,7 @@ export function TransactionDetail({ txId, onDeleted }: { txId: string; onDeleted
                   predictedConfidence: tx.categoryConfidence,
                   finalKind: k,
                   finalCategoryId: tx.categoryId,
-                });
+                }).catch((e) => console.error("Failed to log type correction", e));
                 updateTransaction(tx.id, { kind: k, goalId: k === "transfer" ? tx.goalId : null });
               }}
               className={cn(
