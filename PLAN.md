@@ -274,8 +274,9 @@ A quick map of what's done, for orientation. Details + rationale are in the desi
   with per-rule and bulk backfill; per-month suggestions mined from corrected data.
 - **Import** — SEB + Revolut CSV, non-SEK→SEK conversion, dedupe, transfer-pair detection, editable
   review with kind/category/confidence and a filter bar.
-- **AI categorization + learning loop** — rules → OpenAI few-shot (built from your corrections +
-  approvals, relevance-matched) → keyword fallback; training set in `categorization_examples`.
+- **AI categorization + learning loop** — rules → hybrid retrieval (pgvector + lexical) over a
+  curated corpus of your corrections → OpenAI. No fallback. Curate at `/training`, measure with
+  `npm run eval`.
 - **Auth** — Google sign-in (Auth.js v5), single-owner allowlist, stub-data claim, dev bypass.
 - **Per-user sync** — dashboard layout + nav config in Neon; account avatar + sign-out in every header.
 - **PWA + polish** — installable, offline shell, level-bars icon; native tap feedback, iOS safe-area,

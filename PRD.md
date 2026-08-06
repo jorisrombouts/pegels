@@ -43,8 +43,8 @@ guesses, and turns the corrected history into a private training signal.
 **Goals**
 - G1 — Import bank CSV exports (SEB and Revolut), de-duplicated, with foreign currency converted to
   SEK at import time.
-- G2 — Auto-categorize each transaction (rules → LLM few-shot → keyword fallback) and flag
-  low-confidence rows for review.
+- G2 — Auto-categorize each transaction (rules → retrieval-grounded LLM) and flag low-confidence
+  rows for review. A failure is surfaced, never papered over with a guess.
 - G3 — Learn from every correction and approval so future predictions improve.
 - G4 — Provide budgets, categories, tags, and rules with full CRUD.
 - G5 — Give a focused dashboard and a calm spending breakdown/trend view.
@@ -231,17 +231,23 @@ correct or approve one.*
   1. **Own-account transfer** — description references one of the user's `accountNumber`s → `transfer`.
   2. **User rules** (`rules`) — contains/starts-with/exact, by `priority`; a resolving match sets
      category/kind/tags and **skips the LLM**.
-  3. **OpenAI** (`gpt-4o-mini`, structured output → `{kind, categoryId, confidence}`) for the rest,
-     with a **few-shot built from the owner's affirmations**.
-  4. **Keyword fallback** (`categorize`) if OpenAI errors.
+  3. **Retrieval + OpenAI** (`gpt-4o-mini`, structured output →
+     `{kind, categoryId, tagIds, confidence}`) for the rest, grounded in examples retrieved from
+     the owner's own confirmations.
+  There is deliberately **no fallback**: if OpenAI errors the import surfaces it. Rows resolved by
+  steps 1–2 are unaffected by an outage.
 - FR-4.2 — Confidence `< 0.6` sets `needsReview`.
 - FR-4.3 — **BR-4 Learning signal.** Every correction and approval is logged to
   `categorization_examples`. The **high-signal set** = corrections (`corrected=true`) **plus**
   detail-panel approvals (`source='detail'`), excluding passive import-keeps.
-- FR-4.4 — **Few-shot selection** (`select-examples`, pure): relevance-match the high-signal examples
-  to the current batch's merchants (past "ICA" fixes steer new "ICA" rows), dedupe, and cap, topping
-  up with recent rows for cold-start.
-- FR-4.5 — Without `OPENAI_API_KEY`, import still works via the keyword fallback.
+- FR-4.4 — **Retrieval** (`retrieve`): two arms fused by reciprocal rank — pgvector cosine over the
+  embedded corpus, and lexical merchant-token overlap — capped per row and diversified so one
+  merchant cannot fill every slot. A hit below the similarity floor is noise and is dropped, so an
+  unrecognised merchant retrieves nothing and is flagged for review.
+- FR-4.5 — `OPENAI_API_KEY` is **required**. Without it, import fails with a visible error.
+- FR-4.6 — **Curation** (`/training`): unreviewed merchants are queued most-seen-first; approving
+  one makes it retrievable, dismissing one is sticky. Accuracy is measured against a hold-out
+  (`npm run eval`).
 
 **AC:** A low-confidence row is flagged; correcting it changes future predictions for similar
 merchants; approving a correct low-confidence guess also improves them. The few-shot selection is
@@ -352,7 +358,9 @@ uncategorized rather than orphaning or deleting them.
 - **NFR-7 Testing (TDD).** New behavior gets a failing test first. Pure logic (selectors, fx, rules,
   example selection, parsers, mutations) is unit-tested directly; UI tests render with a seeded
   QueryClient. The suite is the regression net (269 tests in the reference build).
-- **NFR-8 Resilience.** AI/FX failures degrade gracefully (keyword fallback; held-back rows + retry).
+- **NFR-8 Resilience.** FX failures degrade gracefully (held-back rows + retry) and a retrieval
+  failure still classifies, without evidence. An OpenAI failure is **surfaced, not absorbed** — a
+  plausible-looking guess hides an outage indefinitely.
   Behind a TLS-inspecting proxy, Node may reject outbound TLS (`SELF_SIGNED_CERT_IN_CHAIN`) — document
   the `NODE_OPTIONS=--use-system-ca` local workaround.
 
@@ -401,7 +409,7 @@ Drizzle schema.
 | Var | Required | Purpose |
 |---|---|---|
 | `DATABASE_URL` | yes | Neon Postgres connection string |
-| `OPENAI_API_KEY` | for AI | OpenAI; without it, import uses keyword rules |
+| `OPENAI_API_KEY` | yes | OpenAI. No fallback — import fails visibly without a valid key |
 | `AUTH_SECRET` | yes | Auth.js session encryption |
 | `AUTH_GOOGLE_ID` / `AUTH_GOOGLE_SECRET` | yes | Google OAuth (redirect `…/api/auth/callback/google`) |
 | `OWNER_EMAIL` | yes | Single-owner allowlist (fail-closed) |
@@ -415,8 +423,8 @@ Bootstrap: `npm install` → `npm run db:push` (sync schema) → `npm run db:see
 ## 11. Acceptance / definition of done
 
 A reproduction is "done" when: a SEB and a Revolut (English **and** Dutch) CSV import correctly with
-FX conversion, dedupe, and transfer detection; the categorization pipeline + learning loop work (or
-degrade to keyword fallback without a key); transactions can be reviewed/edited/split/tagged/excluded/
+FX conversion, dedupe, and transfer detection; the categorization pipeline + learning loop work
+(and fail visibly without a key); transactions can be reviewed/edited/split/tagged/excluded/
 **deleted-with-confirmation**; budgets/categories/tags/rules have full CRUD with their business
 rules (BR-5, detach/strip on delete); Google
 single-owner auth gates access and claims stub data; the PWA installs and serves an offline shell; and
@@ -428,7 +436,8 @@ the test suite passes with build + lint clean.
 
 - **Localized bank exports** silently mis-importing (the EUR-as-SEK class): mitigated by FR-3.4 alias
   detection + FR-3.6 hold-back-on-failed-FX (never import foreign as SEK).
-- **AI/network failure:** keyword fallback (FR-4.5) and held-back FX rows with retry (FR-3.6).
+- **AI/network failure:** surfaced to the user (FR-4.5), never masked by a guess; held-back FX rows
+  with retry (FR-3.6).
 - **Local dev writing to prod data:** use a separate Neon dev branch + `DEV_USER_ID` (see §13/PLAN).
 - **Commit attribution / TLS proxy:** see PLAN.md notes (repo-local git identity; `--use-system-ca`).
 
