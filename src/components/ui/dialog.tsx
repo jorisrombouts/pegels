@@ -37,7 +37,7 @@ export function DialogContent({ className, children, title, description, ...prop
         >
           <div className="mb-5 flex items-center justify-between">
             <DialogPrimitive.Title className="text-lg font-semibold">{title}</DialogPrimitive.Title>
-            <DialogPrimitive.Close className="grid size-8 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-[hsl(var(--muted)/0.6)] hover:text-foreground">
+            <DialogPrimitive.Close aria-label="Close" className="grid size-8 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-[hsl(var(--muted)/0.6)] hover:text-foreground">
               <X className="size-4" />
             </DialogPrimitive.Close>
           </div>

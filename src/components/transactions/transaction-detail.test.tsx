@@ -68,6 +68,13 @@ describe("TransactionDetail", () => {
     expect(screen.queryByRole("button", { name: /approve/i })).not.toBeInTheDocument();
   });
 
+  it("gives the dialog close button an accessible name", async () => {
+    const user = userEvent.setup();
+    renderWithData(<TransactionDetail txId="tx-001" />);
+    await user.click(screen.getByRole("button", { name: "Delete transaction" }));
+    expect(screen.getByRole("button", { name: "Close" })).toBeInTheDocument();
+  });
+
   it("falls back to the empty state for an unknown id", () => {
     renderWithData(<TransactionDetail txId="nope" />);
     expect(screen.getByText("Select an item")).toBeInTheDocument();

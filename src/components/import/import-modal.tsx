@@ -494,10 +494,10 @@ export function ImportModal() {
                       className="size-4 shrink-0 accent-[hsl(var(--primary))] disabled:opacity-40"
                       aria-label={`Include ${r.description}`}
                     />
-                    <Input type="date" value={r.date} onChange={(e) => update(i, { date: e.target.value })} className="min-w-0 flex-1 px-2 py-1 text-xs sm:order-1 sm:w-32 sm:flex-none" />
-                    <Input value={String(r.amount)} onChange={(e) => update(i, { amount: parseAmount(e.target.value) })} className="w-24 shrink-0 px-2 py-1 text-right text-sm tnum sm:order-3" />
+                    <Input type="date" value={r.date} onChange={(e) => update(i, { date: e.target.value })} className="min-w-0 flex-1 px-2 py-1 text-xs sm:order-1 sm:w-32 sm:flex-none" aria-label={`Date for ${r.description}`} />
+                    <Input value={String(r.amount)} onChange={(e) => update(i, { amount: parseAmount(e.target.value) })} className="w-24 shrink-0 px-2 py-1 text-right text-sm tnum sm:order-3" aria-label={`Amount for ${r.description}`} />
                     <div className="w-full min-w-0 sm:order-2 sm:w-auto sm:flex-1">
-                      <Input value={r.description} onChange={(e) => update(i, { description: e.target.value })} className={cn("px-2 py-1 text-sm", dup && "line-through")} />
+                      <Input value={r.description} onChange={(e) => update(i, { description: e.target.value })} className={cn("px-2 py-1 text-sm", dup && "line-through")} aria-label={`Description for ${r.description}`} />
                       {dup && <span className="ml-1 text-[10px] text-muted-foreground">Duplicate of existing</span>}
                       {r.unconverted && <span className="ml-1 text-[10px] text-[hsl(var(--warning))]">Needs {r.currency} exchange rate</span>}
                     </div>
