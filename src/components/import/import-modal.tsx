@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { memo, useCallback, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { FileText, Upload, Loader2, Search } from "lucide-react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
@@ -18,7 +18,7 @@ import { categorizeTransactions, logImportExamples } from "@/app/actions/ai";
 import { detectTransfersOnImport, orderCategories, type ExistingTransferUpdate } from "@/lib/domain/selectors";
 import { formatSEK } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import type { Transaction, TransactionKind } from "@/lib/domain/types";
+import type { Category, Transaction, TransactionKind } from "@/lib/domain/types";
 
 interface DraftRow {
   date: string;
@@ -259,9 +259,12 @@ export function ImportModal() {
   const visibleCount = rows.filter(matchesFilters).length;
   const dates = rows.map((r) => r.date).filter(Boolean).sort();
 
-  function update(i: number, patch: Partial<DraftRow>) {
+  // Stable identity (functional `setRows`, so no deps) — every unedited row keeps its object
+  // reference and its `ReviewRow` bails out, making a tick or keystroke flat instead of O(rows).
+  const update = useCallback((i: number, patch: Partial<DraftRow>) => {
     setRows((rs) => rs.map((r, idx) => (idx === i ? { ...r, ...patch } : r)));
-  }
+  }, []);
+  const orderedCategories = useMemo(() => orderCategories(categories), [categories]);
 
   function confirmImport() {
     const txs: Transaction[] = included.map((r, i) => ({
@@ -481,57 +484,7 @@ export function ImportModal() {
               )}
               {rows.map((r, i) => {
                 if (!matchesFilters(r)) return null;
-                const dup = isDup(r);
-                return (
-                  <div key={i} className={cn("flex flex-wrap items-center gap-2 border-b border-[hsl(var(--glass-border))] px-3 py-2 last:border-0 sm:flex-nowrap", (dup || r.unconverted) && "opacity-60")}>
-                    {/* On phones this wraps to 3 lines: [date · amount] / [description] / [kind · category].
-                        sm:order-* restores the desktop column order (date, description, amount, kind, category). */}
-                    <input
-                      type="checkbox"
-                      checked={r.include}
-                      disabled={r.unconverted}
-                      onChange={(e) => update(i, { include: e.target.checked })}
-                      className="size-4 shrink-0 accent-[hsl(var(--primary))] disabled:opacity-40"
-                      aria-label={`Include ${r.description}`}
-                    />
-                    <Input type="date" value={r.date} onChange={(e) => update(i, { date: e.target.value })} className="min-w-0 flex-1 px-2 py-1 text-xs sm:order-1 sm:w-32 sm:flex-none" aria-label={`Date for ${r.description}`} />
-                    <Input value={String(r.amount)} onChange={(e) => update(i, { amount: parseAmount(e.target.value) })} className="w-24 shrink-0 px-2 py-1 text-right text-sm tnum sm:order-3" aria-label={`Amount for ${r.description}`} />
-                    <div className="w-full min-w-0 sm:order-2 sm:w-auto sm:flex-1">
-                      <Input value={r.description} onChange={(e) => update(i, { description: e.target.value })} className={cn("px-2 py-1 text-sm", dup && "line-through")} aria-label={`Description for ${r.description}`} />
-                      {dup && <span className="ml-1 text-[10px] text-muted-foreground">Duplicate of existing</span>}
-                      {r.unconverted && <span className="ml-1 text-[10px] text-[hsl(var(--warning))]">Needs {r.currency} exchange rate</span>}
-                    </div>
-                    <Select value={r.kind} onValueChange={(v) => update(i, { kind: v as TransactionKind })}>
-                      <SelectTrigger className="flex-1 px-2 py-1 text-xs sm:order-4 sm:w-28 sm:flex-none"><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="expense">Expense</SelectItem>
-                        <SelectItem value="transfer">Transfer</SelectItem>
-                        <SelectItem value="income">Income</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <div className="flex min-w-0 flex-1 items-center gap-1.5 sm:order-5 sm:w-44 sm:flex-none">
-                      {r.kind === "expense" ? (
-                        <>
-                          <Select value={r.categoryId ?? ""} onValueChange={(v) => update(i, { categoryId: v, confidence: 1 })}>
-                            <SelectTrigger className="min-w-0 flex-1 px-2 py-1 text-xs"><SelectValue placeholder="Uncategorized" /></SelectTrigger>
-                            <SelectContent>
-                              {orderCategories(categories).map((c) => (
-                                <SelectItem key={c.id} value={c.id}>{c.parentId ? "↳ " : ""}{c.icon} {c.name}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <span
-                            className="size-1.5 shrink-0 rounded-full"
-                            title={`${Math.round(r.confidence * 100)}% confidence`}
-                            style={{ backgroundColor: r.confidence >= 0.85 ? "hsl(var(--positive))" : r.confidence >= 0.6 ? "hsl(var(--warning))" : "hsl(var(--negative))" }}
-                          />
-                        </>
-                      ) : (
-                        <span className="px-1 text-xs text-muted-foreground">—</span>
-                      )}
-                    </div>
-                  </div>
-                );
+                return <ReviewRow key={i} row={r} index={i} dup={isDup(r)} categories={orderedCategories} onUpdate={update} />;
               })}
             </div>
 
@@ -545,6 +498,65 @@ export function ImportModal() {
     </Dialog>
   );
 }
+
+const ReviewRow = memo(function ReviewRow({ row: r, index: i, dup, categories, onUpdate }: {
+  row: DraftRow;
+  index: number;
+  dup: boolean;
+  categories: Category[]; // pre-ordered by the parent
+  onUpdate: (i: number, patch: Partial<DraftRow>) => void;
+}) {
+  return (
+    <div className={cn("flex flex-wrap items-center gap-2 border-b border-[hsl(var(--glass-border))] px-3 py-2 last:border-0 sm:flex-nowrap", (dup || r.unconverted) && "opacity-60")}>
+      {/* On phones this wraps to 3 lines: [date · amount] / [description] / [kind · category].
+          sm:order-* restores the desktop column order (date, description, amount, kind, category). */}
+      <input
+        type="checkbox"
+        checked={r.include}
+        disabled={r.unconverted}
+        onChange={(e) => onUpdate(i, { include: e.target.checked })}
+        className="size-4 shrink-0 accent-[hsl(var(--primary))] disabled:opacity-40"
+        aria-label={`Include ${r.description}`}
+      />
+      <Input type="date" value={r.date} onChange={(e) => onUpdate(i, { date: e.target.value })} className="min-w-0 flex-1 px-2 py-1 text-xs sm:order-1 sm:w-32 sm:flex-none" aria-label={`Date for ${r.description}`} />
+      <Input value={String(r.amount)} onChange={(e) => onUpdate(i, { amount: parseAmount(e.target.value) })} className="w-24 shrink-0 px-2 py-1 text-right text-sm tnum sm:order-3" aria-label={`Amount for ${r.description}`} />
+      <div className="w-full min-w-0 sm:order-2 sm:w-auto sm:flex-1">
+        <Input value={r.description} onChange={(e) => onUpdate(i, { description: e.target.value })} className={cn("px-2 py-1 text-sm", dup && "line-through")} aria-label={`Description for ${r.description}`} />
+        {dup && <span className="ml-1 text-[10px] text-muted-foreground">Duplicate of existing</span>}
+        {r.unconverted && <span className="ml-1 text-[10px] text-[hsl(var(--warning))]">Needs {r.currency} exchange rate</span>}
+      </div>
+      <Select value={r.kind} onValueChange={(v) => onUpdate(i, { kind: v as TransactionKind })}>
+        <SelectTrigger className="flex-1 px-2 py-1 text-xs sm:order-4 sm:w-28 sm:flex-none"><SelectValue /></SelectTrigger>
+        <SelectContent>
+          <SelectItem value="expense">Expense</SelectItem>
+          <SelectItem value="transfer">Transfer</SelectItem>
+          <SelectItem value="income">Income</SelectItem>
+        </SelectContent>
+      </Select>
+      <div className="flex min-w-0 flex-1 items-center gap-1.5 sm:order-5 sm:w-44 sm:flex-none">
+        {r.kind === "expense" ? (
+          <>
+            <Select value={r.categoryId ?? ""} onValueChange={(v) => onUpdate(i, { categoryId: v, confidence: 1 })}>
+              <SelectTrigger className="min-w-0 flex-1 px-2 py-1 text-xs"><SelectValue placeholder="Uncategorized" /></SelectTrigger>
+              <SelectContent>
+                {categories.map((c) => (
+                  <SelectItem key={c.id} value={c.id}>{c.parentId ? "↳ " : ""}{c.icon} {c.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <span
+              className="size-1.5 shrink-0 rounded-full"
+              title={`${Math.round(r.confidence * 100)}% confidence`}
+              style={{ backgroundColor: r.confidence >= 0.85 ? "hsl(var(--positive))" : r.confidence >= 0.6 ? "hsl(var(--warning))" : "hsl(var(--negative))" }}
+            />
+          </>
+        ) : (
+          <span className="px-1 text-xs text-muted-foreground">—</span>
+        )}
+      </div>
+    </div>
+  );
+});
 
 function Stat({ label, value, tone }: { label: string; value: string; tone?: "positive" | "warning" }) {
   const color = tone === "positive" ? "hsl(var(--positive))" : tone === "warning" ? "hsl(var(--warning))" : undefined;
