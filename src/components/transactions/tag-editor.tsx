@@ -4,10 +4,9 @@ import { useState } from "react";
 import { Plus, X } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Input } from "@/components/ui/input";
+import { COLOR_SWATCHES } from "@/components/ui/color-swatches";
 import { useData } from "@/store/data";
 import { cn } from "@/lib/utils";
-
-const TAG_COLORS = ["217 91% 60%", "150 65% 50%", "35 90% 55%", "0 75% 60%", "270 70% 64%", "190 80% 52%"];
 
 /** Edit a transaction's tags: remove via ×, add existing, or inline-create. */
 export function TagEditor({ tagIds, onChange }: { tagIds: string[]; onChange: (ids: string[]) => void }) {
@@ -29,7 +28,7 @@ export function TagEditor({ tagIds, onChange }: { tagIds: string[]; onChange: (i
     const name = query.trim();
     if (!name) return;
     const id = `tag-${Date.now()}`;
-    upsertTag({ id, name, color: TAG_COLORS[tags.length % TAG_COLORS.length] });
+    upsertTag({ id, name, color: COLOR_SWATCHES[tags.length % COLOR_SWATCHES.length] });
     add(id);
   }
 
