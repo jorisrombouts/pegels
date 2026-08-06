@@ -8,7 +8,9 @@ import {
   affirmedExamples,
   upsertTransaction,
 } from "@/lib/db/queries";
-import { categorize, matchesOwnAccount } from "@/lib/categorize";
+import { categorize } from "@/lib/categorize";
+import { matchesOwnAccount } from "@/lib/domain/own-account";
+import { reconcileKindWithSign } from "@/lib/ai/reconcile";
 import { applyRules, planRuleBackfill, selectRulesForBackfill } from "@/lib/rules";
 import { categorizeWithOpenAI, type AiExample, type AiResult, type AiRow } from "@/lib/ai/categorize-openai";
 import { selectExamples } from "@/lib/ai/select-examples";
@@ -96,20 +98,6 @@ export async function categorizeTransactions(rows: AiRow[]): Promise<AiResult[]>
     out.push(res);
   }
   return out;
-}
-
-/**
- * Enforce the sign convention (negative = expense, positive = income) the LLM can violate.
- * Transfers move in either direction, so they're left untouched; a kind flipped to a non-expense
- * also drops its category (only expenses carry one).
- */
-function reconcileKindWithSign(res: AiResult, amount: number): void {
-  if (res.kind === "transfer" || amount === 0) return;
-  const expected: TransactionKind = amount < 0 ? "expense" : "income";
-  if (res.kind !== expected) {
-    res.kind = expected;
-    if (expected !== "expense") res.categoryId = null;
-  }
 }
 
 export async function previewRuleBackfill(ruleId?: string): Promise<{ count: number; samples: { description: string }[] }> {

@@ -11,7 +11,8 @@
     "check:docs": "node scripts/check-doc-refs.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
-    "db:push": "drizzle-kit push",
+    "db:ensure-ext": "tsx src/lib/db/ensure-extensions.ts",
+    "db:push": "npm run db:ensure-ext && drizzle-kit push",
     "db:generate": "drizzle-kit generate",
     "db:seed": "tsx src/lib/db/seed.ts",
     "prepare": "husky"

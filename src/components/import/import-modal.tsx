@@ -13,7 +13,7 @@ import { parseCsv, parseAmount, parseDate, cleanDescription, type ColumnField, t
 import { isRevolutCsv, normalizeRevolut } from "@/lib/parse-revolut";
 import { convertRowsToSEK, foreignCurrencies } from "@/lib/fx";
 import { fetchRatesToSEK } from "@/app/actions/fx";
-import { needsReview } from "@/lib/categorize";
+import { needsReview } from "@/lib/domain/review";
 import { categorizeTransactions, logImportExamples } from "@/app/actions/ai";
 import { detectTransfersOnImport, orderCategories, type ExistingTransferUpdate } from "@/lib/domain/selectors";
 import { formatSEK } from "@/lib/format";

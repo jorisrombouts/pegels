@@ -1,5 +1,13 @@
-import { pgTable, text, numeric, real, boolean, jsonb, index, timestamp, integer, primaryKey } from "drizzle-orm/pg-core";
+import { pgTable, text, numeric, real, boolean, jsonb, index, timestamp, integer, primaryKey, uniqueIndex, vector } from "drizzle-orm/pg-core";
 import type { AccountKind, CategorySource, MatchMode, RuleOrigin, Split, TransactionKind } from "../domain/types";
+import type { EvalMetrics, EvalMistake } from "../eval/types";
+
+/** Whether an example participates in retrieval. Only `approved` is trusted evidence. */
+export type ExampleStatus = "candidate" | "approved" | "rejected";
+export type ExampleSource = "import" | "detail" | "manual" | "backfill";
+
+/** text-embedding-3-small's native width. pgvector's HNSW cap is 2000, so this indexes fine. */
+export const EMBED_DIMS = 1536;
 
 // Every table is scoped by userId (stub today; real auth later). Embedded arrays
 // (tagIds, splits) are JSONB — document-scoped, never queried alone.
@@ -98,24 +106,79 @@ export const categorizationRules = pgTable(
   (t) => [index("rules_user_idx").on(t.userId)],
 );
 
+/**
+ * The categorization corpus — what the model retrieves from, and what the /training page curates.
+ *
+ * One row per distinct merchant (`dedupKey`), not per correction: forty "ICA MAXI" corrections
+ * collapse into one row with `hitCount = 40`. That keeps retrieval from being flooded by a single
+ * merchant, bounds table growth, and shrinks the raw-description PII surface.
+ *
+ * Every added NOT NULL column carries a default so `drizzle-kit push` can ADD COLUMN in place.
+ */
 export const categorizationExamples = pgTable(
   "categorization_examples",
   {
     id: text("id").primaryKey(),
     userId: text("user_id").notNull(),
+
+    /** normalizeMerchant(cleanedDescription) — the consolidation identity. */
+    dedupKey: text("dedup_key").notNull().default(""),
     rawDescription: text("raw_description").notNull(),
     cleanedDescription: text("cleaned_description").notNull(),
     amount: numeric("amount", { precision: 12, scale: 2 }).notNull(),
+
+    // What the model said, kept so the accuracy panel can score it.
     predictedKind: text("predicted_kind").$type<TransactionKind>(),
     predictedCategoryId: text("predicted_category_id"),
     predictedConfidence: real("predicted_confidence"),
+
+    // The labels.
     finalKind: text("final_kind").$type<TransactionKind>().notNull(),
     finalCategoryId: text("final_category_id"),
+    finalTagIds: jsonb("final_tag_ids").$type<string[]>().notNull().default([]),
+
+    // Corpus membership.
+    status: text("status").$type<ExampleStatus>().notNull().default("candidate"),
+    /** Held out of retrieval and scored by the eval harness. */
+    gold: boolean("gold").notNull().default(false),
     corrected: boolean("corrected").notNull(),
-    source: text("source").$type<"import" | "detail">().notNull(),
+    source: text("source").$type<ExampleSource>().notNull(),
+    /** Times this merchant has been observed. Drives the lexical tie-break and the curation sort. */
+    hitCount: integer("hit_count").notNull().default(1),
     createdAt: text("created_at").notNull(), // ISO string, set by the caller
+    lastSeenAt: text("last_seen_at").notNull().default(""),
+
+    // Retrieval. Nullable by design: a write never blocks on the embeddings API; a lazy
+    // self-heal pass fills the gaps before the next categorization run.
+    embedding: vector("embedding", { dimensions: EMBED_DIMS }),
+    embeddingModel: text("embedding_model"),
   },
-  (t) => [index("catex_user_idx").on(t.userId)],
+  (t) => [
+    index("catex_user_idx").on(t.userId),
+    uniqueIndex("catex_user_dedup_idx").on(t.userId, t.dedupKey), // required for onConflictDoUpdate
+    index("catex_user_status_idx").on(t.userId, t.status),
+    index("catex_embedding_idx").using("hnsw", t.embedding.op("vector_cosine_ops")),
+  ],
+);
+
+/** One row per eval run, so the /training accuracy panel can show a trend rather than a snapshot. */
+export const evalRuns = pgTable(
+  "eval_runs",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id").notNull(),
+    createdAt: text("created_at").notNull(),
+    chatModel: text("chat_model").notNull(),
+    embeddingModel: text("embedding_model").notNull(),
+    promptVersion: text("prompt_version").notNull(),
+    corpusSize: integer("corpus_size").notNull(),
+    goldSize: integer("gold_size").notNull(),
+    /** JSONB so the metric set can evolve without a migration. */
+    metrics: jsonb("metrics").$type<EvalMetrics>().notNull(),
+    /** Only the wrong rows, capped — powers the "worst mistakes" list. */
+    mistakes: jsonb("mistakes").$type<EvalMistake[]>().notNull().default([]),
+  },
+  (t) => [index("eval_runs_user_idx").on(t.userId)],
 );
 
 
