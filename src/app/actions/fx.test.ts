@@ -18,6 +18,12 @@ describe("fetchRatesToSEK", () => {
     expect(await fetchRatesToSEK(["EUR", "USD"])).toEqual({ SEK: 1, EUR: 10, USD: 20 });
   });
 
+  it("drops symbols that are not ISO-4217 codes", async () => {
+    const spy = vi.spyOn(globalThis, "fetch").mockResolvedValue(ok({ rates: { EUR: 0.1 } }));
+    expect(await fetchRatesToSEK(["EUR", "USD&base=GBP"])).toEqual({ SEK: 1, EUR: 10 });
+    expect(spy).toHaveBeenCalledWith("https://api.frankfurter.dev/v1/latest?base=SEK&symbols=EUR", expect.anything());
+  });
+
   it("falls back to the second provider when the first errors", async () => {
     const spy = vi
       .spyOn(globalThis, "fetch")
