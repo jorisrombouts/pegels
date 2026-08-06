@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
+import { useShallow } from "zustand/react/shallow";
 import { Plus, Target } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { Card } from "@/components/ui/card";
@@ -26,19 +27,27 @@ const healthColor: Record<BudgetHealth, string> = {
 
 export default function BudgetsPage() {
   const data = useData();
-  const { month, masked } = useUI();
+  // Scoped pick so opening modals (importOpen/quickAddOpen) doesn't re-render this page.
+  const { month, masked } = useUI(useShallow((s) => ({ month: s.month, masked: s.masked })));
   const isDesktop = useMediaQuery("(min-width: 1024px)");
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
-  const maps = buildMaps(data.categories);
-  const statuses = budgetForecasts(data.budgets, data.transactions, maps, month);
+  // The dataset slices are referentially stable across renders (TanStack Query structural sharing),
+  // so memoizing on them skips these full-transaction scans — four per budget on an in-progress
+  // month — when only local state changes, i.e. on every tap of a budget row.
+  const { transactions, categories, budgets } = data;
+  const maps = useMemo(() => buildMaps(categories), [categories]);
+  const statuses = useMemo(
+    () => budgetForecasts(budgets, transactions, maps, month),
+    [budgets, transactions, maps, month],
+  );
   const totalSpent = statuses.reduce((s, b) => s + b.spent, 0);
   const totalLimit = statuses.reduce((s, b) => s + b.limit, 0);
   const overallPct = totalLimit > 0 ? totalSpent / totalLimit : 0;
   const anyProjected = statuses.some((b) => b.isProjected);
   const projectedTotal = statuses.reduce((s, b) => s + b.projected, 0);
 
-  const selectedBudget = selectedId && selectedId !== "new" ? data.budgets.find((b) => b.id === selectedId) ?? null : null;
+  const selectedBudget = selectedId && selectedId !== "new" ? budgets.find((b) => b.id === selectedId) ?? null : null;
 
   const editor = <BudgetEditor key={selectedId} budget={selectedBudget} month={month} onClose={() => setSelectedId(null)} />;
 
