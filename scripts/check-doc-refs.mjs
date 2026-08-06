@@ -7,7 +7,7 @@ import process from "node:process";
 import { fileURLToPath } from "node:url";
 
 /** Directory names never walked into. */
-const IGNORE_DIRS = new Set(["node_modules", ".next", ".git", ".agents", "out", "build", ".husky"]);
+const IGNORE_DIRS = new Set(["node_modules", ".next", ".git", ".agents", "out", "build", ".husky", ".claude"]);
 
 /** Repo-relative path prefixes whose markdown is NOT checked (frozen point-in-time artifacts). */
 const IGNORE_DOC_PREFIXES = ["docs/superpowers/"];

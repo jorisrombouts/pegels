@@ -184,6 +184,39 @@ table grows that far *and* the LLM leg is ever cached or removed, revisit.
 
 ---
 
+### R10 · "Import motion via LazyMotion + `m` across 11 modules"
+**Hypothesis:** every site imports the full `motion` component for simple opacity/`y` animations;
+`LazyMotion` + `domAnimation` would cut the bundle.
+
+**Why it was wrong:** measured, the refactor saves ~12.6 KiB gz on three routes but **adds 26.9 KiB gz
+to the sign-in and not-found routes**, because the feature bundle lands in the root-layout chunk and
+those routes use no motion at all. Isolated properly, the narrower feature set is **6.8 KB net *worse*
+over a full 9-route session** — it reshuffles chunk boundaries and reduces sharing on later routes.
+
+**Lesson:** a bundle "fix" can be net negative. Measure **per route and across a whole session**, not
+just on the one page you were looking at. Chunking is a global optimisation; local improvements can
+regress it. Also: placement matters as much as the change — the same wrapper at the root layout
+regressed sign-in by 42 KiB, while scoping it to the `(app)` subtree was a large win.
+
+---
+
+## The value of "considered and NOT filed"
+
+Round 1's pass 3 noticed **four chunks of exactly 136,638 bytes with differing content**, could not
+establish whether that was real duplication, and explicitly recorded it as *not filed — an unverified
+hunch does not clear the bar*.
+
+It was real, and it turned out to be the **largest bundle finding of the review** (issue #12):
+the four chunks own an identical set of 15 module factories differing only in emission order, so they
+get different hashes and different URLs and defeat HTTP caching. **132.5 KiB gz of redundant copies —
+29.9% of the whole client-JS budget.** The fix touches two files and no call sites.
+
+**Lesson:** record anomalies you cannot prove, with what would settle them. Do not file them — a hunch
+is not a finding — but do not discard them either. The written-down anomaly is what let a later,
+better-equipped pass go straight to the answer.
+
+---
+
 ## Partially-wrong findings (right defect, wrong mechanism)
 
 Worth its own category — these are the most dangerous, because the issue gets filed and the wrong
