@@ -10,7 +10,6 @@ import { BottomNav } from "@/components/nav/bottom-nav";
 import { LazyModals } from "@/components/lazy-modals";
 import { HydrationGate } from "@/components/hydration-gate";
 import { ServiceWorkerRegister } from "@/components/service-worker-register";
-import { PreferencesSync } from "@/components/preferences-sync";
 import { SaveFailedBanner } from "@/components/save-failed-banner";
 import { MonthInitializer } from "@/components/month-initializer";
 import { MotionProvider } from "@/components/motion-provider";
@@ -44,7 +43,6 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         <MotionProvider>
           <HydrationGate>
             <ServiceWorkerRegister />
-            <PreferencesSync />
             <SaveFailedBanner />
             <MonthInitializer />
             <div className={SHELL}>{children}</div>

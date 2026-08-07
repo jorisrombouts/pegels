@@ -1,6 +1,5 @@
 import { pgTable, text, numeric, real, boolean, jsonb, index, timestamp, integer, primaryKey } from "drizzle-orm/pg-core";
 import type { AccountKind, CategorySource, MatchMode, RuleOrigin, Split, TransactionKind } from "../domain/types";
-import type { WidgetLayout, NavConfigItem } from "../../store/ui";
 
 // Every table is scoped by userId (stub today; real auth later). Embedded arrays
 // (tagIds, splits) are JSONB — document-scoped, never queried alone.
@@ -62,7 +61,6 @@ export const transactions = pgTable(
     needsReview: boolean("needs_review").notNull(),
     excluded: boolean("excluded").notNull(),
     kind: text("kind").$type<TransactionKind>().notNull(),
-    goalId: text("goal_id"),
     tagIds: jsonb("tag_ids").$type<string[]>().notNull(),
     splits: jsonb("splits").$type<Split[]>(), // nullable
     notes: text("notes"),
@@ -120,20 +118,6 @@ export const categorizationExamples = pgTable(
   (t) => [index("catex_user_idx").on(t.userId)],
 );
 
-export const goals = pgTable(
-  "goals",
-  {
-    id: text("id").primaryKey(),
-    userId: text("user_id").notNull(),
-    name: text("name").notNull(),
-    icon: text("icon").notNull(),
-    target: numeric("target", { precision: 12, scale: 2 }).notNull(),
-    baseline: numeric("baseline", { precision: 12, scale: 2 }).notNull(),
-    deadline: text("deadline"), // ISO date or null
-    accountId: text("account_id"), // linked savings account or null
-  },
-  (t) => [index("goals_user_idx").on(t.userId)],
-);
 
 // --- Auth.js (next-auth) tables. users.id is the app-wide userId. ---
 
@@ -178,11 +162,3 @@ export const authVerificationTokens = pgTable(
   },
   (t) => [primaryKey({ columns: [t.identifier, t.token] })],
 );
-
-// --- Per-user UI preferences (dashboard layout + bottom-nav config). One row per user. ---
-export const userPreferences = pgTable("user_preferences", {
-  userId: text("user_id").primaryKey(),
-  layout: jsonb("layout").$type<WidgetLayout[]>().notNull(),
-  navConfig: jsonb("nav_config").$type<NavConfigItem[]>().notNull(),
-  updatedAt: text("updated_at").notNull(),
-});

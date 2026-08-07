@@ -3,7 +3,6 @@ import {
   List,
   Layers,
   PiggyBank,
-  Target,
   Landmark,
   Tag,
   Wand2,
@@ -16,19 +15,21 @@ export interface NavItem {
   href: string;
   label: string;
   icon: LucideIcon;
+  /** true = a tab in the bottom bar; false = under "More". */
+  primary: boolean;
 }
 
 /** Master registry of all navigable destinations (Import is a separate action). */
 export const NAV_REGISTRY: NavItem[] = [
-  { key: "home", href: "/", label: "Home", icon: Home },
-  { key: "transactions", href: "/transactions", label: "Activity", icon: List },
-  { key: "budgets", href: "/budgets", label: "Budgets", icon: PiggyBank },
-  { key: "goals", href: "/goals", label: "Goals", icon: Target },
-  { key: "categories", href: "/categories", label: "Categories", icon: Layers },
-  { key: "accounts", href: "/accounts", label: "Accounts", icon: Landmark },
-  { key: "tags", href: "/tags", label: "Tags", icon: Tag },
-  { key: "rules", href: "/rules", label: "Rules", icon: Wand2 },
-  { key: "settings", href: "/settings", label: "Settings", icon: Settings },
+  { key: "home", href: "/", label: "Home", icon: Home, primary: true },
+  { key: "transactions", href: "/transactions", label: "Activity", icon: List, primary: true },
+  { key: "budgets", href: "/budgets", label: "Budgets", icon: PiggyBank, primary: true },
+  { key: "categories", href: "/categories", label: "Categories", icon: Layers, primary: true },
+  { key: "accounts", href: "/accounts", label: "Accounts", icon: Landmark, primary: false },
+  { key: "tags", href: "/tags", label: "Tags", icon: Tag, primary: false },
+  { key: "rules", href: "/rules", label: "Rules", icon: Wand2, primary: false },
+  { key: "settings", href: "/settings", label: "Settings", icon: Settings, primary: false },
 ];
 
-export const navByKey = new Map(NAV_REGISTRY.map((i) => [i.key, i]));
+export const PRIMARY_NAV = NAV_REGISTRY.filter((i) => i.primary);
+export const MORE_NAV = NAV_REGISTRY.filter((i) => !i.primary);

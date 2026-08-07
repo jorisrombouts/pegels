@@ -2,15 +2,14 @@
 
 import { useTheme } from "next-themes";
 import Link from "next/link";
-import { ChevronDown, ChevronUp, Monitor, Moon, RotateCcw, Sun, Trash2, Wand2 } from "lucide-react";
+import { Monitor, Moon, Sun, Trash2, Wand2 } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { Card, SectionLabel } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogClose, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { AccountCard } from "@/components/settings/account-card";
-import { navByKey } from "@/components/nav/nav-items";
-import { MAX_PRIMARY_NAV, useUI } from "@/store/ui";
+import { useUI } from "@/store/ui";
 import { useData } from "@/store/data";
 import { useMounted } from "@/lib/use-mounted";
 import { cn } from "@/lib/utils";
@@ -30,7 +29,6 @@ export default function SettingsPage() {
       <div className="mx-auto max-w-xl space-y-4">
         <AccountCard />
         <AppearanceSection />
-        <NavigationSection />
         <RulesSection />
         <PrivacySection />
         <DataSection />
@@ -84,66 +82,6 @@ function AppearanceSection() {
           </div>
         }
       />
-    </Card>
-  );
-}
-
-function NavigationSection() {
-  const { navConfig, setNavPrimary, moveNavItem, resetNav } = useUI();
-  const primaryCount = navConfig.filter((n) => n.primary).length;
-
-  return (
-    <Card>
-      <div className="mb-1 flex items-center justify-between">
-        <SectionLabel>Navigation bar</SectionLabel>
-        <button type="button" onClick={resetNav} className="pressable flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground">
-          <RotateCcw className="size-3.5" /> Reset
-        </button>
-      </div>
-      <p className="mb-3 text-xs text-muted-foreground">
-        Choose up to {MAX_PRIMARY_NAV} tabs for the bar; the rest live under “More”. Reorder with the arrows.
-      </p>
-      <ul className="space-y-1">
-        {navConfig.map((n, i) => {
-          const item = navByKey.get(n.key);
-          if (!item) return null;
-          const Icon = item.icon;
-          const atCap = !n.primary && primaryCount >= MAX_PRIMARY_NAV;
-          return (
-            <li key={n.key} className="flex items-center gap-3 rounded-xl glass-inset px-3 py-2">
-              <div className="flex flex-col">
-                <button
-                  type="button"
-                  aria-label={`Move ${item.label} up`}
-                  disabled={i === 0}
-                  onClick={() => moveNavItem(n.key, -1)}
-                  className="pressable text-muted-foreground hover:text-foreground disabled:opacity-30"
-                >
-                  <ChevronUp className="size-4" />
-                </button>
-                <button
-                  type="button"
-                  aria-label={`Move ${item.label} down`}
-                  disabled={i === navConfig.length - 1}
-                  onClick={() => moveNavItem(n.key, 1)}
-                  className="pressable text-muted-foreground hover:text-foreground disabled:opacity-30"
-                >
-                  <ChevronDown className="size-4" />
-                </button>
-              </div>
-              <Icon className="size-4 shrink-0 text-muted-foreground" />
-              <span className="flex-1 text-sm font-medium">{item.label}</span>
-              <span className="text-[11px] text-muted-foreground">{n.primary ? "In bar" : "More"}</span>
-              <Switch
-                checked={n.primary}
-                disabled={atCap}
-                onCheckedChange={(v) => setNavPrimary(n.key, v)}
-                aria-label={`Show ${item.label} in bar`}
-              />
-            </li>
-          );
-        })}
-      </ul>
     </Card>
   );
 }

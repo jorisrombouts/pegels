@@ -2,7 +2,7 @@
 
 > **Pegels** is a single-user Swedish personal-finance PWA: import your bank transactions,
 > auto-categorize them with an LLM that learns from your corrections, and see calm spending
-> analysis (budgets, goals, trends). Built with Next.js 16 (App Router) + Neon Postgres + OpenAI,
+> analysis (budgets, trends). Built with Next.js 16 (App Router) + Neon Postgres + OpenAI,
 > deployed on Vercel.
 >
 > **Status — 2026-06-09:** live on Vercel, 269 tests passing, build + lint clean. Every feature
@@ -56,13 +56,13 @@ The app is a **client-side SPA** backed by server actions, not a set of server-r
   queries (`queries.ts`). `src/app/actions/data.ts` exposes one server action per mutation.
 - **`useData()`** (`src/store/data.ts`) is the single read/write facade. It's a TanStack Query
   wrapper over one `['dataset']` entry (the whole user dataset: accounts, categories, tags,
-  transactions, budgets, goals, rules). Reads are **persisted to `localStorage`** (instant + offline
+  transactions, budgets, rules). Reads are **persisted to `localStorage`** (instant + offline
   reads). Each mutation updates the cache **optimistically**, persists via a server action, and
   **rolls back + resyncs on failure**.
 - **`getUserId()`** (`src/lib/auth.ts`) is the auth seam every query is keyed by — the real session
   user, or `DEV_USER_ID` locally.
-- **Local UI state** (privacy mask, selected month, account filter, dashboard layout, nav config)
-  lives in a Zustand store (`src/store/ui.ts`); durable preferences also sync to Neon (below).
+- **Local UI state** (privacy mask, selected month, account filter) lives in a Zustand store
+  (`src/store/ui.ts`), persisted to `localStorage`.
 
 Implication: the whole dataset is loaded and computed client-side. This is deliberate (instant
 navigation, offline reads) and fine at personal scale. Derived figures are memoized; see `Conventions`.
@@ -126,14 +126,6 @@ first sign-in, a one-time idempotent `claimStubData` re-points all `user-stub` r
 Route protection lives in the `(app)` server layout (`auth()` + `redirect("/signin")`). Pure logic
 (`resolveUserId`, allowlist) is unit-tested in `src/lib/auth-helpers.ts`.
 
-### Per-user preferences sync
-
-Dashboard **layout** (widget order + size) and **bottom-nav config** persist in a `user_preferences`
-table, keyed by `getUserId()`, so they follow the user across devices. `<PreferencesSync />` (mounted
-in the `(app)` layout) hydrates the Zustand store on load and debounce-saves edits (server is source
-of truth; `localStorage` is the instant/offline cache; last-write-wins). `masked`/`month`/
-`accountFilter` stay device-local.
-
 ### PWA
 
 Installable + offline app-shell via a **hand-rolled** `public/sw.js` (app-shell cache, network-first
@@ -155,7 +147,6 @@ roadmap.)
 | Motion | `motion` (Framer Motion v12), `<MotionConfig reducedMotion="user">`; springy presets in `src/lib/motion.ts` |
 | Data | TanStack Query v5 over `useData()`; Drizzle ORM + Neon serverless |
 | Local state | Zustand v5 |
-| Drag reorder | `@dnd-kit` (dashboard widgets) |
 | Charts | **CSS-width bars + inline SVG** (Recharts was removed — no chart dep) |
 | Auth | Auth.js v5 (`next-auth@5`) + `@auth/drizzle-adapter`, Google |
 | LLM | OpenAI `gpt-4o-mini` (structured output) |
@@ -169,9 +160,9 @@ roadmap.)
 ```
 src/
   app/
-    (app)/            authed routes: dashboard (page.tsx), transactions, budgets, goals,
+    (app)/            authed routes: dashboard (page.tsx), transactions, budgets,
                       categories, accounts, tags, rules, settings; layout = auth gate
-    actions/          server actions: data (CRUD), ai (categorize + training log), fx, auth, preferences
+    actions/          server actions: data (CRUD), ai (categorize + training log), fx, auth
     layout.tsx        root: fonts, Providers, metadata; manifest.ts; apple-icon.png
   components/
     dashboard/        widgets + registry + compute (pure dashboard aggregation)
@@ -181,6 +172,7 @@ src/
     ui/               Radix + cva primitives (button, select, dialog, …)
   lib/
     domain/           types + effectiveExpense (the spending invariant) + selectors
+    forecast/         recurrence detection + fixed/variable projection (pure, date-injected)
     ai/               categorize-openai, select-examples (few-shot selection)
     db/               schema, queries, map (row<->domain), claim, index
     rules.ts fx.ts parse-csv.ts parse-revolut.ts categorize.ts format.ts auth*.ts
@@ -227,8 +219,6 @@ funnel) — they graduate here once scoped into a design spec.
   with the "Running it" section above.
 
 **P2 — nice-to-haves**
-- **Dashboard forecast widget** — `budgetForecasts()` (history-blended, current-month projection)
-  exists and is surfaced on `/budgets`; a dashboard widget would reuse it.
 - **Light-theme ("Silver Slate") polish** — the light theme exists in `globals.css` but was tuned
   less than dark; a polish pass is deferred.
 - **Offline write queue/replay** — reads work offline (localStorage cache); writes need the network
@@ -245,15 +235,16 @@ funnel) — they graduate here once scoped into a design spec.
 
 A quick map of what's done, for orientation. Details + rationale are in the design specs.
 
-- **Dashboard** — drag-reorderable widgets with per-widget S/M/L sizing: hero "This month",
-  spending breakdown (Categories | Tags | Accounts toggle, ±% vs last month, tap-to-expand
-  subcategories), trend (with subcategory drill-down), budgets, goals, recent activity, calendar
-  heatmap. Layout persists per user.
+- **Dashboard** — a fixed set of widgets (`DASHBOARD_LAYOUT` in the registry): hero "This month",
+  where you'll land (per-category projection + verdict + daily allowance), spending breakdown
+  (Categories | Tags | Accounts toggle, ±% vs last month, tap-to-expand subcategories), budgets,
+  recent activity, trend (with subcategory drill-down), calendar heatmap.
 - **Transactions** — search + filters (category/account/tag/needs-review/has-splits), month nav with
   filtered count + Spent, master-detail (desktop sticky panel + mobile sheet). Detail panel: category
   + **Approve**, tags, split (among N people; only `mine` counts), kind, exclude, notes.
-- **Budgets / Goals / Categories / Tags / Accounts** — full CRUD; budgets have health + forecast;
-  goals are transaction-driven (`baseline + Σ|linked transfers|`); categories nest (parent/sub).
+- **Budgets / Categories / Tags / Accounts** — full CRUD; budgets have health + forecast (the
+  shared engine, not their own maths);
+  categories nest (parent/sub).
 - **Rules** — `/rules` page: description rules set category/kind/tags, run before the LLM at import,
   with per-rule and bulk backfill; per-month suggestions mined from corrected data.
 - **Import** — SEB + Revolut CSV, non-SEK→SEK conversion, dedupe, transfer-pair detection, editable

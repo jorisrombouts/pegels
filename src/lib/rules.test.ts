@@ -67,7 +67,7 @@ describe("isRiskyMatch", () => {
 const tx = (over: Partial<Transaction>): Transaction => ({
   id: `t${Math.random()}`, date: "2026-01-10", description: "x", amount: -100, accountId: "acc-lon",
   categoryId: "cat-groceries", predictedCategoryId: null, categoryConfidence: null, categorySource: "user",
-  needsReview: false, tagIds: [], kind: "expense", goalId: null, ...over,
+  needsReview: false, tagIds: [], kind: "expense", ...over,
 });
 
 describe("suggestRulesFromMonth", () => {

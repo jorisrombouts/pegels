@@ -2,7 +2,7 @@
 // removeCategory/removeTag cascades) so they can drive optimistic cache updates AND be
 // unit-tested without React or a database.
 import type { Dataset } from "@/data/mock";
-import type { Account, Budget, Category, CategorizationRule, Goal, Tag, Transaction } from "@/lib/domain/types";
+import type { Account, Budget, Category, CategorizationRule, Tag, Transaction } from "@/lib/domain/types";
 
 export const emptyDataset: Dataset = {
   accounts: [],
@@ -10,7 +10,6 @@ export const emptyDataset: Dataset = {
   tags: [],
   transactions: [],
   budgets: [],
-  goals: [],
   rules: [],
 };
 
@@ -80,13 +79,7 @@ export function applyRemoveBudget(d: Dataset, id: string): Dataset {
   return { ...d, budgets: d.budgets.filter((b) => b.id !== id) };
 }
 
-export function applyUpsertGoal(d: Dataset, g: Goal): Dataset {
-  return { ...d, goals: upsertById(d.goals, g) };
-}
 
-export function applyRemoveGoal(d: Dataset, id: string): Dataset {
-  return { ...d, goals: d.goals.filter((g) => g.id !== id) };
-}
 
 export function applyUpsertRule(d: Dataset, r: CategorizationRule): Dataset {
   return { ...d, rules: upsertById(d.rules, r) };

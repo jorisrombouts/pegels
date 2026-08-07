@@ -6,8 +6,7 @@ import { Card, CardHeader } from "@/components/ui/card";
 import { ProgressBar } from "@/components/ui/progress";
 import { formatSEKAbs, formatSignedPct } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import type { DashCtx } from "./registry";
-import type { WidgetSize } from "@/store/ui";
+import type { DashCtx, WidgetSize } from "./registry";
 
 type Mode = "categories" | "tags" | "accounts";
 const MODES: { value: Mode; label: string }[] = [

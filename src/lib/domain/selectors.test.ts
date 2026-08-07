@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { budgetForecasts, budgetStatuses, buildMaps, categorySpendInMonth, categoryTrends, detectTransfersOnImport, earliestDataMonth, goalProgress, goalSaved, latestDataMonth, monthNet, monthProgress, orderCategories, spendBySubcategory, spendByTag, withDelta } from "./selectors";
-import type { Budget, Category, Goal, Tag, Transaction } from "./types";
+import { budgetStatuses, buildMaps, categorySpendInMonth, categoryTrends, detectTransfersOnImport, earliestDataMonth, latestDataMonth, monthNet, monthProgress, orderCategories, spendBySubcategory, spendByTag, withDelta } from "./selectors";
+import type { Budget, Category, Tag, Transaction } from "./types";
 
 const food: Category = { id: "food", name: "Food", icon: "🍔", color: "150 60% 45%", parentId: null };
 const maps = buildMaps([food]);
@@ -10,7 +10,7 @@ function tx(amount: number, o: Partial<Transaction> = {}): Transaction {
     id: `t${Math.random()}`, date: "2025-03-10", description: "x", amount, accountId: "a",
     categoryId: "food", predictedCategoryId: "food", categoryConfidence: 0.9, categorySource: "model",
     needsReview: false, tagIds: [],
-    kind: amount < 0 ? "expense" : "income", goalId: null, ...o,
+    kind: amount < 0 ? "expense" : "income", ...o,
   };
 }
 
@@ -42,7 +42,7 @@ describe("categoryTrends subcategories", () => {
   const t2 = (catId: string, amount: number, date: string): Transaction => ({
     id: `t${Math.random()}`, date, description: "x", amount, accountId: "a",
     categoryId: catId, predictedCategoryId: null, categoryConfidence: null, categorySource: "user",
-    needsReview: false, tagIds: [], kind: "expense", goalId: null,
+    needsReview: false, tagIds: [], kind: "expense",
   });
 
   it("emits subcategory series tagged with parentId; total/top-level have none", () => {
@@ -83,44 +83,6 @@ describe("budgetStatuses", () => {
   });
 });
 
-describe("goalProgress", () => {
-  const base: Goal = {
-    id: "g", name: "Trip", icon: "🗾", target: 1000, baseline: 600, accountId: null, deadline: "2025-12-31",
-  };
-
-  it("sums baseline into saved and pct with no linked transfers", () => {
-    const p = goalProgress(base, [], new Date("2025-06-01"));
-    expect(p.saved).toBe(600);
-    expect(p.pct).toBeCloseTo(0.6);
-  });
-
-  it("reports days left and overdue", () => {
-    expect(goalProgress(base, [], new Date("2025-06-01")).daysLeft).toBeGreaterThan(0);
-    expect(goalProgress(base, [], new Date("2026-06-01")).daysLeft).toBeLessThan(0);
-  });
-
-  it("is on track while the deadline is in the future", () => {
-    expect(goalProgress(base, [], new Date("2025-06-01")).onTrack).toBe(true);
-  });
-});
-
-describe("goalSaved / goalProgress (transaction-driven)", () => {
-  const goal = { id: "g", name: "Japan", icon: "🗾", target: 25000, baseline: 6000, deadline: null, accountId: "spar" };
-  const txs = [
-    { ...tx(-3000), id: "t1", goalId: "g", kind: "transfer" as const, date: "2025-03-14" },
-    { ...tx(1000), id: "t2", goalId: "g", kind: "transfer" as const, date: "2025-04-02" },
-    { ...tx(-500), id: "t3", goalId: null, kind: "expense" as const, date: "2025-03-01" },
-  ];
-  it("sums baseline + |amount| of linked transfers", () => {
-    expect(goalSaved(goal as never, txs as never)).toBe(6000 + 3000 + 1000);
-  });
-  it("goalProgress reports saved and pct from transactions", () => {
-    const p = goalProgress(goal as never, txs as never, new Date("2025-05-01"));
-    expect(p.saved).toBe(10000);
-    expect(p.pct).toBeCloseTo(0.4);
-  });
-});
-
 describe("monthNet", () => {
   it("counts only expense rows; income and transfers are excluded", () => {
     const txs = [tx(-487), tx(38500, { categoryId: null }), tx(-5000, { kind: "transfer" })];
@@ -152,9 +114,15 @@ describe("monthProgress", () => {
     });
   });
 
-  it("treats a non-current month as fully elapsed", () => {
+  it("treats a past month as fully elapsed", () => {
     expect(monthProgress("2025-03", new Date(2025, 5, 1))).toMatchObject({
-      daysElapsed: 31, daysLeft: 0, isCurrentMonth: false,
+      daysElapsed: 31, daysLeft: 0, isCurrentMonth: false, isFutureMonth: false,
+    });
+  });
+
+  it("treats a future month as not started, so a forecast can't read it as complete", () => {
+    expect(monthProgress("2025-09", new Date(2025, 5, 1))).toMatchObject({
+      daysInMonth: 30, daysElapsed: 0, daysLeft: 30, isCurrentMonth: false, isFutureMonth: true,
     });
   });
 });
@@ -175,40 +143,31 @@ describe("categorySpendInMonth", () => {
 });
 
 describe("detectTransfersOnImport", () => {
-  const goals = [{ id: "g-japan", accountId: "spar" }];
-  const mk = (id: string, accountId: string, amount: number, date: string) => ({ id, accountId, amount, date, kind: (amount < 0 ? "expense" : "income") as const, goalId: null });
+  const mk = (id: string, accountId: string, amount: number, date: string) => ({ id, accountId, amount, date, kind: (amount < 0 ? "expense" : "income") as const });
 
   it("marks a new inflow as transfer and updates the existing outflow leg", () => {
     const existing = [mk("seb-out", "seb", -5000, "2025-03-10")];
-    const { rows, existingUpdates } = detectTransfersOnImport([mk("rev-in", "rev", 5000, "2025-03-11")] as never, existing as never, goals as never);
+    const { rows, existingUpdates } = detectTransfersOnImport([mk("rev-in", "rev", 5000, "2025-03-11")] as never, existing as never);
     expect(rows[0].kind).toBe("transfer");
-    expect(existingUpdates).toEqual([{ id: "seb-out", goalId: null }]);
+    expect(existingUpdates).toEqual([{ id: "seb-out" }]);
   });
 
-  it("links the outflow to a goal when the inflow account backs one", () => {
-    const existing = [mk("seb-out", "seb", -3000, "2025-03-10")];
-    const { rows, existingUpdates } = detectTransfersOnImport([mk("spar-in", "spar", 3000, "2025-03-10")] as never, existing as never, goals as never);
-    expect(rows[0].kind).toBe("transfer");
-    expect(existingUpdates).toEqual([{ id: "seb-out", goalId: "g-japan" }]);
-  });
-
-  it("when the NEW row is the outflow, it gets the goal and existing inflow has none", () => {
+  it("marks a new outflow as transfer and updates the existing inflow leg", () => {
     const existing = [mk("spar-in", "spar", 3000, "2025-03-10")];
-    const { rows, existingUpdates } = detectTransfersOnImport([mk("seb-out", "seb", -3000, "2025-03-11")] as never, existing as never, goals as never);
+    const { rows, existingUpdates } = detectTransfersOnImport([mk("seb-out", "seb", -3000, "2025-03-11")] as never, existing as never);
     expect(rows[0].kind).toBe("transfer");
-    expect(rows[0].goalId).toBe("g-japan");
-    expect(existingUpdates).toEqual([{ id: "spar-in", goalId: null }]);
+    expect(existingUpdates).toEqual([{ id: "spar-in" }]);
   });
 
   it("leaves an unmatched inflow as income with no updates", () => {
-    const { rows, existingUpdates } = detectTransfersOnImport([mk("x", "rev", 5000, "2025-03-11")] as never, [] as never, goals as never);
+    const { rows, existingUpdates } = detectTransfersOnImport([mk("x", "rev", 5000, "2025-03-11")] as never, [] as never);
     expect(rows[0].kind).toBe("income");
     expect(existingUpdates).toEqual([]);
   });
 
   it("does not pair same-account rows", () => {
     const existing = [mk("a", "seb", -5000, "2025-03-10")];
-    const { rows, existingUpdates } = detectTransfersOnImport([mk("b", "seb", 5000, "2025-03-10")] as never, existing as never, goals as never);
+    const { rows, existingUpdates } = detectTransfersOnImport([mk("b", "seb", 5000, "2025-03-10")] as never, existing as never);
     expect(rows[0].kind).toBe("income");
     expect(existingUpdates).toEqual([]);
   });
@@ -229,53 +188,6 @@ describe("withDelta", () => {
   });
 });
 
-describe("budgetForecasts", () => {
-  const budget: Budget = { id: "b", categoryId: "food", limit: 5000, month: null };
-  const marchMid = new Date(2025, 2, 15); // day 15 of 31
-
-  it("projects an in-progress month over the limit when the pace is high", () => {
-    const f = budgetForecasts([budget], [tx(-4000)], maps, "2025-03", marchMid)[0];
-    expect(f.isProjected).toBe(true);
-    expect(f.projected).toBeGreaterThan(f.spent);
-    expect(f.forecastHealth).toBe("over");
-    expect(f.overBy).toBeGreaterThan(0);
-  });
-
-  it("blends in category history so a low-pace month stays under", () => {
-    const txs = [
-      tx(-1000, { date: "2025-03-10" }),
-      tx(-1500, { date: "2025-02-10" }),
-      tx(-1500, { date: "2025-01-10" }),
-    ];
-    const f = budgetForecasts([budget], txs, maps, "2025-03", marchMid)[0];
-    expect(f.isProjected).toBe(true);
-    expect(f.forecastHealth).toBe("under");
-    expect(f.projected).toBeLessThan(budget.limit);
-  });
-
-  it("leans on history early in the month rather than the noisy daily pace", () => {
-    const txs = [
-      tx(-200, { date: "2025-03-01" }),
-      tx(-3000, { date: "2025-02-10" }),
-      tx(-3000, { date: "2025-01-10" }),
-    ];
-    const f = budgetForecasts([budget], txs, maps, "2025-03", new Date(2025, 2, 1))[0];
-    const linearPace = 200 * 31;
-    expect(Math.abs(f.projected - 3000)).toBeLessThan(Math.abs(f.projected - linearPace));
-  });
-
-  it("falls back to linear pace with no category history", () => {
-    const f = budgetForecasts([budget], [tx(-3000)], maps, "2025-03", marchMid)[0];
-    expect(f.projected).toBeCloseTo((3000 / 15) * 31, 5);
-  });
-
-  it("does not project a completed (non-current) month", () => {
-    const f = budgetForecasts([budget], [tx(-4000)], maps, "2025-03", new Date(2025, 5, 1))[0];
-    expect(f.isProjected).toBe(false);
-    expect(f.projected).toBe(f.spent);
-  });
-});
-
 describe("spendBySubcategory", () => {
   const cats: Category[] = [
     { id: "food", name: "Food", icon: "🍔", color: "0 0% 0%", parentId: null },
@@ -286,7 +198,7 @@ describe("spendBySubcategory", () => {
   const t = (id: string | null, amount: number): Transaction => ({
     id: `t${Math.random()}`, date: "2025-03-10", description: "x", amount, accountId: "a",
     categoryId: id, predictedCategoryId: null, categoryConfidence: null, categorySource: "user",
-    needsReview: false, tagIds: [], kind: "expense", goalId: null,
+    needsReview: false, tagIds: [], kind: "expense",
   });
   it("groups a parent's spend by immediate subcategory, sorted desc", () => {
     const txs = [t("grocery", -100), t("grocery", -50), t("resto", -200), t("food", -10)];
@@ -308,7 +220,7 @@ describe("spendByTag", () => {
   const t = (amount: number, tagIds: string[]): Transaction => ({
     id: `t${Math.random()}`, date: "2025-03-10", description: "x", amount, accountId: "a",
     categoryId: "c", predictedCategoryId: null, categoryConfidence: null, categorySource: "user",
-    needsReview: false, tagIds, kind: "expense", goalId: null,
+    needsReview: false, tagIds, kind: "expense",
   });
   it("adds a transaction's spend to every tag it carries (overlap)", () => {
     const txs = [t(-100, ["fix", "fun"]), t(-40, ["fun"]), t(-10, [])];

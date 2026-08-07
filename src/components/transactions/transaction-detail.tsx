@@ -32,7 +32,7 @@ export function DetailEmpty() {
 }
 
 export function TransactionDetail({ txId, onDeleted }: { txId: string; onDeleted?: () => void }) {
-  const { transactions, categories, accounts, goals, updateTransaction, removeTransaction } = useData();
+  const { transactions, categories, accounts, updateTransaction, removeTransaction } = useData();
   const masked = useUI((s) => s.masked);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const tx = transactions.find((t) => t.id === txId);
@@ -179,7 +179,7 @@ export function TransactionDetail({ txId, onDeleted }: { txId: string; onDeleted
                   finalKind: k,
                   finalCategoryId: tx.categoryId,
                 }).catch((e) => console.error("Failed to log type correction", e));
-                updateTransaction(tx.id, { kind: k, goalId: k === "transfer" ? tx.goalId : null });
+                updateTransaction(tx.id, { kind: k });
               }}
               className={cn(
                 "pressable flex-1 rounded-lg px-3 py-1.5 text-sm font-medium capitalize",
@@ -194,28 +194,6 @@ export function TransactionDetail({ txId, onDeleted }: { txId: string; onDeleted
           Transfers move money between your own accounts — they don&apos;t count as spending or income.
         </p>
       </div>
-
-      {tx.kind === "transfer" && (
-        <div className="space-y-1.5">
-          <Label>Counts toward goal (optional)</Label>
-          <Select
-            value={tx.goalId ?? "__none__"}
-            onValueChange={(v) => updateTransaction(tx.id, { goalId: v === "__none__" ? null : v })}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="No goal" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="__none__">No goal</SelectItem>
-              {goals.map((g) => (
-                <SelectItem key={g.id} value={g.id}>
-                  {g.icon} {g.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      )}
 
       {/* Ignore */}
       <div className="flex items-center justify-between gap-4">
