@@ -130,11 +130,22 @@ async function backfillConfidenceLevels(): Promise<void> {
       CASE
         WHEN category_source = 'user' THEN NULL
         WHEN category_confidence IS NULL THEN NULL
-        WHEN category_confidence >= 0.85 THEN 'confirmed'
-        WHEN category_confidence >= 0.6  THEN 'likely'
-        ELSE 'unsure'
+        WHEN category_confidence >= 0.85 THEN 'high'
+        WHEN category_confidence >= 0.6  THEN 'medium'
+        ELSE 'low'
       END
     WHERE category_level IS NULL AND category_source <> 'user'
+  `);
+  // The levels were first named confirmed/likely/unsure. Rows written under those names carry the
+  // same meaning, so rename in place rather than re-deriving them from the score.
+  await db.execute(sql`
+    UPDATE transactions SET category_level =
+      CASE category_level
+        WHEN 'confirmed' THEN 'high'
+        WHEN 'likely'    THEN 'medium'
+        WHEN 'unsure'    THEN 'low'
+      END
+    WHERE category_level IN ('confirmed', 'likely', 'unsure')
   `);
 }
 

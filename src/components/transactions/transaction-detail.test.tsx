@@ -26,11 +26,11 @@ describe("TransactionDetail", () => {
     const dataset = {
       ...seedDataset,
       transactions: seedDataset.transactions.map((t) =>
-        t.id === "tx-001" ? { ...t, categorySource: "model" as const, categoryLevel: "unsure" as const } : t,
+        t.id === "tx-001" ? { ...t, categorySource: "model" as const, categoryLevel: "low" as const } : t,
       ),
     };
     renderWithData(<TransactionDetail txId="tx-001" />, { dataset });
-    expect(screen.getByText("New merchant")).toBeInTheDocument();
+    expect(screen.getByText("Low")).toBeInTheDocument();
     expect(screen.queryByText(/%/)).not.toBeInTheDocument();
   });
 
@@ -38,13 +38,13 @@ describe("TransactionDetail", () => {
     const dataset = {
       ...seedDataset,
       transactions: seedDataset.transactions.map((t) =>
-        t.id === "tx-001" ? { ...t, categorySource: "user" as const, categoryLevel: "unsure" as const } : t,
+        t.id === "tx-001" ? { ...t, categorySource: "user" as const, categoryLevel: "low" as const } : t,
       ),
     };
     renderWithData(<TransactionDetail txId="tx-001" />, { dataset });
     expect(screen.getByText("Your choice")).toBeInTheDocument();
     // The model's stale opinion must not leak through once the user has overridden it.
-    expect(screen.queryByText("New merchant")).not.toBeInTheDocument();
+    expect(screen.queryByText("Low")).not.toBeInTheDocument();
   });
 
   it("can flag a transaction to not count toward spending", async () => {

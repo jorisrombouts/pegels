@@ -66,7 +66,7 @@ describe("selectForRecategorize", () => {
 
 describe("diffRecategorization", () => {
   const result = (o: Partial<AiResult> = {}): AiResult => ({
-    index: 0, kind: "expense", categoryId: "cat-groceries", tagIds: [], confidence: 0.9, level: "likely", ...o,
+    index: 0, kind: "expense", categoryId: "cat-groceries", tagIds: [], confidence: 0.9, level: "medium", ...o,
   });
 
   it("reports a genuine category change", () => {

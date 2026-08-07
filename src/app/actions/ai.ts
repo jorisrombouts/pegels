@@ -52,7 +52,7 @@ export async function categorizeTransactions(rows: AiRow[]): Promise<AiResult[]>
   const remaining: AiRow[] = [];
   for (const r of rows) {
     if (matchesOwnAccount(r.description, ownNumbers)) {
-      ruled.set(r.index, { index: r.index, kind: "transfer", categoryId: null, confidence: 1, tagIds: [], level: "confirmed" });
+      ruled.set(r.index, { index: r.index, kind: "transfer", categoryId: null, confidence: 1, tagIds: [], level: "high" });
       continue;
     }
     remaining.push(r);
@@ -97,7 +97,7 @@ export async function categorizeTransactions(rows: AiRow[]): Promise<AiResult[]>
     const res =
       ruled.get(r.index) ??
       aiResults.find((a) => a.index === r.index) ??
-      ({ index: r.index, kind: r.amount < 0 ? "expense" : "income", categoryId: null, tagIds: [], confidence: 0.4, level: "unsure" } as AiResult);
+      ({ index: r.index, kind: r.amount < 0 ? "expense" : "income", categoryId: null, tagIds: [], confidence: 0.4, level: "low" } as AiResult);
     reconcileKindWithSign(res, r.amount); // the data model forbids income<0 / expense>0; the sign wins
     if (res.categoryId && !validIds.has(res.categoryId)) res.categoryId = null;
 

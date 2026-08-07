@@ -200,8 +200,8 @@ describe("categorizeWithOpenAI", () => {
     );
     // `level` is provisional here — the action grades it against retrieval evidence.
     expect(results).toEqual([
-      { index: 0, kind: "expense", categoryId: "cat-groceries", tagIds: ["tag-fixed"], confidence: 0.9, level: "likely" },
-      { index: 1, kind: "income", categoryId: null, tagIds: [], confidence: 1, level: "likely" },
+      { index: 0, kind: "expense", categoryId: "cat-groceries", tagIds: ["tag-fixed"], confidence: 0.9, level: "medium" },
+      { index: 1, kind: "income", categoryId: null, tagIds: [], confidence: 1, level: "medium" },
     ]);
   });
 

@@ -4,9 +4,10 @@ import { cn } from "@/lib/utils";
 /**
  * How much a categorization is worth trusting, in words.
  *
- * Deliberately not a percentage. The model's number is uncalibrated — on the hold-out its mean on
- * correct answers and on wrong ones are indistinguishable — so "58%" would claim a precision that
- * does not exist. These three say what is actually known.
+ * The label is the familiar high/medium/low; the `title` carries *why*, because the reason is the
+ * actionable part — "nothing like this in your approved examples" tells you to go approve one,
+ * where a bare "Low" does not. Deliberately not a percentage: the model's number is uncalibrated,
+ * and showing it would claim a precision that does not exist.
  */
 const COPY: Record<ConfidenceLevel | "user", { label: string; title: string; color: string }> = {
   user: {
@@ -14,18 +15,18 @@ const COPY: Record<ConfidenceLevel | "user", { label: string; title: string; col
     title: "You set this category yourself.",
     color: "hsl(var(--positive))",
   },
-  confirmed: {
-    label: "Confirmed",
+  high: {
+    label: "High",
     title: "Matches a merchant you've already approved.",
     color: "hsl(var(--positive))",
   },
-  likely: {
-    label: "Likely",
+  medium: {
+    label: "Medium",
     title: "Based on similar merchants you've approved, but nothing identical.",
     color: "hsl(var(--warning))",
   },
-  unsure: {
-    label: "New merchant",
+  low: {
+    label: "Low",
     title: "Nothing like this in your approved examples yet — worth a look.",
     color: "hsl(var(--negative))",
   },
@@ -51,15 +52,15 @@ export function ConfidenceBadge({
   );
 }
 
-/** Just the dot, for dense rows where a word doesn't fit. */
+/** Just the dot, for dense rows where a word doesn't fit. The reason stays on hover. */
 export function ConfidenceDot({ level, isUserChoice }: { level: ConfidenceLevel | null; isUserChoice?: boolean }) {
   const key = isUserChoice ? "user" : level;
   if (!key) return null;
-  const { title, color } = COPY[key];
+  const { label, title, color } = COPY[key];
   return (
     <span
       title={title}
-      aria-label={COPY[key].label}
+      aria-label={`${label} confidence`}
       className="size-1.5 shrink-0 rounded-full"
       style={{ backgroundColor: color }}
     />

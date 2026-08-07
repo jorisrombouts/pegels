@@ -92,9 +92,11 @@ categories on every failure, which is precisely how an expired API key went unno
 resolved by steps 1–2 are unaffected by an outage.
 
 **Confidence is categorical, not a percentage.** `gradeConfidence()` labels each row from what
-retrieval actually found — `confirmed` (a near-identical approved merchant agreed), `likely` (there
-was evidence, nothing decisive), `unsure` (nothing retrieved). `needsReview` is simply
-`level === "unsure"`. The model's own number is retained but never shown: measured against the
+retrieval actually found — `high` (a near-identical approved merchant agreed), `medium` (there
+was evidence, nothing decisive), `low` (nothing retrieved). `needsReview` is simply
+`level === "low"`. The words are the familiar magnitude scale, but they are not the model's opinion
+of itself; the UI carries the reason on hover so the label is never the whole story. The model's own
+number is retained but never shown: measured against the
 hold-out its mean on correct answers (0.58) and wrong ones (0.53) are indistinguishable, so a
 percentage would claim a precision that does not exist. The number stays only so the eval can keep
 watching for calibration.

@@ -97,7 +97,7 @@ Dates are **ISO `yyyy-mm-dd` strings**.
 | **Account** | `id, name, type, kind('spending'\|'savings'), icon(emoji), color(hsl), balance, accountNumber?, archived` | `savings` never counts toward expenses. A transaction whose description references an `accountNumber` is auto-classified `transfer`. |
 | **Category** | `id, name, icon(emoji), color(hsl), parentId(null=top-level)` | One level of nesting (parent → sub). |
 | **Tag** | `id, name, color(hsl)` | Free-form labels, many-per-transaction. |
-| **Transaction** | `id, date, description, amount(signed SEK), accountId, categoryId?, predictedCategoryId?, categoryConfidence?(0..1, internal), categoryLevel?('confirmed'\|'likely'\|'unsure'), categorySource('model'\|'user'), needsReview, excluded?, tagIds[], splits?[], notes?, kind('expense'\|'income'\|'transfer')` | The central entity. |
+| **Transaction** | `id, date, description, amount(signed SEK), accountId, categoryId?, predictedCategoryId?, categoryConfidence?(0..1, internal), categoryLevel?('high'\|'medium'\|'low'), categorySource('model'\|'user'), needsReview, excluded?, tagIds[], splits?[], notes?, kind('expense'\|'income'\|'transfer')` | The central entity. |
 | **Split** | `id, label?, amount(absolute SEK), mine(bool)` | A portion of a transaction; **only `mine` portions count** toward expenses. |
 | **Budget** | `id, categoryId, limit(positive SEK), month('yyyy-mm'\|null)` | `null` month = repeats every month. Targets a top-level or sub category. |
 | **CategorizationExample** | `id, rawDescription, cleanedDescription, amount, predictedKind?, predictedCategoryId?, predictedConfidence?, finalKind, finalCategoryId?, corrected(bool), source('import'\|'detail'), createdAt` | The training set (BR-4). |
@@ -235,8 +235,10 @@ correct or approve one.*
   There is deliberately **no fallback**: if OpenAI errors the import surfaces it. Rows resolved by
   steps 1–2 are unaffected by an outage.
 - FR-4.2 — **Confidence is categorical.** `gradeConfidence` labels each row from the retrieval
-  evidence: `confirmed` (a near-identical approved merchant agreed), `likely` (evidence existed but
-  nothing decisive), `unsure` (nothing retrieved). `needsReview` is `level === 'unsure'`. The raw
+  evidence: `high` (a near-identical approved merchant agreed), `medium` (evidence existed but
+  nothing decisive), `low` (nothing retrieved). `needsReview` is `level === 'low'`. Each label is
+  shown with its reason on hover, so "low" reads as "nothing like this in your approved examples
+  yet" rather than as the model hedging. The raw
   score is retained for the eval's calibration metric and is **never shown** — on the hold-out its
   mean on right and wrong answers are indistinguishable, so a percentage would overstate what is
   known.

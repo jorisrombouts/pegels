@@ -3,13 +3,13 @@ import { needsReview } from "./review";
 
 describe("needsReview", () => {
   it("flags a merchant the system has never seen", () => {
-    expect(needsReview("unsure")).toBe(true);
+    expect(needsReview("low")).toBe(true);
   });
 
   it("does not flag a prediction backed by evidence", () => {
-    // "likely" means retrieval found something. That is not certainty, but it is not a blank
+    // "medium" means retrieval found something. That is not certainty, but it is not a blank
     // either, and flagging it would bury the rows that genuinely need a human.
-    expect(needsReview("likely")).toBe(false);
-    expect(needsReview("confirmed")).toBe(false);
+    expect(needsReview("medium")).toBe(false);
+    expect(needsReview("high")).toBe(false);
   });
 });

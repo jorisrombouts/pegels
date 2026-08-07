@@ -172,7 +172,7 @@ export function ImportModal() {
         accountId,
         categoryId: isTransfer ? null : res?.categoryId ?? null,
         confidence: isTransfer ? 1 : res?.confidence ?? 0.4,
-        level: (isTransfer ? "confirmed" : res?.level ?? "unsure") as ConfidenceLevel,
+        level: (isTransfer ? "high" : res?.level ?? "low") as ConfidenceLevel,
         tagIds: isTransfer ? [] : res?.tagIds ?? [],
         include: !isDup && !b.unconverted, // a row with no exchange rate yet can't be imported
         kind: (b.forcedKind ?? res?.kind ?? (b.amount < 0 ? "expense" : "income")) as TransactionKind,

@@ -14,5 +14,5 @@ export const REVIEW_THRESHOLD = 0.6;
  * and it is the thing actually worth a minute of attention.
  */
 export function needsReview(level: ConfidenceLevel): boolean {
-  return level === "unsure";
+  return level === "low";
 }

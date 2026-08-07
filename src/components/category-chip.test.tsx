@@ -19,8 +19,8 @@ describe("CategoryChip", () => {
 
   it("marks an unseen merchant with a dot the user can hover for the reason", () => {
     // Named rather than scored: a percentage would imply a calibration the model doesn't have.
-    render(<CategoryChip category={groceries} level="unsure" />);
-    expect(screen.getByLabelText("New merchant")).toBeInTheDocument();
+    render(<CategoryChip category={groceries} level="low" />);
+    expect(screen.getByLabelText("Low confidence")).toBeInTheDocument();
   });
 
   it("shows no dot when there is no level to report", () => {

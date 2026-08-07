@@ -3,7 +3,7 @@ import { reconcileKindWithSign } from "./reconcile";
 import type { AiResult } from "./categorize-openai";
 
 const res = (o: Partial<AiResult> = {}): AiResult => ({
-  index: 0, kind: "expense", categoryId: "cat-food", tagIds: [], confidence: 0.9, level: "likely", ...o,
+  index: 0, kind: "expense", categoryId: "cat-food", tagIds: [], confidence: 0.9, level: "medium", ...o,
 });
 
 describe("reconcileKindWithSign", () => {

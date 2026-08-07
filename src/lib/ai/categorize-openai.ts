@@ -297,6 +297,6 @@ export async function categorizeWithOpenAI(
     tagIds: (r.tagIds ?? []).filter((id) => validTags.has(id)),
     confidence: Math.min(1, Math.max(0, r.confidence)),
     // Provisional: the action grades this against retrieval evidence before anyone sees it.
-    level: "likely" as const,
+    level: "medium" as const,
   }));
 }
