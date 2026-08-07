@@ -7,6 +7,7 @@ import { Card, SectionLabel } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { CandidateQueue } from "@/components/training/candidate-queue";
 import { CorpusTable } from "@/components/training/corpus-table";
+import { RecategorizePanel } from "@/components/training/recategorize-panel";
 import { useCorpus } from "@/store/corpus";
 import { useData } from "@/store/data";
 
@@ -84,6 +85,7 @@ export default function TrainingPage() {
               onApprove={approve}
               onReject={reject}
             />
+            <RecategorizePanel categories={categories} />
             <CorpusTable
               rows={approved}
               categories={categories}

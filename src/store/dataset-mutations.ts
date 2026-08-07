@@ -24,6 +24,16 @@ export function applyUpdateTransaction(d: Dataset, id: string, patch: Partial<Tr
   return { ...d, transactions: d.transactions.map((t) => (t.id === id ? { ...t, ...patch } : t)) };
 }
 
+/** Apply many transaction patches at once — one cache write, not one per row. */
+export function applyBulkTransactionPatch(
+  d: Dataset,
+  patches: { id: string; patch: Partial<Transaction> }[],
+): Dataset {
+  const byId = new Map(patches.map((p) => [p.id, p.patch]));
+  if (byId.size === 0) return d;
+  return { ...d, transactions: d.transactions.map((t) => (byId.has(t.id) ? { ...t, ...byId.get(t.id)! } : t)) };
+}
+
 export function applyAddTransaction(d: Dataset, tx: Transaction): Dataset {
   return { ...d, transactions: [tx, ...d.transactions] };
 }

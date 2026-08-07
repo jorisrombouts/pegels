@@ -42,8 +42,22 @@ export async function embedMany(texts: string[]): Promise<(number[] | null)[]> {
       continue; // this chunk's slots stay null
     }
     const { chunk, res } = s.value;
+    // Never trust the shape. A filtering proxy or captive portal answers 200 with an HTML block
+    // page, so the SDK resolves instead of throwing and hands back a string — and assuming
+    // `res.data` is iterable turns that into a TypeError that escapes this function, breaking the
+    // never-throws contract everything downstream depends on.
+    const data = (res as { data?: unknown })?.data;
+    if (!Array.isArray(data)) {
+      failedChunks += 1;
+      firstError ??= new Error("embeddings response had no data array (blocked or proxied?)");
+      continue;
+    }
     // `data` is not guaranteed to be ordered — each item carries its position in the request.
-    for (const item of res.data) out[chunk[item.index].index] = item.embedding as number[];
+    for (const item of data as { index: number; embedding: unknown }[]) {
+      const slot = chunk[item.index];
+      if (!slot || !Array.isArray(item.embedding)) continue;
+      out[slot.index] = item.embedding as number[];
+    }
   }
   if (failedChunks > 0) {
     console.error(

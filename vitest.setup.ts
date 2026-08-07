@@ -17,7 +17,7 @@ vi.mock("@/app/actions/data", async () => {
   const noop = async () => {};
   return {
     loadDataset: async () => seedDataset,
-    upsertTransaction: noop, addTransactions: noop,
+    upsertTransaction: noop, addTransactions: noop, bulkUpdateTransactions: noop,
     upsertCategory: noop, removeCategory: noop,
     upsertTag: noop, removeTag: noop,
     upsertAccount: noop, removeAccount: noop,
@@ -38,6 +38,19 @@ vi.mock("@/app/actions/ai", () => ({
 
 vi.mock("@/app/actions/corpus", () => ({
   recordExamples: async () => {},
+  loadCorpusRows: async () => [],
+  approveExample: async () => {},
+  rejectExample: async () => {},
+  setExampleStatus: async () => {},
+  setExampleGold: async () => {},
+  editExample: async () => {},
+  removeExample: async () => {},
+  backfillCorpus: async () => ({ considered: 0, merchants: 0, embedded: 0, stillUnembedded: 0 }),
+}));
+
+vi.mock("@/app/actions/recategorize", () => ({
+  previewRecategorize: async () => ({ changes: [], unchanged: 0, truncated: false }),
+  applyRecategorize: async () => 0,
 }));
 
 // jsdom has no matchMedia; next-themes (system mode) and useMediaQuery need it.

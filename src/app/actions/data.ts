@@ -69,3 +69,8 @@ export async function clearData(): Promise<void> {
 export async function resetData(): Promise<void> {
   return q.replaceAll(await getUserId(), seedDataset);
 }
+
+/** Persist many transaction updates in one round-trip. */
+export async function bulkUpdateTransactions(txs: Transaction[]): Promise<void> {
+  return q.bulkUpsertTransactions(await getUserId(), txs);
+}

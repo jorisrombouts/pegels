@@ -5,7 +5,7 @@
 > analysis (budgets, trends). Built with Next.js 16 (App Router) + Neon Postgres + OpenAI,
 > deployed on Vercel.
 >
-> **Status — 2026-08-06:** live on Vercel, 440 tests passing, build + lint clean. Every feature
+> **Status — 2026-08-06:** live on Vercel, 459 tests passing, build + lint clean. Every feature
 > screen, the import + categorization pipeline, auth, and per-user sync are shipped. What remains
 > is a short, optional roadmap (see the end of this file).
 >
@@ -23,7 +23,7 @@ npm run db:seed          # load the Swedish sample dataset
 npm run corpus:backfill  # seed the categorization corpus from your own corrections
 npm run eval             # score categorization against the hold-out
 npm run dev              # http://localhost:3000
-npm test                 # vitest (440 tests)
+npm test                 # vitest (459 tests)
 npm run build            # production build (Turbopack)
 ```
 
@@ -113,6 +113,13 @@ queue means *"the system has never seen this merchant"*.
 ordered most-seen-first, because approving a merchant seen 47 times buys far more future accuracy
 than one seen once. The corpus lives in its own `['corpus']` query rather than `['dataset']`, which
 is on every page's critical path.
+
+**Re-running it** — the same page can re-categorize transactions an older pipeline classified
+(`src/lib/corpus/recategorize.ts`, pure). Preview then apply, where apply sends back exactly the
+changes shown, so there is no drift between the two and no second call to the model.
+`categorySource === "user"` rows are excluded at both ends. It deliberately writes **no** corpus
+examples: the model's own output is not evidence, and recording it would train the system on its
+own predictions.
 
 **Measuring it** — `npm run eval` (`src/lib/eval/`) scores the live pipeline against a
 deterministic hold-out (`gold`, excluded from retrieval). Reports kind, exact and root category,

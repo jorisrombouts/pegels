@@ -69,4 +69,22 @@ describe("embedMany", () => {
     createMock.mockImplementation(() => Promise.reject(new Error("down")));
     await expect(embedMany(["a", "b"])).resolves.toEqual([null, null]);
   });
+
+  it("survives a proxy answering 200 with something that isn't an embedding response", async () => {
+    // A captive portal or filtering gateway returns an HTML block page with a 200, so the SDK
+    // resolves rather than throwing and hands back a string. Assuming res.data is iterable turns
+    // that into a TypeError that escapes — breaking the never-throws contract this relies on.
+    createMock.mockImplementation(() => Promise.resolve("<!DOCTYPE html><html>Blocked</html>"));
+    await expect(embedMany(["a", "b"])).resolves.toEqual([null, null]);
+  });
+
+  it("survives a response whose data array is missing", async () => {
+    createMock.mockImplementation(() => Promise.resolve({ object: "list" }));
+    await expect(embedMany(["a"])).resolves.toEqual([null]);
+  });
+
+  it("ignores an item whose embedding isn't a vector", async () => {
+    createMock.mockImplementation(() => Promise.resolve({ data: [{ index: 0, embedding: "not-a-vector" }] }));
+    await expect(embedMany(["a"])).resolves.toEqual([null]);
+  });
 });

@@ -43,6 +43,16 @@ export async function insertTransactions(userId: string, txs: Transaction[]): Pr
   await db.insert(transactions).values(txs.map((t) => transactionToRow(t, userId)));
 }
 
+/** Update many transactions in one round-trip. Looping upsertTransaction would be N of them. */
+export async function bulkUpsertTransactions(userId: string, txs: Transaction[]): Promise<void> {
+  if (txs.length === 0) return;
+  const ops = txs.map((t) => {
+    const row = transactionToRow(t, userId);
+    return db.insert(transactions).values(row).onConflictDoUpdate({ target: transactions.id, set: row });
+  });
+  await batch(ops);
+}
+
 export async function removeTransaction(userId: string, id: string): Promise<void> {
   await db.delete(transactions).where(and(eq(transactions.userId, userId), eq(transactions.id, id)));
 }
