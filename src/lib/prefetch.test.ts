@@ -20,10 +20,13 @@ describe("dehydrateDataset", () => {
     expect(state.queries[0].state.data).toEqual(sample);
   });
 
-  it("omits the query when the load fails, so a DB hiccup never blocks the render", async () => {
-    const state = await dehydrateDataset(async () => {
-      throw new Error("db down");
-    });
-    expect(state.queries).toHaveLength(0);
+  // Was: "omits the query when the load fails, so a DB hiccup never blocks the render". That
+  // behaviour hid a getDataset broken against the live schema behind an empty-looking app.
+  it("rejects when the load fails instead of dehydrating an empty cache", async () => {
+    await expect(
+      dehydrateDataset(async () => {
+        throw new Error('relation "categorization_rules" does not exist');
+      }),
+    ).rejects.toThrow('relation "categorization_rules" does not exist');
   });
 });
