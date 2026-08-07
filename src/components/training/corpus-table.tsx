@@ -8,6 +8,8 @@ import { Switch } from "@/components/ui/switch";
 import { merchantTokens } from "@/lib/text/merchant-tokens";
 import type { CurationRow } from "@/lib/corpus/types";
 import type { Category, Tag } from "@/lib/domain/types";
+import { paginate } from "@/lib/paginate";
+import { Pager } from "@/components/ui/pager";
 
 /**
  * The approved corpus — what the model actually retrieves from.
@@ -15,6 +17,8 @@ import type { Category, Tag } from "@/lib/domain/types";
  * Search matches on `merchantTokens`, the same tokeniser the lexical arm uses, so finding a row
  * here behaves like retrieval finding it rather than like a substring match.
  */
+const PAGE_SIZE = 25;
+
 export function CorpusTable({
   rows,
   categories,
@@ -29,10 +33,11 @@ export function CorpusTable({
   onRemove: (id: string) => void;
 }) {
   const [query, setQuery] = useState("");
+  const [page, setPage] = useState(0);
   const categoryById = useMemo(() => new Map(categories.map((c) => [c.id, c])), [categories]);
   const tagById = useMemo(() => new Map(tags.map((t) => [t.id, t])), [tags]);
 
-  const shown = useMemo(() => {
+  const matches = useMemo(() => {
     const q = merchantTokens(query);
     if (!q.length) return rows;
     return rows.filter((r) => {
@@ -42,6 +47,7 @@ export function CorpusTable({
   }, [rows, query]);
 
   const goldCount = rows.filter((r) => r.gold).length;
+  const shown = paginate(matches, page, PAGE_SIZE);
 
   return (
     <Card>
@@ -55,17 +61,20 @@ export function CorpusTable({
       />
       <Input
         value={query}
-        onChange={(e) => setQuery(e.target.value)}
+        onChange={(e) => {
+          setQuery(e.target.value);
+          setPage(0); // a new search should land on its first page, not page 3 of it
+        }}
         placeholder="Search merchants…"
         className="mb-3"
       />
-      {shown.length === 0 ? (
+      {matches.length === 0 ? (
         <p className="py-6 text-center text-sm text-muted-foreground">
           {rows.length === 0 ? "No approved examples yet." : "No merchant matches that search."}
         </p>
       ) : (
         <ul className="divide-y divide-[hsl(var(--glass-border))]">
-          {shown.slice(0, 100).map((r) => {
+          {shown.rows.map((r) => {
             const cat = r.finalCategoryId ? categoryById.get(r.finalCategoryId) : null;
             return (
               <li key={r.id} className="flex flex-wrap items-center gap-3 py-2.5 first:pt-0">
@@ -101,11 +110,7 @@ export function CorpusTable({
           })}
         </ul>
       )}
-      {shown.length > 100 && (
-        <p className="pt-3 text-center text-xs text-muted-foreground">
-          Showing the 100 most-seen of {shown.length} — search to narrow.
-        </p>
-      )}
+      <Pager page={shown} onPage={setPage} noun="merchants" />
     </Card>
   );
 }

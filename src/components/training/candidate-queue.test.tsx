@@ -61,6 +61,39 @@ describe("CandidateQueue", () => {
     expect(screen.getByText(/nothing waiting/i)).toBeInTheDocument();
   });
 
+  it("pages a long queue rather than rendering all of it", () => {
+    const rows = Array.from({ length: 45 }, (_, i) => row(`MERCHANT ${String(i).padStart(3, "0")}`));
+    render(<CandidateQueue rows={rows} categories={CATEGORIES} onApprove={noop} onReject={noop} />);
+    expect(screen.getByText("MERCHANT 000")).toBeInTheDocument();
+    expect(screen.queryByText("MERCHANT 025")).not.toBeInTheDocument();
+    expect(screen.getByText(/1–20 of 45 merchants/)).toBeInTheDocument();
+  });
+
+  it("falls back to the last page when approvals shrink the queue underneath it", async () => {
+    // The real failure mode: work the last page down and it stops existing, which would otherwise
+    // render as an empty list and look like the remaining work had vanished.
+    const user = userEvent.setup();
+    const rows = Array.from({ length: 45 }, (_, i) => row(`M${String(i).padStart(3, "0")}`));
+    const { rerender } = render(
+      <CandidateQueue rows={rows} categories={CATEGORIES} onApprove={noop} onReject={noop} />,
+    );
+    await user.click(screen.getByRole("button", { name: /next page/i }));
+    await user.click(screen.getByRole("button", { name: /next page/i })); // page 3 of 3
+    expect(screen.getByText(/41–45 of 45/)).toBeInTheDocument();
+
+    // Approving those five leaves two pages; the view drops back to the new last one.
+    rerender(<CandidateQueue rows={rows.slice(0, 40)} categories={CATEGORIES} onApprove={noop} onReject={noop} />);
+    expect(screen.getByText(/21–40 of 40/)).toBeInTheDocument();
+    expect(screen.getByText("M020")).toBeInTheDocument();
+  });
+
+  it("collapses to a single page, hiding the pager, once few enough remain", () => {
+    const rows = Array.from({ length: 8 }, (_, i) => row(`M${i}`));
+    render(<CandidateQueue rows={rows} categories={CATEGORIES} onApprove={noop} onReject={noop} />);
+    expect(screen.queryByRole("button", { name: /next page/i })).not.toBeInTheDocument();
+    expect(screen.getByText("M7")).toBeInTheDocument();
+  });
+
   it("notes a non-expense kind, which changes what approving means", () => {
     render(
       <CandidateQueue

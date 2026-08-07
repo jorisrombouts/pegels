@@ -9,8 +9,12 @@ import { formatSEKAbs } from "@/lib/format";
 import type { CurationRow } from "@/lib/corpus/types";
 import type { Category } from "@/lib/domain/types";
 import type { CorpusEdit } from "@/store/corpus";
+import { paginate } from "@/lib/paginate";
+import { Pager } from "@/components/ui/pager";
 
 const NONE = "__none__";
+/** Small enough that the top of the queue stays the point, rather than a wall of rows. */
+const PAGE_SIZE = 20;
 
 /**
  * Unreviewed merchants, most-seen first.
@@ -31,8 +35,12 @@ export function CandidateQueue({
   onReject: (id: string) => void;
 }) {
   const [edits, setEdits] = useState<Record<string, string>>({});
+  const [page, setPage] = useState(0);
   const ordered = orderCategories(categories);
   const nameOf = new Map(categories.map((c) => [c.id, c]));
+  // Rows leave this list as they're approved, so the page can shrink out from under the user;
+  // paginate clamps rather than showing an empty page.
+  const shown = paginate(rows, page, PAGE_SIZE);
 
   return (
     <Card>
@@ -46,7 +54,7 @@ export function CandidateQueue({
         </p>
       ) : (
         <ul className="divide-y divide-[hsl(var(--glass-border))]">
-          {rows.map((r) => {
+          {shown.rows.map((r) => {
             const chosen = edits[r.id] ?? r.finalCategoryId ?? NONE;
             const current = chosen === NONE ? null : nameOf.get(chosen);
             return (
@@ -101,6 +109,7 @@ export function CandidateQueue({
           })}
         </ul>
       )}
+      <Pager page={shown} onPage={setPage} noun="merchants" />
     </Card>
   );
 }
