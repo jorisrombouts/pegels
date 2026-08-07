@@ -33,6 +33,7 @@ const corpusRow = (id: string, description: string, o: Record<string, unknown> =
   finalTagIds: [],
   hitCount: 1,
   lastSeenAt: "2025-03-01",
+  status: "approved",
   ...o,
 });
 
@@ -150,6 +151,24 @@ describe("retrieveNeighbours", () => {
     countApproved.mockResolvedValue(200);
     await retrieveNeighbours("u1", [{ index: 0, description: "ICA", amount: -100 }]);
     expect(loadCorpus.mock.calls[0][1]).toMatchObject({ includeCandidates: false });
+  });
+
+  // `approved` decides which half of the evidence table a neighbour is rendered under, so it has to
+  // be the row's own status. Deriving it from the corpus-wide includeCandidates flag downgraded
+  // every approved example to "the user has not reviewed these" exactly when the corpus was thin —
+  // which is when each approved example carries the most weight.
+  it("keeps an approved neighbour approved while candidates are also in play", async () => {
+    countApproved.mockResolvedValue(12); // thin corpus → candidates participate
+    loadCorpus.mockResolvedValue([corpusRow("e1", "ICA SUPERMARKET", { status: "approved" })]);
+    const out = await retrieveNeighbours("u1", [{ index: 0, description: "ICA SUPERMARKET", amount: -500 }]);
+    expect(out.get(0)![0].approved).toBe(true);
+  });
+
+  it("marks an unreviewed candidate as weaker evidence", async () => {
+    countApproved.mockResolvedValue(12);
+    loadCorpus.mockResolvedValue([corpusRow("e2", "ICA SUPERMARKET", { status: "candidate" })]);
+    const out = await retrieveNeighbours("u1", [{ index: 0, description: "ICA SUPERMARKET", amount: -500 }]);
+    expect(out.get(0)![0].approved).toBe(false);
   });
 
   it("back-fills missing embeddings before searching, without blocking on failure", async () => {

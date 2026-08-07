@@ -130,8 +130,10 @@ export async function retrieveNeighbours(
       .filter((r): r is { row: CorpusRow; score: number } => r !== null)
       .sort((a, b) => b.score - a.score);
 
+    // Per row, not per corpus: when candidates are in play the two kinds come back mixed, and the
+    // prompt renders them under different headings.
     const neighbours = diversify(ranked, (r) => r.row.dedupKey, limit).map(
-      (r): Neighbour => ({ ...r.row, approved: !includeCandidates }),
+      (r): Neighbour => ({ ...r.row, approved: r.row.status === "approved" }),
     );
     for (const index of q.indices) out.set(index, neighbours);
   }

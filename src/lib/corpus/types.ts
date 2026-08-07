@@ -35,11 +35,15 @@ export interface CorpusRow {
   finalTagIds: string[];
   hitCount: number;
   lastSeenAt: string;
+  /**
+   * Needed by retrieval, not just curation: while the approved corpus is thin, retrieval loads
+   * candidates alongside approved rows, and the prompt renders the two under different headings.
+   */
+  status: ExampleStatus;
 }
 
 /** A corpus row as the curation page shows it. */
 export interface CurationRow extends CorpusRow {
-  status: ExampleStatus;
   gold: boolean;
   source: string;
   createdAt: string;

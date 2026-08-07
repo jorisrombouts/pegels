@@ -54,6 +54,7 @@ export async function loadCorpus(userId: string, opts: { includeCandidates: bool
       finalTagIds: categorizationExamples.finalTagIds,
       hitCount: categorizationExamples.hitCount,
       lastSeenAt: categorizationExamples.lastSeenAt,
+      status: categorizationExamples.status,
     })
     .from(categorizationExamples)
     .where(corpusFilter(userId, opts));
