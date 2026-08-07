@@ -19,8 +19,9 @@ function chunked<T>(xs: T[], size: number): T[][] {
   return out;
 }
 
-// Postgres caps bind parameters at 65,535 and transactionToRow emits 17 columns → 3,855 rows/statement. 2,000 leaves headroom.
-const TX_CHUNK = 2000;
+// Postgres caps bind parameters at 65,535. The widest row here is transactionToRow's 17 columns
+// → 3,855 rows/statement; categorization examples are 13 → 5,041. 2,000 leaves headroom for both.
+const ROW_CHUNK = 2000;
 
 // ── Reads ──
 
@@ -57,7 +58,7 @@ export async function upsertTransaction(userId: string, tx: Transaction): Promis
 export async function upsertTransactions(userId: string, txs: Transaction[]): Promise<void> {
   // `set` lists every column transactionToRow writes except the `id` conflict target, so an updated
   // row keeps exactly the values the caller passed — same as upsertTransaction's `set: row`.
-  for (const part of chunked(txs, TX_CHUNK)) {
+  for (const part of chunked(txs, ROW_CHUNK)) {
     await db.insert(transactions).values(part.map((t) => transactionToRow(t, userId))).onConflictDoUpdate({
       target: transactions.id,
       set: {
@@ -73,7 +74,7 @@ export async function upsertTransactions(userId: string, txs: Transaction[]): Pr
 }
 
 export async function insertTransactions(userId: string, txs: Transaction[]): Promise<void> {
-  for (const part of chunked(txs, TX_CHUNK)) {
+  for (const part of chunked(txs, ROW_CHUNK)) {
     await db.insert(transactions).values(part.map((t) => transactionToRow(t, userId)));
   }
 }
@@ -163,8 +164,9 @@ export async function insertCategorizationExamples(
   userId: string,
   rows: Omit<typeof categorizationExamples.$inferInsert, "userId">[],
 ): Promise<void> {
-  if (!rows.length) return;
-  await db.insert(categorizationExamples).values(rows.map((r) => ({ ...r, userId })));
+  for (const part of chunked(rows, ROW_CHUNK)) {
+    await db.insert(categorizationExamples).values(part.map((r) => ({ ...r, userId })));
+  }
 }
 
 export async function recentCategorizationExamples(userId: string, limit = 40) {
