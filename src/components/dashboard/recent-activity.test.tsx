@@ -12,7 +12,7 @@ function tx(o: Partial<Transaction>): Transaction {
     id: "t", date: "2025-03-02", description: "ICA Maxi", amount: -487, accountId: "acc-lon",
     categoryId: "cat-groceries", predictedCategoryId: "cat-groceries", categoryConfidence: 0.9,
     categorySource: "model", needsReview: false, tagIds: [],
-    kind: "expense", goalId: null, ...o,
+    kind: "expense", ...o,
   };
 }
 

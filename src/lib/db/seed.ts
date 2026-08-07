@@ -10,7 +10,7 @@ async function main() {
   const c = seedDataset;
   console.log(
     `Seeded user "${STUB_USER_ID}": ${c.accounts.length} accounts, ${c.categories.length} categories, ` +
-      `${c.tags.length} tags, ${c.transactions.length} transactions, ${c.budgets.length} budgets, ${c.goals.length} goals.`,
+      `${c.tags.length} tags, ${c.transactions.length} transactions, ${c.budgets.length} budgets.`,
   );
 }
 

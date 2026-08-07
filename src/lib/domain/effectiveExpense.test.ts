@@ -27,7 +27,7 @@ function tx(overrides: Partial<Transaction>): Transaction {
     needsReview: false,
     tagIds: [],
     kind: "expense",
-    goalId: null,
+   
     ...overrides,
   };
 }
@@ -42,14 +42,14 @@ describe("effectiveExpense", () => {
   });
 
   it("counts only expense-kind transactions", () => {
-    const base = { id: "t", date: "2025-03-01", description: "x", accountId: "a", categoryId: null, predictedCategoryId: null, categoryConfidence: null, categorySource: "user" as const, needsReview: false, tagIds: [], goalId: null };
+    const base = { id: "t", date: "2025-03-01", description: "x", accountId: "a", categoryId: null, predictedCategoryId: null, categoryConfidence: null, categorySource: "user" as const, needsReview: false, tagIds: [] };
     expect(effectiveExpense({ ...base, amount: -100, kind: "expense" })).toBe(100);
     expect(effectiveExpense({ ...base, amount: -100, kind: "transfer" })).toBe(0);
     expect(effectiveExpense({ ...base, amount: 100, kind: "income" })).toBe(0);
   });
 
   it("counts only the mine portion of a split expense", () => {
-    const base = { id: "t", date: "2025-03-01", description: "x", accountId: "a", categoryId: null, predictedCategoryId: null, categoryConfidence: null, categorySource: "user" as const, needsReview: false, tagIds: [], goalId: null, kind: "expense" as const };
+    const base = { id: "t", date: "2025-03-01", description: "x", accountId: "a", categoryId: null, predictedCategoryId: null, categoryConfidence: null, categorySource: "user" as const, needsReview: false, tagIds: [], kind: "expense" as const };
     expect(effectiveExpense({ ...base, amount: -1000, splits: [{ id: "s1", amount: 500, mine: true }, { id: "s2", amount: 500, mine: false }] })).toBe(500);
   });
 

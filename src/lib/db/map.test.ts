@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { rowToTransaction, transactionToRow, rowToGoal, goalToRow, rowToAccount, accountToRow, rowToRule, ruleToRow } from "./map";
-import type { Account, Goal, Transaction, CategorizationRule } from "../domain/types";
+import { rowToTransaction, transactionToRow, rowToAccount, accountToRow, rowToRule, ruleToRow } from "./map";
+import type { Account, Transaction, CategorizationRule } from "../domain/types";
 
 describe("db mappers", () => {
   it("transaction: injects userId, maps undefined splits/notes -> null, round-trips", () => {
@@ -8,7 +8,7 @@ describe("db mappers", () => {
       id: "t1", date: "2025-03-01", description: "x", amount: -100, accountId: "a",
       categoryId: null, predictedCategoryId: null, categoryConfidence: null,
       categorySource: "user", needsReview: false, tagIds: ["tag-1"],
-      kind: "expense", goalId: null,
+      kind: "expense",
     };
     const row = transactionToRow(tx, "u1");
     expect(row.userId).toBe("u1");
@@ -23,11 +23,10 @@ describe("db mappers", () => {
       categoryId: "c", predictedCategoryId: "c", categoryConfidence: 0.9,
       categorySource: "model", needsReview: false, tagIds: ["t", "u"],
       splits: [{ id: "s1", amount: 445, mine: true }, { id: "s2", amount: 445, mine: false, label: "P" }],
-      notes: "hi", kind: "transfer", goalId: "goal-x",
+      notes: "hi", kind: "transfer",
     };
     const row = transactionToRow(tx, "u");
     expect(row.kind).toBe("transfer");
-    expect(row.goalId).toBe("goal-x");
     expect(rowToTransaction(row)).toEqual(tx);
   });
 
@@ -36,22 +35,13 @@ describe("db mappers", () => {
       id: "t3", date: "2025-03-03", description: "z", amount: -188.75, accountId: "a",
       categoryId: null, predictedCategoryId: null, categoryConfidence: null,
       categorySource: "user", needsReview: false, tagIds: [],
-      kind: "expense", goalId: null,
+      kind: "expense",
     };
     const back = rowToTransaction(transactionToRow(tx, "u"));
     expect(back.amount).toBe(-188.75);
     expect(back).toEqual(tx);
   });
 
-  it("goal: round-trips nullable fields", () => {
-    const g: Goal = {
-      id: "g", name: "n", icon: "🗾", target: 100, baseline: 10,
-      deadline: null, accountId: null,
-    };
-    const row = goalToRow(g, "u");
-    expect(row.userId).toBe("u");
-    expect(rowToGoal(row)).toEqual(g);
-  });
 
   it("account: round-trips", () => {
     const a: Account = { id: "a", name: "n", type: "Checking", kind: "spending", icon: "🏦", color: "0 0% 0%", balance: 100, accountNumber: null, archived: false };

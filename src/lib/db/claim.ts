@@ -2,7 +2,7 @@ import { eq } from "drizzle-orm";
 import { db } from "./index";
 import {
   accounts, categories, tags, transactions,
-  budgets, goals, categorizationRules, categorizationExamples,
+  budgets, categorizationRules, categorizationExamples,
 } from "./schema";
 
 /** The original single-user owner id. Source of the one-time data migration. */
@@ -11,7 +11,7 @@ export const STUB_USER_ID = "user-stub";
 /** Every user-scoped data table whose rows must follow the owner to their real account. */
 export const CLAIMABLE_TABLES = [
   accounts, categories, tags, transactions,
-  budgets, goals, categorizationRules, categorizationExamples,
+  budgets, categorizationRules, categorizationExamples,
 ] as const;
 
 type Batchable = Parameters<typeof db.batch>[0][number];

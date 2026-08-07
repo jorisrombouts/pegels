@@ -83,8 +83,6 @@ export interface Transaction {
   notes?: string;
   /** What this money event is. Drives counting + visibility. */
   kind: TransactionKind;
-  /** Goal this transfer funds (only when kind === "transfer"). */
-  goalId: string | null;
 }
 
 export interface Budget {
@@ -96,14 +94,3 @@ export interface Budget {
   month: string | null;
 }
 
-export interface Goal {
-  id: string;
-  name: string;
-  icon: string; // emoji
-  target: number;
-  /** Baseline already put aside before linked transfers were logged. */
-  baseline: number;
-  deadline: string | null; // ISO date
-  /** Optional linked savings account. */
-  accountId: string | null;
-}

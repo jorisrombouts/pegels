@@ -19,7 +19,7 @@ import { insertCategorizationExamples, insertTransactions, upsertTransactions } 
 const tx = (over: Partial<Transaction>): Transaction => ({
   id: "t1", date: "2026-01-10", description: "ICA Maxi", amount: -100, accountId: "acc-lon",
   categoryId: "cat-groceries", predictedCategoryId: null, categoryConfidence: null, categorySource: "model",
-  needsReview: false, tagIds: [], kind: "expense", goalId: null, ...over,
+  needsReview: false, tagIds: [], kind: "expense", ...over,
 });
 
 describe("upsertTransactions", () => {
@@ -31,23 +31,22 @@ describe("upsertTransactions", () => {
     expect(sent[0].sql).toBe(
       'insert into "transactions" ("id", "user_id", "date", "description", "amount", "account_id",' +
         ' "category_id", "predicted_category_id", "category_confidence", "category_source", "needs_review",' +
-        ' "excluded", "kind", "goal_id", "tag_ids", "splits", "notes") values' +
-        " ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)," +
-        " ($18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34)" +
+        ' "excluded", "kind", "tag_ids", "splits", "notes") values' +
+        " ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)," +
+        " ($17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32)" +
         ' on conflict ("id") do update set "user_id" = excluded.user_id, "date" = excluded.date,' +
         ' "description" = excluded.description, "amount" = excluded.amount, "account_id" = excluded.account_id,' +
         ' "category_id" = excluded.category_id, "predicted_category_id" = excluded.predicted_category_id,' +
         ' "category_confidence" = excluded.category_confidence, "category_source" = excluded.category_source,' +
         ' "needs_review" = excluded.needs_review, "excluded" = excluded.excluded, "kind" = excluded.kind,' +
-        ' "goal_id" = excluded.goal_id, "tag_ids" = excluded.tag_ids, "splits" = excluded.splits,' +
-        ' "notes" = excluded.notes',
+        ' "tag_ids" = excluded.tag_ids, "splits" = excluded.splits, "notes" = excluded.notes',
     );
-    // 17 columns/row is the number the 65,535 bind-parameter ceiling divides into.
-    expect(sent[0].params).toHaveLength(34);
+    // 16 columns/row is the number the 65,535 bind-parameter ceiling divides into.
+    expect(sent[0].params).toHaveLength(32);
     // Every column the caller passed survives the round-trip, not just the patched ones.
-    expect(sent[0].params.slice(17)).toEqual([
+    expect(sent[0].params.slice(16)).toEqual([
       "b", "u1", "2026-01-10", "ICA Maxi", "-100", "acc-lon", "cat-groceries", null, null, "model",
-      false, true, "expense", null, "[]", null, "n",
+      false, true, "expense", "[]", null, "n",
     ]);
   });
 
@@ -55,8 +54,8 @@ describe("upsertTransactions", () => {
     sent.length = 0;
     await upsertTransactions("u1", Array.from({ length: 4223 }, (_, i) => tx({ id: `t${i}` })));
 
-    // 2,000-row chunks: 2000 + 2000 + 223, and 2000 x 17 = 34,000 params stays under 65,535.
-    expect(sent.map((s) => s.params.length / 17)).toEqual([2000, 2000, 223]);
+    // 2,000-row chunks: 2000 + 2000 + 223, and 2000 x 16 = 32,000 params stays under 65,535.
+    expect(sent.map((s) => s.params.length / 16)).toEqual([2000, 2000, 223]);
     expect(Math.max(...sent.map((s) => s.params.length))).toBeLessThan(65535);
   });
 
@@ -70,10 +69,10 @@ describe("upsertTransactions", () => {
 describe("insertTransactions", () => {
   it("splits an import larger than one chunk into whole statements", async () => {
     sent.length = 0;
-    // 4,223 rows is past the 3,855-row bind-parameter cap, so an unchunked insert would be rejected.
+    // 4,223 rows is past the 4,095-row bind-parameter cap, so an unchunked insert would be rejected.
     await insertTransactions("u1", Array.from({ length: 4223 }, (_, i) => tx({ id: `t${i}` })));
 
-    expect(sent.map((s) => s.params.length / 17)).toEqual([2000, 2000, 223]);
+    expect(sent.map((s) => s.params.length / 16)).toEqual([2000, 2000, 223]);
     expect(Math.max(...sent.map((s) => s.params.length))).toBeLessThan(65535);
   });
 

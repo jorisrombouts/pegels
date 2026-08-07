@@ -4,7 +4,7 @@ import { Card, CardHeader } from "@/components/ui/card";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { formatSEKAbs, dayLabel } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import type { WidgetSize } from "@/store/ui";
+import type { WidgetSize } from "./registry";
 
 export interface DaySpend {
   day: number;
