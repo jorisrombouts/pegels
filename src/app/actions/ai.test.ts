@@ -18,6 +18,7 @@ vi.mock("@/lib/ai/retrieve", () => ({ retrieveNeighbours: retrieveMock }));
 vi.unmock("@/app/actions/ai");
 
 import { categorizeTransactions } from "./ai";
+import { needsReview } from "@/lib/domain/review";
 
 beforeEach(() => {
   getDatasetMock.mockReset();
@@ -102,6 +103,35 @@ describe("categorizeTransactions", () => {
     categorizeWithOpenAIMock.mockResolvedValue([]); // AI returns nothing for the remaining row
     const out = await categorizeTransactions([{ index: 0, description: "UNMATCHED", amount: -42 }]);
     expect(out[0]).toMatchObject({ kind: "expense", categoryId: null, confidence: 0.4 });
+  });
+
+  // categorizeWithOpenAI keeps the chunks that succeeded and drops the rows whose chunk rejected,
+  // so on a multi-chunk import a row can come back with no result at all. Grading that placeholder
+  // against retrieval evidence read the merchant's neighbours as confidence in an answer nobody
+  // gave — the row landed uncategorized *and* unflagged, which is the one outcome the review queue
+  // exists to prevent.
+  it("flags a row whose chunk failed, however familiar its merchant is", async () => {
+    categorizeWithOpenAIMock.mockResolvedValue([
+      { index: 0, kind: "expense", categoryId: "cat-groceries", tagIds: [], confidence: 0.9, level: "medium" },
+    ]);
+    retrieveMock.mockResolvedValue(
+      new Map([
+        [0, []],
+        // A near-identical approved merchant — enough to grade "high" if this were a real answer.
+        [1, [{ id: "e1", dedupKey: "ica supermarket", cleanedDescription: "ICA SUPERMARKET", amount: -200,
+               finalKind: "expense", finalCategoryId: "cat-groceries", finalTagIds: [],
+               hitCount: 3, lastSeenAt: "2025-03-01", status: "approved", approved: true }]],
+      ]),
+    );
+
+    const out = await categorizeTransactions([
+      { index: 0, description: "COOP", amount: -100 },
+      { index: 1, description: "ICA SUPERMARKET", amount: -200 },
+    ]);
+
+    const dropped = out.find((r) => r.index === 1)!;
+    expect(dropped.categoryId).toBeNull();
+    expect(needsReview(dropped.level)).toBe(true);
   });
 
   it("never classifies a negative amount as income, even when the AI says income", async () => {

@@ -94,14 +94,21 @@ export async function categorizeTransactions(rows: AiRow[]): Promise<AiResult[]>
   const byIndex = new Map(rows.map((r) => [r.index, r]));
   const out: AiResult[] = [];
   for (const r of rows) {
+    const fromModel = aiResults.find((a) => a.index === r.index);
     const res =
       ruled.get(r.index) ??
-      aiResults.find((a) => a.index === r.index) ??
+      fromModel ??
       ({ index: r.index, kind: r.amount < 0 ? "expense" : "income", categoryId: null, tagIds: [], confidence: 0.4, level: "low" } as AiResult);
     reconcileKindWithSign(res, r.amount); // the data model forbids income<0 / expense>0; the sign wins
     if (res.categoryId && !validIds.has(res.categoryId)) res.categoryId = null;
 
-    if (!ruled.has(r.index)) {
+    if (!ruled.has(r.index) && !fromModel) {
+      // Nobody classified this row — its chunk failed, and categorizeWithOpenAI returns the chunks
+      // that survived. The retrieval evidence describes the merchant, not this non-answer, so
+      // grading against it would manufacture confidence in a blank and keep the row out of the
+      // review queue. An unanswered row is exactly what a human should see.
+      res.level = "low";
+    } else if (!ruled.has(r.index)) {
       const near = neighbours.get(r.index) ?? [];
       const top = near[0];
       const queryTokens = new Set(merchantTokens(byIndex.get(r.index)!.description));
