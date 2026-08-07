@@ -15,7 +15,7 @@ import {
 } from "@/lib/ai/categorize-openai";
 import { retrieveNeighbours } from "@/lib/ai/retrieve";
 import { merchantTokens, tokenOverlap } from "@/lib/text/merchant-tokens";
-import { clampConfidence } from "@/lib/ai/confidence";
+import { gradeConfidence } from "@/lib/ai/confidence";
 import { stableHash } from "@/lib/ai/hash";
 
 
@@ -52,7 +52,7 @@ export async function categorizeTransactions(rows: AiRow[]): Promise<AiResult[]>
   const remaining: AiRow[] = [];
   for (const r of rows) {
     if (matchesOwnAccount(r.description, ownNumbers)) {
-      ruled.set(r.index, { index: r.index, kind: "transfer", categoryId: null, confidence: 1, tagIds: [] });
+      ruled.set(r.index, { index: r.index, kind: "transfer", categoryId: null, confidence: 1, tagIds: [], level: "confirmed" });
       continue;
     }
     remaining.push(r);
@@ -97,7 +97,7 @@ export async function categorizeTransactions(rows: AiRow[]): Promise<AiResult[]>
     const res =
       ruled.get(r.index) ??
       aiResults.find((a) => a.index === r.index) ??
-      ({ index: r.index, kind: r.amount < 0 ? "expense" : "income", categoryId: null, tagIds: [], confidence: 0.4 } as AiResult);
+      ({ index: r.index, kind: r.amount < 0 ? "expense" : "income", categoryId: null, tagIds: [], confidence: 0.4, level: "unsure" } as AiResult);
     reconcileKindWithSign(res, r.amount); // the data model forbids income<0 / expense>0; the sign wins
     if (res.categoryId && !validIds.has(res.categoryId)) res.categoryId = null;
 
@@ -105,7 +105,7 @@ export async function categorizeTransactions(rows: AiRow[]): Promise<AiResult[]>
       const near = neighbours.get(r.index) ?? [];
       const top = near[0];
       const queryTokens = new Set(merchantTokens(byIndex.get(r.index)!.description));
-      res.confidence = clampConfidence(
+      const graded = gradeConfidence(
         res.confidence,
         {
           neighbourCount: near.length,
@@ -114,6 +114,8 @@ export async function categorizeTransactions(rows: AiRow[]): Promise<AiResult[]>
         },
         res.categoryId,
       );
+      res.confidence = graded.score;
+      res.level = graded.level;
       res.tagIds = res.tagIds ?? [];
     }
     out.push(res);

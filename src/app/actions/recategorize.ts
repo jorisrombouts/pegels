@@ -62,8 +62,9 @@ export async function applyRecategorize(changes: RecategorizeChange[]): Promise<
       tagIds: c.after.tagIds,
       predictedCategoryId: c.after.categoryId,
       categoryConfidence: c.after.confidence,
+      categoryLevel: c.after.level,
       categorySource: "model" as const,
-      needsReview: needsReview(c.after.confidence),
+      needsReview: needsReview(c.after.level),
     }];
   });
 

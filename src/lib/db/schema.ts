@@ -1,5 +1,6 @@
 import { pgTable, text, numeric, real, boolean, jsonb, index, timestamp, integer, primaryKey, uniqueIndex, vector } from "drizzle-orm/pg-core";
 import type { AccountKind, CategorySource, Split, TransactionKind } from "../domain/types";
+import type { ConfidenceLevel } from "../ai/confidence";
 import type { EvalMetrics, EvalMistake } from "../eval/types";
 
 /** Whether an example participates in retrieval. Only `approved` is trusted evidence. */
@@ -65,6 +66,7 @@ export const transactions = pgTable(
     categoryId: text("category_id"),
     predictedCategoryId: text("predicted_category_id"),
     categoryConfidence: real("category_confidence"),
+    categoryLevel: text("category_level").$type<ConfidenceLevel>(),
     categorySource: text("category_source").$type<CategorySource>().notNull(),
     needsReview: boolean("needs_review").notNull(),
     excluded: boolean("excluded").notNull(),

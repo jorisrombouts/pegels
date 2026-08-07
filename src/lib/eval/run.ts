@@ -7,7 +7,7 @@ import { buildMaps } from "@/lib/domain/selectors";
 import { merchantTokens, tokenOverlap } from "@/lib/text/merchant-tokens";
 import { categorizeWithOpenAI, type AiNeighbour, type AiRow, type PromptTaxonomy } from "@/lib/ai/categorize-openai";
 import { retrieveNeighbours } from "@/lib/ai/retrieve";
-import { clampConfidence } from "@/lib/ai/confidence";
+import { gradeConfidence } from "@/lib/ai/confidence";
 import { evaluate, type GoldExample } from "./metrics";
 import type { EvalMetrics, EvalMistake } from "./types";
 
@@ -90,7 +90,7 @@ export async function runEval(userId: string, opts: { limit?: number } = {}): Pr
     const near = neighbours.get(p.index) ?? [];
     const top = near[0];
     const queryTokens = new Set(merchantTokens(rows[p.index]?.description ?? ""));
-    p.confidence = clampConfidence(
+    const graded = gradeConfidence(
       p.confidence,
       {
         neighbourCount: near.length,
@@ -101,6 +101,8 @@ export async function runEval(userId: string, opts: { limit?: number } = {}): Pr
       },
       p.categoryId,
     );
+    p.confidence = graded.score;
+    p.level = graded.level;
   }
 
   const metrics = evaluate(gold, predictions, maps);

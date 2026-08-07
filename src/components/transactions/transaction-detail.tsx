@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { TagEditor } from "./tag-editor";
 import { SplitEditor } from "./split-editor";
+import { ConfidenceBadge } from "./confidence-badge";
 import { recordExamples } from "@/app/actions/corpus";
 import type { ExampleInput } from "@/lib/corpus/types";
 import { useData } from "@/store/data";
@@ -103,22 +104,9 @@ export function TransactionDetail({ txId, onDeleted }: { txId: string; onDeleted
       <div className="space-y-1.5">
         <div className="flex items-center justify-between">
           <Label>Category</Label>
-          {tx.categorySource === "user" ? (
-            // A hand-pick is certain → 100%. We don't touch the stored categoryConfidence so the
-            // model's original score stays available for the training-set log.
-            <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              <span className="size-1.5 rounded-full" style={{ backgroundColor: "hsl(var(--positive))" }} />
-              100%
-            </span>
-          ) : tx.categorySource === "model" && tx.categoryConfidence != null ? (
-            <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              <span
-                className="size-1.5 rounded-full"
-                style={{ backgroundColor: tx.categoryConfidence >= 0.85 ? "hsl(var(--positive))" : tx.categoryConfidence >= 0.6 ? "hsl(var(--warning))" : "hsl(var(--negative))" }}
-              />
-              {Math.round(tx.categoryConfidence * 100)}%
-            </span>
-          ) : null}
+          {/* Named, not scored. The stored number stays untouched so the eval can keep measuring
+              calibration — it just isn't something to show a person. */}
+          <ConfidenceBadge level={tx.categoryLevel} isUserChoice={tx.categorySource === "user"} />
         </div>
         <Select
           value={tx.categoryId ?? ""}

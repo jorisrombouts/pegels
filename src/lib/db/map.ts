@@ -33,6 +33,7 @@ export function rowToTransaction(r: TransactionRow): Transaction {
     categoryId: r.categoryId,
     predictedCategoryId: r.predictedCategoryId,
     categoryConfidence: r.categoryConfidence,
+    categoryLevel: r.categoryLevel,
     categorySource: r.categorySource,
     needsReview: r.needsReview,
     excluded: r.excluded || undefined, // false → absent, matching the optional domain field
@@ -73,6 +74,7 @@ export function transactionToRow(t: Transaction, userId: string): TransactionRow
     categoryId: t.categoryId,
     predictedCategoryId: t.predictedCategoryId,
     categoryConfidence: t.categoryConfidence,
+    categoryLevel: t.categoryLevel ?? null,
     categorySource: t.categorySource,
     needsReview: t.needsReview,
     excluded: t.excluded ?? false,

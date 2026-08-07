@@ -20,6 +20,7 @@ import { detectTransfersOnImport, orderCategories, type ExistingTransferUpdate }
 import { formatSEK } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type { Transaction, TransactionKind } from "@/lib/domain/types";
+import type { ConfidenceLevel } from "@/lib/ai/confidence";
 
 interface DraftRow {
   date: string;
@@ -30,6 +31,7 @@ interface DraftRow {
   unconverted?: boolean; // non-SEK row whose rate couldn't be fetched yet (held back from import)
   categoryId: string | null;
   confidence: number;
+  level: ConfidenceLevel;
   tagIds: string[];
   include: boolean;
   kind: TransactionKind;
@@ -170,6 +172,7 @@ export function ImportModal() {
         accountId,
         categoryId: isTransfer ? null : res?.categoryId ?? null,
         confidence: isTransfer ? 1 : res?.confidence ?? 0.4,
+        level: (isTransfer ? "confirmed" : res?.level ?? "unsure") as ConfidenceLevel,
         tagIds: isTransfer ? [] : res?.tagIds ?? [],
         include: !isDup && !b.unconverted, // a row with no exchange rate yet can't be imported
         kind: (b.forcedKind ?? res?.kind ?? (b.amount < 0 ? "expense" : "income")) as TransactionKind,
@@ -184,7 +187,7 @@ export function ImportModal() {
     setExistingUpdates(detected.existingUpdates);
     return drafts.map((d, i): DraftRow => ({
       date: d.date, description: d.description, amount: d.amount, currency: d.currency, notes: d.notes, unconverted: d.unconverted,
-      categoryId: d.categoryId, confidence: d.confidence, tagIds: d.tagIds, include: d.include, kind: detected.rows[i].kind,
+      categoryId: d.categoryId, confidence: d.confidence, level: d.level, tagIds: d.tagIds, include: d.include, kind: detected.rows[i].kind,
       predictedKind: d.predictedKind, predictedCategoryId: d.predictedCategoryId,
       predictedTagIds: d.predictedTagIds, predictedConfidence: d.predictedConfidence,
     }));
@@ -252,20 +255,20 @@ export function ImportModal() {
   // Live summary over the current draft.
   const included = rows.filter((r) => r.include);
   const dupCount = rows.filter(isDup).length;
-  const reviewCount = included.filter((r) => needsReview(r.confidence)).length;
+  const reviewCount = included.filter((r) => needsReview(r.level)).length;
   const moneyIn = included.filter((r) => r.amount > 0).reduce((s, r) => s + r.amount, 0);
   const moneyOut = included.filter((r) => r.amount < 0).reduce((s, r) => s + r.amount, 0);
   const kindCounts = { expense: 0, income: 0, transfer: 0 } as Record<TransactionKind, number>;
   included.forEach((r) => { kindCounts[r.kind] += 1; });
   const kindTotals = { expense: 0, income: 0, transfer: 0 } as Record<TransactionKind, number>;
   rows.forEach((r) => { kindTotals[r.kind] += 1; });
-  const reviewTotal = rows.filter((r) => needsReview(r.confidence)).length;
+  const reviewTotal = rows.filter((r) => needsReview(r.level)).length;
   const isUncategorized = (r: DraftRow) => r.kind === "expense" && !r.categoryId;
   const uncategorizedTotal = rows.filter(isUncategorized).length;
   const query = search.trim().toLowerCase();
   const matchesFilters = (r: DraftRow) =>
     (kindFilter === "all" || r.kind === kindFilter) &&
-    (!reviewOnly || needsReview(r.confidence)) &&
+    (!reviewOnly || needsReview(r.level)) &&
     (!uncategorizedOnly || isUncategorized(r)) &&
     (!hideDuplicates || !isDup(r)) &&
     (!query || r.description.toLowerCase().includes(query));
@@ -286,8 +289,9 @@ export function ImportModal() {
       categoryId: r.categoryId,
       predictedCategoryId: r.categoryId,
       categoryConfidence: r.confidence,
+      categoryLevel: r.level,
       categorySource: "model",
-      needsReview: needsReview(r.confidence),
+      needsReview: needsReview(r.level),
       tagIds: r.tagIds,
       kind: r.kind,
       notes: r.notes,

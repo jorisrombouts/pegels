@@ -28,6 +28,7 @@ const pred = (o: Partial<AiResult> = {}): AiResult => ({
   categoryId: "cat-food",
   tagIds: [],
   confidence: 0.9,
+  level: "likely",
   ...o,
 });
 
@@ -140,9 +141,9 @@ describe("evaluate — confidence calibration", () => {
     const m = evaluate(
       [gold(), gold(), gold()],
       [
-        pred({ index: 0, confidence: 0.3, categoryId: "cat-housing" }), // flagged, wrong  ✓
-        pred({ index: 1, confidence: 0.3 }), // flagged, right ✗
-        pred({ index: 2, confidence: 0.9 }), // not flagged
+        pred({ index: 0, confidence: 0.3, level: "unsure", categoryId: "cat-housing" }), // flagged, wrong  ✓
+        pred({ index: 1, confidence: 0.3, level: "unsure" }), // flagged, right ✗
+        pred({ index: 2, confidence: 0.9, level: "confirmed" }), // not flagged
       ],
       maps,
     );
@@ -151,7 +152,7 @@ describe("evaluate — confidence calibration", () => {
   });
 
   it("reports zero review precision when nothing was flagged", () => {
-    const m = evaluate([gold()], [pred({ confidence: 0.99 })], maps);
+    const m = evaluate([gold()], [pred({ confidence: 0.99, level: "confirmed" })], maps);
     expect(m.reviewFlagged).toBe(0);
     expect(Number.isNaN(m.reviewPrecision)).toBe(false);
   });

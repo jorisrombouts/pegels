@@ -75,7 +75,7 @@ function t(
     accountId: "acc-lon",
     categoryId,
     predictedCategoryId: categoryId,
-    categoryConfidence: opts.categorySource === "user" ? null : 0.94,
+    categoryConfidence: opts.categorySource === "user" ? null : 0.94, categoryLevel: null,
     categorySource: "model",
     needsReview: false,
     tagIds: [],

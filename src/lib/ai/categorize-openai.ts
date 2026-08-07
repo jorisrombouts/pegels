@@ -1,5 +1,6 @@
 import OpenAI from "openai";
 import type { TransactionKind } from "@/lib/domain/types";
+import type { ConfidenceLevel } from "./confidence";
 
 /** Bump when the prompt template changes — it feeds the cache key so a stale prefix isn't reused. */
 export const PROMPT_VERSION = "4";
@@ -37,7 +38,10 @@ export interface AiResult {
   kind: TransactionKind;
   categoryId: string | null;
   tagIds: string[];
+  /** Raw self-report, re-anchored by `gradeConfidence` once retrieval evidence is known. */
   confidence: number;
+  /** How much this is worth trusting. Graded by the action, not claimed by the model. */
+  level: ConfidenceLevel;
 }
 
 /** Row index → its retrieved neighbours, best first. */
@@ -292,5 +296,7 @@ export async function categorizeWithOpenAI(
     categoryId: r.categoryId && validCategories.has(r.categoryId) ? r.categoryId : null,
     tagIds: (r.tagIds ?? []).filter((id) => validTags.has(id)),
     confidence: Math.min(1, Math.max(0, r.confidence)),
+    // Provisional: the action grades this against retrieval evidence before anyone sees it.
+    level: "likely" as const,
   }));
 }

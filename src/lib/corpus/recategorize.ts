@@ -1,6 +1,7 @@
 import { monthKey } from "@/lib/format";
 import type { AiResult } from "@/lib/ai/categorize-openai";
 import type { Transaction, TransactionKind } from "@/lib/domain/types";
+import type { ConfidenceLevel } from "@/lib/ai/confidence";
 
 /**
  * Re-running the categorizer over transactions that were classified by an older pipeline.
@@ -16,7 +17,7 @@ export interface RecategorizeChange {
   description: string;
   amount: number;
   before: { kind: TransactionKind; categoryId: string | null; tagIds: string[] };
-  after: { kind: TransactionKind; categoryId: string | null; tagIds: string[]; confidence: number };
+  after: { kind: TransactionKind; categoryId: string | null; tagIds: string[]; confidence: number; level: ConfidenceLevel };
 }
 
 /**
@@ -81,7 +82,7 @@ export function diffRecategorization(
       description: t.description,
       amount: t.amount,
       before: { kind: t.kind, categoryId: t.categoryId, tagIds: tags },
-      after: { kind: r.kind, categoryId: r.categoryId, tagIds: r.tagIds, confidence: r.confidence },
+      after: { kind: r.kind, categoryId: r.categoryId, tagIds: r.tagIds, confidence: r.confidence, level: r.level },
     });
   });
 

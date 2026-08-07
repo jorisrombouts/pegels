@@ -6,7 +6,7 @@ describe("db mappers", () => {
   it("transaction: injects userId, maps undefined splits/notes -> null, round-trips", () => {
     const tx: Transaction = {
       id: "t1", date: "2025-03-01", description: "x", amount: -100, accountId: "a",
-      categoryId: null, predictedCategoryId: null, categoryConfidence: null,
+      categoryId: null, predictedCategoryId: null, categoryConfidence: null, categoryLevel: null,
       categorySource: "user", needsReview: false, tagIds: ["tag-1"],
       kind: "expense",
     };
@@ -20,7 +20,7 @@ describe("db mappers", () => {
   it("transaction: preserves splits, tagIds and notes through the round-trip", () => {
     const tx: Transaction = {
       id: "t2", date: "2025-03-02", description: "y", amount: -890, accountId: "a",
-      categoryId: "c", predictedCategoryId: "c", categoryConfidence: 0.9,
+      categoryId: "c", predictedCategoryId: "c", categoryConfidence: 0.9, categoryLevel: null,
       categorySource: "model", needsReview: false, tagIds: ["t", "u"],
       splits: [{ id: "s1", amount: 445, mine: true }, { id: "s2", amount: 445, mine: false, label: "P" }],
       notes: "hi", kind: "transfer",
@@ -33,7 +33,7 @@ describe("db mappers", () => {
   it("transaction: round-trips a decimal amount", () => {
     const tx: Transaction = {
       id: "t3", date: "2025-03-03", description: "z", amount: -188.75, accountId: "a",
-      categoryId: null, predictedCategoryId: null, categoryConfidence: null,
+      categoryId: null, predictedCategoryId: null, categoryConfidence: null, categoryLevel: null,
       categorySource: "user", needsReview: false, tagIds: [],
       kind: "expense",
     };

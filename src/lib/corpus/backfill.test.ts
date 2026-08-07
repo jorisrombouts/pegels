@@ -12,7 +12,7 @@ function tx(description: string, o: Partial<Transaction> = {}): Transaction {
     accountId: "acc-1",
     categoryId: "cat-groceries",
     predictedCategoryId: "cat-other",
-    categoryConfidence: 0.8,
+    categoryConfidence: 0.8, categoryLevel: null,
     categorySource: "user",
     needsReview: false,
     tagIds: [],
@@ -57,7 +57,7 @@ describe("planCorpusBackfill", () => {
 
   it("can opt in to confident model rows to give a thin corpus some mass", () => {
     const out = planCorpusBackfill(
-      [tx("WILLYS", { categorySource: "model", categoryConfidence: 0.95, needsReview: false })],
+      [tx("WILLYS", { categorySource: "model", categoryConfidence: 0.95, categoryLevel: null, needsReview: false })],
       { includeHighConfidenceModel: true },
     );
     expect(out).toHaveLength(1);
@@ -66,7 +66,7 @@ describe("planCorpusBackfill", () => {
   it("never opts in a model row that is unsure or already flagged", () => {
     const rows = [
       tx("A", { categorySource: "model", categoryConfidence: 0.7 }),
-      tx("B", { categorySource: "model", categoryConfidence: 0.95, needsReview: true }),
+      tx("B", { categorySource: "model", categoryConfidence: 0.95, categoryLevel: null, needsReview: true }),
     ];
     expect(planCorpusBackfill(rows, { includeHighConfidenceModel: true })).toEqual([]);
   });

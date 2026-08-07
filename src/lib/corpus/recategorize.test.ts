@@ -13,7 +13,7 @@ function tx(o: Partial<Transaction> = {}): Transaction {
     accountId: "acc-1",
     categoryId: "cat-groceries",
     predictedCategoryId: "cat-groceries",
-    categoryConfidence: 0.8,
+    categoryConfidence: 0.8, categoryLevel: null,
     categorySource: "model",
     needsReview: false,
     tagIds: [],
@@ -66,7 +66,7 @@ describe("selectForRecategorize", () => {
 
 describe("diffRecategorization", () => {
   const result = (o: Partial<AiResult> = {}): AiResult => ({
-    index: 0, kind: "expense", categoryId: "cat-groceries", tagIds: [], confidence: 0.9, ...o,
+    index: 0, kind: "expense", categoryId: "cat-groceries", tagIds: [], confidence: 0.9, level: "likely", ...o,
   });
 
   it("reports a genuine category change", () => {

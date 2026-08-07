@@ -21,6 +21,7 @@ function makeTx(date: string, description: string, amount: number, categoryId: s
     categoryId,
     predictedCategoryId: null,
     categoryConfidence: null,
+    categoryLevel: null,
     categorySource: "user",
     needsReview: false,
     tagIds: [],

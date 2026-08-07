@@ -99,7 +99,7 @@ export function evaluate(gold: GoldExample[], predictions: AiResult[], maps: Map
       kindOk, categoryOk, rootOk,
       tagHits, tagPredicted: p.tagIds.length, tagExpected: g.finalTagIds.length,
       confidence: p.confidence,
-      flagged: needsReview(p.confidence),
+      flagged: needsReview(p.level),
       correct: kindOk && categoryOk,
     };
   });

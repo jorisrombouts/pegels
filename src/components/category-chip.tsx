@@ -1,15 +1,17 @@
 import { cn } from "@/lib/utils";
 import type { Category } from "@/lib/domain/types";
+import type { ConfidenceLevel } from "@/lib/ai/confidence";
+import { ConfidenceDot } from "@/components/transactions/confidence-badge";
 
 /** Colored category pill (emoji + name), tinted from the category's own hue. */
 export function CategoryChip({
   category,
-  confidence,
+  level,
   className,
 }: {
   category: Category | undefined;
-  /** 0..1 model confidence — renders a small dot when provided. */
-  confidence?: number | null;
+  /** Renders a small dot when provided. Named levels, not a percentage — see ConfidenceBadge. */
+  level?: ConfidenceLevel | null;
   className?: string;
 }) {
   if (!category) {
@@ -27,13 +29,7 @@ export function CategoryChip({
     >
       <span aria-hidden>{category.icon}</span>
       {category.name}
-      {confidence != null && (
-        <span
-          className="size-1.5 rounded-full"
-          style={{ backgroundColor: confidence >= 0.85 ? "hsl(var(--positive))" : confidence >= 0.6 ? "hsl(var(--warning))" : "hsl(var(--negative))" }}
-          title={`${Math.round(confidence * 100)}% confidence`}
-        />
-      )}
+      <ConfidenceDot level={level ?? null} />
     </span>
   );
 }

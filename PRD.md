@@ -97,7 +97,7 @@ Dates are **ISO `yyyy-mm-dd` strings**.
 | **Account** | `id, name, type, kind('spending'\|'savings'), icon(emoji), color(hsl), balance, accountNumber?, archived` | `savings` never counts toward expenses. A transaction whose description references an `accountNumber` is auto-classified `transfer`. |
 | **Category** | `id, name, icon(emoji), color(hsl), parentId(null=top-level)` | One level of nesting (parent → sub). |
 | **Tag** | `id, name, color(hsl)` | Free-form labels, many-per-transaction. |
-| **Transaction** | `id, date, description, amount(signed SEK), accountId, categoryId?, predictedCategoryId?, categoryConfidence?(0..1), categorySource('model'\|'user'), needsReview, excluded?, tagIds[], splits?[], notes?, kind('expense'\|'income'\|'transfer')` | The central entity. |
+| **Transaction** | `id, date, description, amount(signed SEK), accountId, categoryId?, predictedCategoryId?, categoryConfidence?(0..1, internal), categoryLevel?('confirmed'\|'likely'\|'unsure'), categorySource('model'\|'user'), needsReview, excluded?, tagIds[], splits?[], notes?, kind('expense'\|'income'\|'transfer')` | The central entity. |
 | **Split** | `id, label?, amount(absolute SEK), mine(bool)` | A portion of a transaction; **only `mine` portions count** toward expenses. |
 | **Budget** | `id, categoryId, limit(positive SEK), month('yyyy-mm'\|null)` | `null` month = repeats every month. Targets a top-level or sub category. |
 | **CategorizationExample** | `id, rawDescription, cleanedDescription, amount, predictedKind?, predictedCategoryId?, predictedConfidence?, finalKind, finalCategoryId?, corrected(bool), source('import'\|'detail'), createdAt` | The training set (BR-4). |
@@ -213,7 +213,7 @@ A two-step modal (Upload → Review), opened globally from the nav.
   ones so internal movements between the user's own accounts aren't double-counted; matched existing
   legs are reclassified as `transfer` on import.
 - FR-3.9 — **Editable review screen:** each row shows include checkbox, date, amount, description,
-  kind, and (for expenses) category + a confidence dot. A filter bar offers All/Expense/Transfer/
+  kind, and (for expenses) category + a confidence dot naming the level on hover. A filter bar offers All/Expense/Transfer/
   Income, Needs-review, Uncategorized, Hide-duplicates, and search. A live summary shows
   will-import/duplicates/date-range/needs-review/money-in/out/net/type counts. Confirm imports only
   the included rows and logs AI predictions vs. final choices (BR-4).
@@ -234,7 +234,12 @@ correct or approve one.*
      the owner's own confirmations.
   There is deliberately **no fallback**: if OpenAI errors the import surfaces it. Rows resolved by
   steps 1–2 are unaffected by an outage.
-- FR-4.2 — Confidence `< 0.6` sets `needsReview`.
+- FR-4.2 — **Confidence is categorical.** `gradeConfidence` labels each row from the retrieval
+  evidence: `confirmed` (a near-identical approved merchant agreed), `likely` (evidence existed but
+  nothing decisive), `unsure` (nothing retrieved). `needsReview` is `level === 'unsure'`. The raw
+  score is retained for the eval's calibration metric and is **never shown** — on the hold-out its
+  mean on right and wrong answers are indistinguishable, so a percentage would overstate what is
+  known.
 - FR-4.3 — **BR-4 Learning signal.** Every correction and approval is logged to
   `categorization_examples`. The **high-signal set** = corrections (`corrected=true`) **plus**
   detail-panel approvals (`source='detail'`), excluding passive import-keeps.

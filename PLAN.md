@@ -5,7 +5,7 @@
 > analysis (budgets, trends). Built with Next.js 16 (App Router) + Neon Postgres + OpenAI,
 > deployed on Vercel.
 >
-> **Status — 2026-08-06:** live on Vercel, 459 tests passing, build + lint clean. Every feature
+> **Status — 2026-08-06:** live on Vercel, 481 tests passing, build + lint clean. Every feature
 > screen, the import + categorization pipeline, auth, and per-user sync are shipped. What remains
 > is a short, optional roadmap (see the end of this file).
 >
@@ -23,7 +23,7 @@ npm run db:seed          # load the Swedish sample dataset
 npm run corpus:backfill  # seed the categorization corpus from your own corrections
 npm run eval             # score categorization against the hold-out
 npm run dev              # http://localhost:3000
-npm test                 # vitest (459 tests)
+npm test                 # vitest (481 tests)
 npm run build            # production build (Turbopack)
 ```
 
@@ -91,7 +91,13 @@ import surfaces the error. The keyword table that used to stand in produced plau
 categories on every failure, which is precisely how an expired API key went unnoticed. Rows already
 resolved by steps 1–2 are unaffected by an outage.
 
-Low confidence (`< 0.6`) sets `needsReview`.
+**Confidence is categorical, not a percentage.** `gradeConfidence()` labels each row from what
+retrieval actually found — `confirmed` (a near-identical approved merchant agreed), `likely` (there
+was evidence, nothing decisive), `unsure` (nothing retrieved). `needsReview` is simply
+`level === "unsure"`. The model's own number is retained but never shown: measured against the
+hold-out its mean on correct answers (0.58) and wrong ones (0.53) are indistinguishable, so a
+percentage would claim a precision that does not exist. The number stays only so the eval can keep
+watching for calibration.
 
 **The learning loop.** Corrections and approvals land in `categorization_examples`, which is a
 **curated corpus** — one row per merchant (`dedupKey`), not one per event, so a merchant corrected
@@ -104,9 +110,9 @@ embeddings, so an embeddings outage degrades quality without breaking import. `g
 excluded from every retrieval path by one shared predicate — they belong to the eval hold-out.
 
 The prompt splits into a **stable, cacheable system message** (instructions, priors, both
-taxonomies) and a volatile user message carrying a deduplicated evidence table. `clampConfidence()`
-re-anchors the model's self-reported confidence on what retrieval actually found, so the review
-queue means *"the system has never seen this merchant"*.
+taxonomies) and a volatile user message carrying a deduplicated evidence table. The review queue
+therefore means *"the system has never seen this merchant"* — a fact — rather than *"the model felt
+unsure"*, which is a self-report.
 
 **Curating it** — `/training` (`src/app/(app)/training/page.tsx`). Retrieval fires only on
 **approved** merchants, so the review queue is the highest-leverage surface in the app: it is
@@ -145,7 +151,7 @@ exports; the format is auto-detected.
 
 A `needsReview` row shows a warning dot in the list and a "Needs review" filter on `/transactions`.
 Open the detail panel to either **change** the category (corrects + logs) or **Approve** the guess
-(confirms a correct low-confidence prediction, marks it user-affirmed → 100%, logs the affirmation).
+(confirms a prediction for a merchant with no evidence yet, and records it as evidence).
 Both feed the few-shot above.
 
 ### Auth & single-owner (`src/lib/auth*.ts`, `src/lib/db/claim.ts`)
@@ -281,7 +287,7 @@ A quick map of what's done, for orientation. Details + rationale are in the desi
 - **Training** — `/training` page: review queue ordered most-seen-first, approved corpus with
   search and hold-out toggles, and a one-click seed from your own corrections.
 - **Import** — SEB + Revolut CSV, non-SEK→SEK conversion, dedupe, transfer-pair detection, editable
-  review with kind/category/confidence and a filter bar.
+  review with kind/category/confidence level and a filter bar.
 - **AI categorization + learning loop** — hybrid retrieval (pgvector + lexical) over a
   curated corpus of your corrections → OpenAI. No fallback. Curate at `/training`, measure with
   `npm run eval`.

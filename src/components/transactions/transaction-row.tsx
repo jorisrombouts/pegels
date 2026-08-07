@@ -71,7 +71,7 @@ export const TransactionRow = memo(function TransactionRow({
       {!isTransfer && tx.categoryId && (
         <CategoryChip
           category={category}
-          confidence={tx.categorySource === "model" ? tx.categoryConfidence : null}
+          level={tx.categorySource === "model" ? tx.categoryLevel : null}
           className="hidden shrink-0 sm:inline-flex"
         />
       )}

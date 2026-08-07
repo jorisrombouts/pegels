@@ -9,7 +9,7 @@ const groceries: Category = { id: "cat-groceries", name: "Groceries", icon: "ðŸ›
 function tx(o: Partial<Transaction>): Transaction {
   return {
     id: "t", date: "2025-03-02", description: "ICA Maxi", amount: -487, accountId: "acc-lon",
-    categoryId: "cat-groceries", predictedCategoryId: "cat-groceries", categoryConfidence: 0.9,
+    categoryId: "cat-groceries", predictedCategoryId: "cat-groceries", categoryConfidence: 0.9, categoryLevel: null,
     categorySource: "model", needsReview: false, tagIds: [],
     kind: "expense", ...o,
   };

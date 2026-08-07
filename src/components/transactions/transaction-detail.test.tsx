@@ -14,23 +14,37 @@ beforeEach(() => recorded.mockClear());
 
 // Uses the real (seeded) Zustand store. tx-001 = "Hyra Mars" (Rent, 97% model confidence).
 describe("TransactionDetail", () => {
-  it("renders the headline, account and model confidence", () => {
+  it("renders the headline and account", () => {
     renderWithData(<TransactionDetail txId="tx-001" />);
     expect(screen.getByText("Hyra Mars")).toBeInTheDocument();
     expect(screen.getByText(/SEB/)).toBeInTheDocument();
-    expect(screen.getByText("97%")).toBeInTheDocument();
   });
 
-  it("shows 100% (not the model score) for a hand-corrected category", () => {
+  it("names how much a categorization is worth trusting instead of scoring it", () => {
+    // A percentage implied a calibration the model doesn't have — on the hold-out its mean
+    // confidence on right and on wrong answers were indistinguishable.
     const dataset = {
       ...seedDataset,
       transactions: seedDataset.transactions.map((t) =>
-        t.id === "tx-001" ? { ...t, categorySource: "user" as const } : t,
+        t.id === "tx-001" ? { ...t, categorySource: "model" as const, categoryLevel: "unsure" as const } : t,
       ),
     };
     renderWithData(<TransactionDetail txId="tx-001" />, { dataset });
-    expect(screen.getByText("100%")).toBeInTheDocument();
-    expect(screen.queryByText("97%")).not.toBeInTheDocument();
+    expect(screen.getByText("New merchant")).toBeInTheDocument();
+    expect(screen.queryByText(/%/)).not.toBeInTheDocument();
+  });
+
+  it("credits the user, not the model, for a hand-corrected category", () => {
+    const dataset = {
+      ...seedDataset,
+      transactions: seedDataset.transactions.map((t) =>
+        t.id === "tx-001" ? { ...t, categorySource: "user" as const, categoryLevel: "unsure" as const } : t,
+      ),
+    };
+    renderWithData(<TransactionDetail txId="tx-001" />, { dataset });
+    expect(screen.getByText("Your choice")).toBeInTheDocument();
+    // The model's stale opinion must not leak through once the user has overridden it.
+    expect(screen.queryByText("New merchant")).not.toBeInTheDocument();
   });
 
   it("can flag a transaction to not count toward spending", async () => {

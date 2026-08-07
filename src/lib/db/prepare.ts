@@ -58,6 +58,8 @@ export async function prepareDatabase(opts: { dryRun?: boolean } = {}): Promise<
       ADD COLUMN IF NOT EXISTS embedding_model text
   `);
 
+  await backfillConfidenceLevels();
+
   const raw = await db.execute(sql`
     SELECT id, user_id, cleaned_description, final_kind, final_category_id, corrected, source, created_at
     FROM categorization_examples
@@ -110,6 +112,30 @@ async function dropRetiredTables(): Promise<void> {
   // were first migrated into the corpus as approved examples — a rule naming a *person* is
   // knowledge no prompt prior could reconstruct.
   await db.execute(sql`DROP TABLE IF EXISTS categorization_rules`);
+}
+
+/**
+ * Give existing rows a confidence level, derived from the score they were stored with.
+ *
+ * Confidence became categorical because the raw number is uncalibrated. Old rows only have the
+ * number, so this maps them onto the closest honest label using the thresholds the old UI used —
+ * approximate by construction, and it self-corrects as rows are re-categorized.
+ */
+async function backfillConfidenceLevels(): Promise<void> {
+  await db.execute(sql`
+    ALTER TABLE transactions ADD COLUMN IF NOT EXISTS category_level text
+  `);
+  await db.execute(sql`
+    UPDATE transactions SET category_level =
+      CASE
+        WHEN category_source = 'user' THEN NULL
+        WHEN category_confidence IS NULL THEN NULL
+        WHEN category_confidence >= 0.85 THEN 'confirmed'
+        WHEN category_confidence >= 0.6  THEN 'likely'
+        ELSE 'unsure'
+      END
+    WHERE category_level IS NULL AND category_source <> 'user'
+  `);
 }
 
 function toLegacy(raw: unknown): LegacyExample[] {
