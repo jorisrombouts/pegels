@@ -14,7 +14,7 @@ vi.mock("./index", async () => {
   return { db: drizzle(client as never) };
 });
 
-import { insertTransactions, upsertTransactions } from "./queries";
+import { insertCategorizationExamples, insertTransactions, upsertTransactions } from "./queries";
 
 const tx = (over: Partial<Transaction>): Transaction => ({
   id: "t1", date: "2026-01-10", description: "ICA Maxi", amount: -100, accountId: "acc-lon",
@@ -80,6 +80,30 @@ describe("insertTransactions", () => {
   it("issues no statement at all for an empty import", async () => {
     sent.length = 0;
     await insertTransactions("u1", []);
+    expect(sent).toEqual([]);
+  });
+});
+
+describe("insertCategorizationExamples", () => {
+  const example = (i: number) => ({
+    id: `ex-${i}`, rawDescription: "ICA MAXI 1234", cleanedDescription: "ICA Maxi", amount: "-100",
+    predictedKind: "expense" as const, predictedCategoryId: "cat-groceries", predictedConfidence: 0.9,
+    finalKind: "expense" as const, finalCategoryId: "cat-groceries", corrected: false,
+    source: "import" as const, createdAt: "2026-01-10T00:00:00.000Z",
+  });
+
+  it("splits a batch larger than one chunk into whole statements", async () => {
+    sent.length = 0;
+    // 13 columns/row → the bind-parameter ceiling is 5,041 rows; 6,000 would be rejected unchunked.
+    await insertCategorizationExamples("u1", Array.from({ length: 6000 }, (_, i) => example(i)));
+
+    expect(sent.map((s) => s.params.length / 13)).toEqual([2000, 2000, 2000]);
+    expect(Math.max(...sent.map((s) => s.params.length))).toBeLessThan(65535);
+  });
+
+  it("issues no statement at all for an empty batch", async () => {
+    sent.length = 0;
+    await insertCategorizationExamples("u1", []);
     expect(sent).toEqual([]);
   });
 });
