@@ -13,9 +13,17 @@ export function makeTestClient(dataset: Dataset = seedDataset): QueryClient {
   return qc;
 }
 
-/** Render a component that consumes useData(), with the seeded dataset available. */
+/**
+ * Render a component that consumes useData(), with the seeded dataset available.
+ *
+ * The provider goes in via RTL's `wrapper` option rather than nesting it around `ui`, because
+ * `rerender()` re-renders only what it is given — a nested provider would be dropped on rerender
+ * and the component would throw "No QueryClient set". As a wrapper it survives.
+ */
 export function renderWithData(ui: ReactElement, opts: { dataset?: Dataset } = {}) {
   const queryClient = makeTestClient(opts.dataset);
-  const result = render(<QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>);
+  const result = render(ui, {
+    wrapper: ({ children }) => <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>,
+  });
   return { ...result, queryClient };
 }
