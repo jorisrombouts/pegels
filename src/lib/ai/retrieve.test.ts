@@ -185,3 +185,38 @@ describe("retrieveNeighbours", () => {
     expect(nearestByVector).not.toHaveBeenCalled();
   });
 });
+
+describe("retrieveNeighbours · leave-one-out", () => {
+  // If this silently stops excluding, every accuracy number becomes a measure of the corpus finding
+  // itself — a score that only ever goes up and means nothing.
+  const ica = corpusRow("ex-ica", "ICA MAXI");
+  const coop = corpusRow("ex-coop", "COOP KONSUM", { finalCategoryId: "cat-groceries" });
+
+  it("normally returns the queried merchant's own row", async () => {
+    loadCorpus.mockResolvedValue([ica, coop]);
+    const out = await retrieveNeighbours("u1", [{ index: 0, description: "ICA MAXI", amount: -500 }]);
+    expect(out.get(0)!.map((n) => n.id)).toContain("ex-ica");
+  });
+
+  it("drops it when excludeSelf is set, keeping the other places", async () => {
+    loadCorpus.mockResolvedValue([ica, coop]);
+    const out = await retrieveNeighbours(
+      "u1",
+      [{ index: 0, description: "ICA MAXI", amount: -500 }],
+      { excludeSelf: true },
+    );
+    const ids = out.get(0)!.map((n) => n.id);
+    expect(ids).not.toContain("ex-ica");
+  });
+
+  it("excludes by merchant, not row id, so a duplicate cannot leak the answer", async () => {
+    // Same merchant recorded twice under different ids — matching on id alone would let one through.
+    loadCorpus.mockResolvedValue([ica, corpusRow("ex-ica-2", "ICA MAXI")]);
+    const out = await retrieveNeighbours(
+      "u1",
+      [{ index: 0, description: "ICA MAXI", amount: -500 }],
+      { excludeSelf: true },
+    );
+    expect(out.get(0)).toEqual([]);
+  });
+});

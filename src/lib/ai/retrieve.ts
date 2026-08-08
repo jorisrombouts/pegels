@@ -54,7 +54,13 @@ const MIN_VECTOR_SIMILARITY = 0.55;
 export async function retrieveNeighbours(
   userId: string,
   rows: RetrievalRow[],
-  opts: { limit?: number } = {},
+  /**
+   * `excludeSelf` drops the queried merchant's own corpus row from its results — leave-one-out, so
+   * accuracy can be measured without the answer being one of the examples. Query text and dedup key
+   * are the same function (`normalizeMerchant`), so an exact key match identifies the row itself.
+   * Off in normal use, where every example should count.
+   */
+  opts: { limit?: number; excludeSelf?: boolean } = {},
 ): Promise<Map<number, Neighbour[]>> {
   const limit = opts.limit ?? NEIGHBOURS_PER_ROW;
   const out = new Map<number, Neighbour[]>(rows.map((r) => [r.index, []]));
@@ -125,6 +131,7 @@ export async function retrieveNeighbours(
       .map(({ id, score }) => {
         const row = byId.get(id);
         if (!row) return null;
+        if (opts.excludeSelf && row.dedupKey === q.key) return null;
         return { row, score: score * (1 + (sameMagnitude(q.amount, row.amount) ? AMOUNT_BONUS : 0)) };
       })
       .filter((r): r is { row: CorpusRow; score: number } => r !== null)

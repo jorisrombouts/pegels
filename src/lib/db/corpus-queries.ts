@@ -1,6 +1,6 @@
 import { and, desc, eq, isNull, ne, sql, type SQL } from "drizzle-orm";
 import { db } from "./index";
-import { categorizationExamples, EMBED_DIMS, type ExampleStatus } from "./schema";
+import { accuracyRuns, categorizationExamples, EMBED_DIMS, type ExampleStatus } from "./schema";
 import type { PlannedExample } from "../corpus/record";
 import type { CorpusRow, CurationRow } from "../corpus/types";
 
@@ -294,3 +294,20 @@ export async function nearestByVector(
 }
 
 export type { ExampleStatus };
+
+// ── Accuracy history ────────────────────────────────────────────────────────
+
+export async function insertAccuracyRun(row: typeof accuracyRuns.$inferInsert): Promise<void> {
+  await db.insert(accuracyRuns).values(row);
+}
+
+/** Oldest first, so the caller can plot it left to right without reversing. */
+export async function loadAccuracyRuns(userId: string, limit = 24) {
+  const rows = await db
+    .select()
+    .from(accuracyRuns)
+    .where(eq(accuracyRuns.userId, userId))
+    .orderBy(desc(accuracyRuns.createdAt))
+    .limit(limit);
+  return rows.reverse();
+}

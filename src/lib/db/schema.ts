@@ -190,3 +190,22 @@ export const authVerificationTokens = pgTable(
   },
   (t) => [primaryKey({ columns: [t.identifier, t.token] })],
 );
+
+/**
+ * One row per accuracy check, so the number can be shown as a trend rather than a lone figure.
+ *
+ * Deliberately thin: the sample is reproducible from `sampleForScoring`, so storing which places
+ * were scored would duplicate something already derivable. Only the outcome is kept.
+ */
+export const accuracyRuns = pgTable(
+  "accuracy_runs",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id").notNull(),
+    createdAt: text("created_at").notNull(), // ISO string, set by the caller
+    sampled: integer("sampled").notNull(),
+    correct: integer("correct").notNull(),
+    corpusSize: integer("corpus_size").notNull(),
+  },
+  (t) => [index("accuracy_runs_user_idx").on(t.userId)],
+);
