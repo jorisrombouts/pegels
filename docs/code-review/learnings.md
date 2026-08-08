@@ -405,6 +405,80 @@ the 1 MB cliff is. It independently reproduced the issue's ~2,900-row failure po
 
 ---
 
+## Round 4 — merging two long-lived branches, and one bad diagnosis
+
+### I diagnosed production from the wrong database
+
+The sharpest failure of the whole review. `.env.local` pointed at a **development** Neon endpoint;
+production used a different one. Queried the dev database, found `goals` / `user_preferences` /
+`categorization_rules` missing, and reported **production is broken behind green deploys**. It was
+not. Production had every table it needed and was serving fine the entire time.
+
+Worse, the user *told* me `.env.local` was production and I accepted it — while already holding the
+contradicting evidence, a 496-row dataset ending in June against a dashboard showing August.
+
+What settled it in one query, once asked properly: **the data has to match what the user sees.**
+
+```
+dev  endpoint ep-quiet-forest…  496 rows  Jan–Jun 2026  0 August rows
+prod endpoint ep-bitter-snow…   768 rows  Jan–Aug 2026  17 August rows   ← the dashboard
+```
+
+**Lesson:** a measurement describes the thing you pointed it at, not the thing you are reasoning
+about. Before concluding anything about an environment, prove the connection *is* that environment
+with a fact only it can have. And an assertion from the user is a hypothesis, not evidence — when it
+conflicts with data already in hand, resolve the conflict instead of picking the friendlier side.
+
+### A clean auto-merge is not a correct one
+
+`src/lib/db/queries.ts` merged with **zero conflicts** and was wrong. The RAG branch added
+`transactions.category_level` to `transactionToRow`; the hand-written `on conflict do update set`
+block from #3 lived in a region that branch never touched, so git had nothing to flag. The result
+would have written a new category label and kept the **stale confidence level**, silently, on every
+recategorized row — defeating the feature the merge existed to ship.
+
+The SQL-pinning test from #3 caught it, because it asserts the generated statement byte-for-byte
+rather than counting statements:
+
+```
+Expected: … "category_confidence", "category_source" …                   (16 cols)
+Received: … "category_confidence", "category_level", "category_source" … (17 cols)
+```
+
+The same merge also reintroduced #8's Server Action body limit on a new path (`patchTransactions`,
+which a recategorize can call with thousands of rows).
+
+**Lesson:** when a long-lived branch merges, the risk is not the conflicts — those get reviewed. It
+is the clean hunks that silently disagree with a change made elsewhere. Pin generated artifacts
+(SQL, wire payloads) in tests so a schema change cannot pass through a quiet auto-merge, and diff
+the merge result against a checklist of what must still be true rather than reading the conflict
+list.
+
+### Verify a destructive migration's stated preconditions
+
+`prepare.ts` justified `DROP TABLE categorization_rules` with: safe "only because the personal ones
+were first migrated into the corpus." **Nothing implemented that migration.** The table name appeared
+in the file exactly once — in the `DROP`.
+
+Fourteen rules were at stake, seven hand-written, including one naming a person — exactly the case
+the comment called irreplaceable. The drop turned out to be survivable, but only because a
+measurement said so: every one of the seven merchants already had corrections in the corpus.
+
+**Lesson:** a comment asserting a precondition is a claim about *other code*. Grep for that code
+before trusting it. And back up what a migration destroys even when you expect it to be fine —
+the backup costs seconds and converts an irreversible step into a reversible one.
+
+### Sequencing a migration and a deploy has no zero-downtime ordering
+
+Migrate first and the running code breaks against the new schema; deploy first and the new code
+breaks against the old one. With fail-loudly shipped, that gap is a visible error page rather than a
+silently empty dashboard — better, but still a gap.
+
+I ran the migration knowing the merge was the user's to make, which put production down while
+waiting on a human. **Say the window out loud before opening it**, and agree who closes it.
+
+---
+
 ## Process notes
 
 - **Anchor issues to symbols, not line numbers.** A concurrent session refactored mid-review and every

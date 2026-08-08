@@ -23,7 +23,7 @@ function setup() {
 const makeTx = (i: number): Transaction => ({
   id: `tx-big-${i}`, date: "2026-04-25", description: "ICA Maxi", amount: -100, accountId: "acc-lon",
   categoryId: "cat-groceries", predictedCategoryId: null, categoryConfidence: null, categorySource: "model",
-  needsReview: false, tagIds: [], kind: "expense", goalId: null,
+  needsReview: false, tagIds: [], kind: "expense", categoryLevel: null,
 });
 
 describe("useData facade", () => {
