@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { previewRecategorize, applyRecategorize } from "@/app/actions/recategorize";
 import type { RecategorizeChange, RecategorizeScope } from "@/lib/corpus/recategorize";
 import { formatSEK } from "@/lib/format";
+import { cn } from "@/lib/utils";
 import { useData } from "@/store/data";
 import type { Category } from "@/lib/domain/types";
 
@@ -25,14 +26,27 @@ const SCOPES: { value: RecategorizeScope; label: string }[] = [
  * confirm is what happens, with no second call to the model and no drift in between.
  */
 export function RecategorizePanel({ categories }: { categories: Category[] }) {
-  const { patchTransactions } = useData();
+  const { patchTransactions, tags } = useData();
   const [scope, setScope] = useState<RecategorizeScope>("needs-review");
   const [busy, setBusy] = useState<"preview" | "apply" | null>(null);
   const [result, setResult] = useState<{ changes: RecategorizeChange[]; unchanged: number; truncated: boolean } | null>(null);
   const [done, setDone] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  /** Ids the user has unticked. Absent = applied, so a fresh preview starts with everything on. */
+  const [skipped, setSkipped] = useState<Set<string>>(new Set());
 
   const nameOf = (id: string | null) => (id ? categories.find((c) => c.id === id)?.name ?? id : "—");
+  const tagNames = (ids: string[]) =>
+    ids.map((id) => tags.find((t) => t.id === id)?.name ?? id).join(", ") || "no tags";
+
+  const selected = (result?.changes ?? []).filter((c) => !skipped.has(c.id));
+  const toggle = (id: string) =>
+    setSkipped((s) => {
+      const next = new Set(s);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
 
   async function runPreview() {
     setBusy("preview");
@@ -41,6 +55,7 @@ export function RecategorizePanel({ categories }: { categories: Category[] }) {
     setResult(null);
     try {
       setResult(await previewRecategorize(scope));
+      setSkipped(new Set()); // a fresh preview starts with every change ticked
     } catch (e) {
       console.error("recategorize preview failed", e);
       setError("Couldn't reach the AI service. Nothing was changed.");
@@ -50,14 +65,15 @@ export function RecategorizePanel({ categories }: { categories: Category[] }) {
   }
 
   async function apply() {
-    if (!result?.changes.length) return;
+    if (!selected.length) return;
     setBusy("apply");
     setError(null);
     try {
-      const n = await applyRecategorize(result.changes);
+      // Only the ticked rows are sent; the unticked ones stay exactly as they are.
+      const n = await applyRecategorize(selected);
       // Mirror the server's write into the cache so the list updates without a refetch.
       patchTransactions(
-        result.changes.map((c) => ({
+        selected.map((c) => ({
           id: c.id,
           patch: { kind: c.after.kind, categoryId: c.after.categoryId, tagIds: c.after.tagIds },
         })),
@@ -123,22 +139,67 @@ export function RecategorizePanel({ categories }: { categories: Category[] }) {
 
           {result.changes.length > 0 && (
             <>
-              <ul className="mt-2 max-h-64 divide-y divide-[hsl(var(--glass-border))] overflow-y-auto">
-                {result.changes.map((c) => (
-                  <li key={c.id} className="flex items-center justify-between gap-3 py-2 text-sm">
-                    <span className="min-w-0 flex-1 truncate">{c.description}</span>
-                    <span className="tnum shrink-0 text-xs text-muted-foreground">{formatSEK(c.amount, false)}</span>
-                    <span className="shrink-0 text-xs">
-                      <span className="text-muted-foreground">{nameOf(c.before.categoryId)}</span>
-                      {" → "}
-                      <span className="font-medium">{nameOf(c.after.categoryId)}</span>
-                    </span>
-                  </li>
-                ))}
+              <div className="mt-2 flex items-center justify-between text-xs text-muted-foreground">
+                <span className="tnum">{selected.length} of {result.changes.length} selected</span>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setSkipped(
+                      selected.length === result.changes.length
+                        ? new Set(result.changes.map((c) => c.id))
+                        : new Set(),
+                    )
+                  }
+                  className="pressable hover:text-foreground"
+                >
+                  {selected.length === result.changes.length ? "Select none" : "Select all"}
+                </button>
+              </div>
+
+              <ul className="mt-1 max-h-64 divide-y divide-[hsl(var(--glass-border))] overflow-y-auto">
+                {result.changes.map((c) => {
+                  // Category alone is not the whole diff — a row can change only its kind or tags,
+                  // which used to render as "Mortgage → Mortgage" and look like a no-op.
+                  const diffs: { label: string; from: string; to: string }[] = [];
+                  if (c.before.categoryId !== c.after.categoryId) {
+                    diffs.push({ label: "category", from: nameOf(c.before.categoryId), to: nameOf(c.after.categoryId) });
+                  }
+                  if (c.before.kind !== c.after.kind) {
+                    diffs.push({ label: "type", from: c.before.kind, to: c.after.kind });
+                  }
+                  if (tagNames(c.before.tagIds) !== tagNames(c.after.tagIds)) {
+                    diffs.push({ label: "tags", from: tagNames(c.before.tagIds), to: tagNames(c.after.tagIds) });
+                  }
+                  const on = !skipped.has(c.id);
+                  return (
+                    <li key={c.id} className="flex items-start gap-3 py-2 text-sm">
+                      <input
+                        type="checkbox"
+                        checked={on}
+                        onChange={() => toggle(c.id)}
+                        aria-label={`Apply the change to ${c.description}`}
+                        className="mt-1 size-4 shrink-0 accent-[hsl(var(--primary))]"
+                      />
+                      <div className={cn("min-w-0 flex-1", !on && "opacity-40")}>
+                        <div className="flex items-baseline justify-between gap-2">
+                          <span className="min-w-0 flex-1 truncate">{c.description}</span>
+                          <span className="tnum shrink-0 text-xs text-muted-foreground">{formatSEK(c.amount, false)}</span>
+                        </div>
+                        {diffs.map((d) => (
+                          <p key={d.label} className="text-xs">
+                            <span className="text-muted-foreground">{d.label}: {d.from}</span>
+                            {" → "}
+                            <span className="font-medium">{d.to}</span>
+                          </p>
+                        ))}
+                      </div>
+                    </li>
+                  );
+                })}
               </ul>
-              <Button size="sm" onClick={apply} disabled={busy !== null} className="mt-3 gap-1.5">
+              <Button size="sm" onClick={apply} disabled={busy !== null || selected.length === 0} className="mt-3 gap-1.5">
                 {busy === "apply" && <Loader2 className="size-4 animate-spin" />}
-                Apply {result.changes.length} change{result.changes.length === 1 ? "" : "s"}
+                Apply {selected.length} change{selected.length === 1 ? "" : "s"}
               </Button>
             </>
           )}
