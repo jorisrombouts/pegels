@@ -59,10 +59,10 @@ export function CorpusTable({
   return (
     <Card>
       <CardHeader
-        label="Shops it recognises"
+        label="Places it recognises"
         action={
           <span className="tnum text-xs text-muted-foreground">
-            {rows.length} shops
+            {rows.length} places
           </span>
         }
       />
@@ -72,12 +72,12 @@ export function CorpusTable({
           setQuery(e.target.value);
           setPage(0); // a new search should land on its first page, not page 3 of it
         }}
-        placeholder="Find a shop…"
+        placeholder="Find a place…"
         className="mb-3"
       />
       {matches.length === 0 ? (
         <p className="py-6 text-center text-sm text-muted-foreground">
-          {rows.length === 0 ? "Nothing confirmed yet — start with the list on the left." : "No shop matches that."}
+          {rows.length === 0 ? "Nothing confirmed yet — start with the list on the left." : "No place matches that."}
         </p>
       ) : (
         <ul className="divide-y divide-[hsl(var(--glass-border))]">
@@ -153,7 +153,7 @@ export function CorpusTable({
           })}
         </ul>
       )}
-      <Pager page={shown} onPage={setPage} noun="shops" />
+      <Pager page={shown} onPage={setPage} noun="places" />
     </Card>
   );
 }

@@ -95,7 +95,7 @@ describe("CandidateQueue", () => {
     renderWithData(<CandidateQueue rows={rows} categories={CATEGORIES} onApprove={noop} onReject={noop} />);
     expect(screen.getByText("MERCHANT 000")).toBeInTheDocument();
     expect(screen.queryByText("MERCHANT 025")).not.toBeInTheDocument();
-    expect(screen.getByText(/1–20 of 45 shops/)).toBeInTheDocument();
+    expect(screen.getByText(/1–20 of 45 places/)).toBeInTheDocument();
   });
 
   it("falls back to the last page when approvals shrink the queue underneath it", async () => {

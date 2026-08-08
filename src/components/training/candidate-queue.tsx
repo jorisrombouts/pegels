@@ -50,7 +50,7 @@ export function CandidateQueue({
       />
       {rows.length === 0 ? (
         <p className="py-6 text-center text-sm text-muted-foreground">
-          All caught up. Every shop it has seen is either confirmed or hidden.
+          All caught up. Every place it has seen is either confirmed or hidden.
         </p>
       ) : (
         <ul className="divide-y divide-[hsl(var(--glass-border))]">
@@ -106,7 +106,7 @@ export function CandidateQueue({
           })}
         </ul>
       )}
-      <Pager page={shown} onPage={setPage} noun="shops" />
+      <Pager page={shown} onPage={setPage} noun="places" />
     </Card>
   );
 }

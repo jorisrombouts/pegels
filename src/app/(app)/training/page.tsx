@@ -41,7 +41,7 @@ export default function TrainingPage() {
     setReport(null);
     try {
       const r = await backfill(false);
-      setReport(`Read ${r.considered} transaction${r.considered === 1 ? "" : "s"} you had fixed yourself, and learned ${r.merchants} shop${r.merchants === 1 ? "" : "s"} from them.`);
+      setReport(`Read ${r.considered} transaction${r.considered === 1 ? "" : "s"} you had fixed yourself, and learned ${r.merchants} place${r.merchants === 1 ? "" : "s"} from them.`);
     } catch {
       setReport("Something went wrong — nothing was changed.");
     } finally {
@@ -51,7 +51,7 @@ export default function TrainingPage() {
 
   return (
     <>
-      <PageHeader title="Teach" subtitle="Shops it recognises, and what it still needs from you" />
+      <PageHeader title="Teach" subtitle="Places it recognises, and what it still needs from you" />
 
       {/* Narrow single column on phones; on desktop the queue and the corpus sit side by side so
           reviewing doesn't mean scrolling past everything already learned. */}
@@ -59,18 +59,18 @@ export default function TrainingPage() {
         <Card>
           <SectionLabel className="mb-3">What it has learned</SectionLabel>
           <div className="grid grid-cols-3 gap-3">
-            <Stat label="Recognises" value={approved.length} sub="shops it can label on its own" />
+            <Stat label="Recognises" value={approved.length} sub="places it can label on its own" />
             <Stat label="Needs a check" value={candidates.length} sub="not used until you confirm" />
-            <Stat label="Transactions" value={sightings} sub="behind those shops" />
+            <Stat label="Transactions" value={sightings} sub="behind those places" />
           </div>
           <p className="mt-3 text-xs text-muted-foreground">
-            A shop only helps once you confirm it. {tagged === 0
+            A place only helps once you confirm it. {tagged === 0
               ? "None of them have tags yet, so it has to guess tags from scratch every time."
               : `${tagged} of them have tags, which is how it learns to tag new purchases.`}
           </p>
           <div className="mt-4 rounded-2xl glass-inset px-3 py-3">
             <p className="text-xs text-muted-foreground">
-              Goes back through every transaction you categorised yourself and learns those shops.
+              Goes back through every transaction you categorised yourself and learns those places.
               Safe to run more than once — it updates what it already knows instead of duplicating it.
             </p>
             <div className="mt-2 flex flex-wrap items-center gap-3">

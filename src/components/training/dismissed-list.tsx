@@ -64,7 +64,7 @@ export function DismissedList({
               </li>
             ))}
           </ul>
-          <Pager page={shown} onPage={setPage} noun="shops" />
+          <Pager page={shown} onPage={setPage} noun="places" />
         </>
       )}
     </Card>
