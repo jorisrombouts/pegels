@@ -42,7 +42,7 @@ describe("CorpusTable pagination", () => {
     renderWithData(table(many(60)));
     expect(screen.getByText("MERCHANT 000")).toBeInTheDocument();
     expect(screen.queryByText("MERCHANT 030")).not.toBeInTheDocument();
-    expect(screen.getByText(/1–25 of 60 merchants/)).toBeInTheDocument();
+    expect(screen.getByText(/1–25 of 60 shops/)).toBeInTheDocument();
   });
 
   it("moves to the next page", async () => {
@@ -71,7 +71,7 @@ describe("CorpusTable pagination", () => {
     const user = userEvent.setup();
     renderWithData(table([...many(40), row("SPOTIFY AB")]));
     await user.click(screen.getByRole("button", { name: /next page/i }));
-    await user.type(screen.getByPlaceholderText("Search merchants…"), "spotify");
+    await user.type(screen.getByPlaceholderText("Find a shop…"), "spotify");
     expect(screen.getByText("SPOTIFY AB")).toBeInTheDocument();
   });
 });

@@ -34,7 +34,7 @@ describe("DismissedList", () => {
     const user = userEvent.setup();
     renderWithData(<DismissedList rows={[row("SKRÄPPOST")]} onRestore={() => {}} />);
     expect(screen.queryByText("SKRÄPPOST")).not.toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: /1 merchant · show/ }));
+    await user.click(screen.getByRole("button", { name: /1 hidden · view/ }));
     expect(screen.getByText("SKRÄPPOST")).toBeInTheDocument();
   });
 
@@ -43,8 +43,8 @@ describe("DismissedList", () => {
     const onRestore = vi.fn();
     const junk = row("SKRÄPPOST");
     renderWithData(<DismissedList rows={[junk]} onRestore={onRestore} />);
-    await user.click(screen.getByRole("button", { name: /show/ }));
-    await user.click(screen.getByRole("button", { name: /Restore SKRÄPPOST/ }));
+    await user.click(screen.getByRole("button", { name: /view/ }));
+    await user.click(screen.getByRole("button", { name: /Bring SKRÄPPOST back/ }));
     expect(onRestore).toHaveBeenCalledWith(junk.id);
   });
 });

@@ -33,10 +33,10 @@ const row = (description: string, o: Partial<CurationRow> = {}): CurationRow => 
 const noop = () => {};
 
 describe("CandidateQueue", () => {
-  it("shows how many times each merchant has been seen", () => {
+  it("shows how many transactions each shop covers", () => {
     renderWithData(<CandidateQueue rows={[row("ICA MAXI", { hitCount: 47 })]} categories={CATEGORIES} onApprove={noop} onReject={noop} />);
     expect(screen.getByText("ICA MAXI")).toBeInTheDocument();
-    expect(screen.getByText(/seen 47×/)).toBeInTheDocument();
+    expect(screen.getByText(/47 transactions/)).toBeInTheDocument();
   });
 
   it("approves with the row's existing category when it is already right", async () => {
@@ -87,7 +87,7 @@ describe("CandidateQueue", () => {
 
   it("says so plainly when the queue is empty", () => {
     renderWithData(<CandidateQueue rows={[]} categories={CATEGORIES} onApprove={noop} onReject={noop} />);
-    expect(screen.getByText(/nothing waiting/i)).toBeInTheDocument();
+    expect(screen.getByText(/all caught up/i)).toBeInTheDocument();
   });
 
   it("pages a long queue rather than rendering all of it", () => {
@@ -95,7 +95,7 @@ describe("CandidateQueue", () => {
     renderWithData(<CandidateQueue rows={rows} categories={CATEGORIES} onApprove={noop} onReject={noop} />);
     expect(screen.getByText("MERCHANT 000")).toBeInTheDocument();
     expect(screen.queryByText("MERCHANT 025")).not.toBeInTheDocument();
-    expect(screen.getByText(/1–20 of 45 merchants/)).toBeInTheDocument();
+    expect(screen.getByText(/1–20 of 45 shops/)).toBeInTheDocument();
   });
 
   it("falls back to the last page when approvals shrink the queue underneath it", async () => {

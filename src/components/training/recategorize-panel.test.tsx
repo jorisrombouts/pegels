@@ -55,7 +55,7 @@ describe("RecategorizePanel", () => {
 
   it("cannot apply when everything is unticked", async () => {
     const user = await previewWith([change()]);
-    await user.click(screen.getByRole("button", { name: "Select none" }));
+    await user.click(screen.getByRole("button", { name: "Untick all" }));
     expect(screen.getByRole("button", { name: /Apply 0 changes/ })).toBeDisabled();
   });
 

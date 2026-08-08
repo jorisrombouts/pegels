@@ -32,7 +32,7 @@ export function DismissedList({
   return (
     <Card>
       <CardHeader
-        label="Dismissed"
+        label="Hidden"
         action={
           <button
             type="button"
@@ -40,7 +40,7 @@ export function DismissedList({
             aria-expanded={open}
             className="pressable text-xs text-muted-foreground hover:text-foreground"
           >
-            {rows.length} merchant{rows.length === 1 ? "" : "s"} · {open ? "hide" : "show"}
+            {rows.length} hidden · {open ? "close" : "view"}
           </button>
         }
       />
@@ -51,11 +51,11 @@ export function DismissedList({
               <li key={r.id} className="flex items-center gap-3 py-2.5 first:pt-0">
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-medium">{r.cleanedDescription}</p>
-                  <p className="tnum text-xs text-muted-foreground">seen {r.hitCount}×</p>
+                  <p className="tnum text-xs text-muted-foreground">{r.hitCount} transaction{r.hitCount === 1 ? "" : "s"}</p>
                 </div>
                 <button
                   type="button"
-                  aria-label={`Restore ${r.cleanedDescription} to the review queue`}
+                  aria-label={`Bring ${r.cleanedDescription} back to be checked`}
                   onClick={() => onRestore(r.id)}
                   className="pressable grid size-8 shrink-0 place-items-center rounded-full text-muted-foreground hover:text-foreground"
                 >
@@ -64,7 +64,7 @@ export function DismissedList({
               </li>
             ))}
           </ul>
-          <Pager page={shown} onPage={setPage} noun="merchants" />
+          <Pager page={shown} onPage={setPage} noun="shops" />
         </>
       )}
     </Card>

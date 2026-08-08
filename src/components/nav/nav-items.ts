@@ -27,7 +27,7 @@ export const NAV_REGISTRY: NavItem[] = [
   { key: "categories", href: "/categories", label: "Categories", icon: Layers, primary: true },
   { key: "accounts", href: "/accounts", label: "Accounts", icon: Landmark, primary: false },
   { key: "tags", href: "/tags", label: "Tags", icon: Tag, primary: false },
-  { key: "training", href: "/training", label: "Training", icon: GraduationCap, primary: false },
+  { key: "training", href: "/training", label: "Teach", icon: GraduationCap, primary: false },
   { key: "settings", href: "/settings", label: "Settings", icon: Settings, primary: false },
 ];
 
