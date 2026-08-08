@@ -116,3 +116,28 @@ describe("diffRecategorization", () => {
     expect(changes[0]).toMatchObject({ description: "SPOTIFY AB", amount: -119 });
   });
 });
+
+describe("selectForRecategorize · hand corrections", () => {
+  // Deliberately shaped to QUALIFY for every scope — needsReview true and no category — so the only
+  // thing keeping it out is categorySource, not a scope mismatch.
+  const mine = () => tx({ id: "t-user", categorySource: "user", needsReview: true, categoryId: null });
+  const model = () => tx({ id: "t-model", categorySource: "model", needsReview: true, categoryId: null });
+
+  it("leaves hand corrections alone under every ordinary scope", () => {
+    for (const scope of ["needs-review", "uncategorized", "all-model"] as const) {
+      const picked = selectForRecategorize([mine(), model()], scope).map((t) => t.id);
+      expect(picked).not.toContain("t-user");
+      expect(picked).toContain("t-model"); // the scope itself does match — exclusion is the reason
+    }
+  });
+
+  it("includes them only under all-including-user", () => {
+    const picked = selectForRecategorize([mine(), model()], "all-including-user").map((t) => t.id);
+    expect(picked).toEqual(expect.arrayContaining(["t-user", "t-model"]));
+  });
+
+  it("still skips excluded rows even under all-including-user", () => {
+    const row = tx({ id: "t-x", categorySource: "user", excluded: true });
+    expect(selectForRecategorize([row], "all-including-user")).toEqual([]);
+  });
+});
