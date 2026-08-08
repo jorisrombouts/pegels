@@ -23,6 +23,11 @@ function NavButton({ item, active }: { item: NavItem; active: boolean }) {
   return (
     <Link
       href={item.href}
+      // Every (app) route is dynamic (the layout reads cookies via auth()), so the default
+      // prefetch stops at the loading.tsx skeleton: the first tap then pays a cold function
+      // invocation plus that route's JS. The bar is always in the viewport, so pull the full
+      // route down while the shell is idle instead. (Prefetching is production-only.)
+      prefetch
       aria-label={item.label}
       aria-current={active ? "page" : undefined}
       className={cn(TAB, "transition-colors", active ? "text-primary-foreground" : "text-muted-foreground hover:text-foreground")}
