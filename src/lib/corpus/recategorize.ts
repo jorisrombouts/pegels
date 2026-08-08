@@ -10,7 +10,7 @@ import type { ConfidenceLevel } from "@/lib/ai/confidence";
  * a database or an API key.
  */
 
-export type RecategorizeScope = "needs-review" | "uncategorized" | "month" | "all-model";
+export type RecategorizeScope = "needs-review" | "uncategorized" | "month" | "all-model" | "all-including-user";
 
 export interface RecategorizeChange {
   id: string;
@@ -33,7 +33,10 @@ export function selectForRecategorize(
 ): Transaction[] {
   return transactions.filter((t) => {
     if (t.excluded) return false;
-    if (t.categorySource === "user") return false;
+    // Hand corrections are normally off-limits — the model should not quietly overwrite a decision
+    // the user made. "all-including-user" is the one scope that opts into revisiting them, and it
+    // still only ever produces a preview the user has to apply.
+    if (t.categorySource === "user" && scope !== "all-including-user") return false;
 
     switch (scope) {
       case "needs-review":
@@ -44,6 +47,7 @@ export function selectForRecategorize(
       case "month":
         return month !== undefined && monthKey(t.date) === month;
       case "all-model":
+      case "all-including-user":
         return true;
     }
   });

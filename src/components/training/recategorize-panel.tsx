@@ -15,6 +15,7 @@ const SCOPES: { value: RecategorizeScope; label: string }[] = [
   { value: "needs-review", label: "Flagged for review" },
   { value: "uncategorized", label: "Uncategorized expenses" },
   { value: "all-model", label: "Everything the AI categorized" },
+  { value: "all-including-user", label: "Everything, including my corrections" },
 ];
 
 /**
@@ -75,8 +76,15 @@ export function RecategorizePanel({ categories }: { categories: Category[] }) {
     <Card>
       <SectionLabel className="mb-3">Re-categorize</SectionLabel>
       <p className="mb-3 text-xs text-muted-foreground">
-        Runs the current categorizer over transactions an older version classified. Anything you
-        corrected by hand is left alone.
+        Runs the current categorizer over transactions an older version classified.{" "}
+        {scope === "all-including-user" ? (
+          <span style={{ color: "hsl(var(--warning))" }}>
+            This scope also revisits the ones you corrected by hand — review the preview before
+            applying.
+          </span>
+        ) : (
+          "Anything you corrected by hand is left alone."
+        )}
       </p>
 
       <div className="flex flex-wrap items-center gap-2">
