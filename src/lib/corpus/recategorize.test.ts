@@ -141,3 +141,36 @@ describe("selectForRecategorize · hand corrections", () => {
     expect(selectForRecategorize([row], "all-including-user")).toEqual([]);
   });
 });
+
+describe("diffRecategorization · an unsure model must not strip a label", () => {
+  const ai = (o: Partial<AiResult> = {}): AiResult =>
+    ({ index: 0, kind: "expense", categoryId: null, tagIds: [], confidence: 0.4, level: "low", ...o }) as AiResult;
+
+  it("keeps the existing category when the model answers null", () => {
+    const rows = [tx({ id: "t-1", categoryId: "cat-groceries", kind: "expense", tagIds: [] })];
+    const { changes, unchanged } = diffRecategorization(rows, [ai()]);
+    expect(changes).toEqual([]);
+    expect(unchanged).toBe(1);
+  });
+
+  it("still applies the rest of the row when only the category is unknown", () => {
+    const rows = [tx({ id: "t-1", categoryId: "cat-groceries", kind: "expense", tagIds: [] })];
+    const { changes } = diffRecategorization(rows, [ai({ tagIds: ["tag-fixed"] })]);
+    expect(changes).toHaveLength(1);
+    expect(changes[0].after.categoryId).toBe("cat-groceries"); // held, not blanked
+    expect(changes[0].after.tagIds).toEqual(["tag-fixed"]);
+  });
+
+  it("still allows a genuine category change", () => {
+    const rows = [tx({ id: "t-1", categoryId: "cat-groceries", kind: "expense", tagIds: [] })];
+    const { changes } = diffRecategorization(rows, [ai({ categoryId: "cat-restaurants" })]);
+    expect(changes[0].after.categoryId).toBe("cat-restaurants");
+  });
+
+  it("leaves an uncategorized row uncategorized rather than inventing one", () => {
+    const rows = [tx({ id: "t-1", categoryId: null, kind: "expense", tagIds: [] })];
+    const { changes, unchanged } = diffRecategorization(rows, [ai()]);
+    expect(changes).toEqual([]);
+    expect(unchanged).toBe(1);
+  });
+});

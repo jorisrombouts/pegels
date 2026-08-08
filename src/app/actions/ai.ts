@@ -100,7 +100,13 @@ export async function categorizeTransactions(rows: AiRow[]): Promise<AiResult[]>
       fromModel ??
       ({ index: r.index, kind: r.amount < 0 ? "expense" : "income", categoryId: null, tagIds: [], confidence: 0.4, level: "low" } as AiResult);
     reconcileKindWithSign(res, r.amount); // the data model forbids income<0 / expense>0; the sign wins
-    if (res.categoryId && !validIds.has(res.categoryId)) res.categoryId = null;
+    if (res.categoryId && !validIds.has(res.categoryId)) {
+      // Should now be unreachable — the response schema enumerates the valid ids. Kept as defence
+      // in depth, but loud: silently blanking this is what made "the AI keeps removing categories"
+      // impossible to diagnose.
+      console.error(`categorize: model returned unknown categoryId ${res.categoryId}; treating as uncategorized`);
+      res.categoryId = null;
+    }
 
     if (!ruled.has(r.index) && !fromModel) {
       // Nobody classified this row — its chunk failed, and categorizeWithOpenAI returns the chunks

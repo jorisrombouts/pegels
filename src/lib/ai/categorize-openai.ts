@@ -213,7 +213,7 @@ function buildUserMessage(rows: AiRow[], neighbours: NeighboursByRow): string {
 
 const CHUNK_SIZE = 40;
 
-const RESPONSE_FORMAT = {
+const responseFormat = (categoryIds: string[]) => ({
   type: "json_schema",
   json_schema: {
     name: "categorizations",
@@ -232,9 +232,10 @@ const RESPONSE_FORMAT = {
             properties: {
               index: { type: "integer" },
               kind: { type: "string", enum: ["expense", "income", "transfer"] },
-              // Left as string|null rather than a dynamic enum — the post-filter below already
-              // handles hallucinated ids and is proven.
-              categoryId: { type: ["string", "null"] },
+              // A dynamic enum, not a bare string: with strict structured outputs the model then
+              // cannot emit an id that does not exist, so a mistyped one can no longer be silently
+              // turned into "uncategorized". The post-filter below stays as defence in depth.
+              categoryId: { type: ["string", "null"], enum: [...categoryIds, null] },
               tagIds: { type: "array", items: { type: "string" } },
               confidence: { type: "number" },
             },
@@ -243,7 +244,7 @@ const RESPONSE_FORMAT = {
       },
     },
   },
-} as const;
+}) as const;
 
 async function categorizeChunk(
   client: OpenAI,
@@ -258,7 +259,7 @@ async function categorizeChunk(
     // Categorization is a classification task, not a creative one. Left unset this defaults to 1,
     // which means every run samples and a settled merchant can flip between imports.
     temperature: 0,
-    response_format: RESPONSE_FORMAT,
+    response_format: responseFormat(taxonomy.categories.map((c) => c.id)),
     ...(cacheKey ? { prompt_cache_key: cacheKey, prompt_cache_retention: "24h" } : {}),
   } as unknown as OpenAI.Chat.Completions.ChatCompletionCreateParamsNonStreaming;
 

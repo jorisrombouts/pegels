@@ -77,7 +77,11 @@ export function diffRecategorization(
       return;
     }
     const tags = t.tagIds ?? [];
-    if (r.kind === t.kind && r.categoryId === t.categoryId && sameTags(r.tagIds, tags)) {
+    // An unsure model answers null. Letting that strip a category the row already has turns
+    // "I don't know" into "it belongs nowhere", which is never an improvement — so hold the
+    // existing category and judge the rest of the row on its merits.
+    const categoryId = r.categoryId === null && t.categoryId !== null && r.kind === "expense" ? t.categoryId : r.categoryId;
+    if (r.kind === t.kind && categoryId === t.categoryId && sameTags(r.tagIds, tags)) {
       unchanged += 1;
       return;
     }
@@ -86,7 +90,7 @@ export function diffRecategorization(
       description: t.description,
       amount: t.amount,
       before: { kind: t.kind, categoryId: t.categoryId, tagIds: tags },
-      after: { kind: r.kind, categoryId: r.categoryId, tagIds: r.tagIds, confidence: r.confidence, level: r.level },
+      after: { kind: r.kind, categoryId, tagIds: r.tagIds, confidence: r.confidence, level: r.level },
     });
   });
 
