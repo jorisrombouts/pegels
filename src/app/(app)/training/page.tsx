@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { CandidateQueue } from "@/components/training/candidate-queue";
 import { CorpusTable } from "@/components/training/corpus-table";
 import { DismissedList } from "@/components/training/dismissed-list";
+import { AccuracyCard } from "@/components/training/accuracy-card";
 import { RecategorizePanel } from "@/components/training/recategorize-panel";
 import { useCorpus } from "@/store/corpus";
 import { useData } from "@/store/data";
@@ -99,6 +100,7 @@ export default function TrainingPage() {
               <DismissedList rows={dismissed} onRestore={restore} />
             </div>
             <div className="grid gap-4">
+              <AccuracyCard />
               <RecategorizePanel categories={categories} />
               <CorpusTable
                 rows={approved}

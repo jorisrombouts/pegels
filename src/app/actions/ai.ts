@@ -34,7 +34,11 @@ function cacheKeyFor(userId: string, taxonomy: PromptTaxonomy): string {
   return `cat:${userId}:${stableHash(signature)}`;
 }
 
-export async function categorizeTransactions(rows: AiRow[]): Promise<AiResult[]> {
+export async function categorizeTransactions(
+  rows: AiRow[],
+  /** Leave-one-out, for measuring accuracy. Never set on the normal path. */
+  opts: { excludeSelf?: boolean } = {},
+): Promise<AiResult[]> {
   const userId = await getUserId();
   const data = await getDataset(userId);
   const taxonomy: PromptTaxonomy = {
@@ -64,7 +68,7 @@ export async function categorizeTransactions(rows: AiRow[]): Promise<AiResult[]>
   let neighbours: NeighboursByRow = new Map();
   if (remaining.length) {
     try {
-      const retrieved = await retrieveNeighbours(userId, remaining);
+      const retrieved = await retrieveNeighbours(userId, remaining, { excludeSelf: opts.excludeSelf });
       neighbours = new Map(
         [...retrieved].map(([index, list]) => [
           index,
