@@ -51,7 +51,9 @@ export default function TrainingPage() {
     <>
       <PageHeader title="Training" subtitle="What the categorizer has learned" />
 
-      <div className="mx-auto max-w-2xl space-y-4">
+      {/* Narrow single column on phones; on desktop the queue and the corpus sit side by side so
+          reviewing doesn't mean scrolling past everything already learned. */}
+      <div className="mx-auto max-w-2xl space-y-4 lg:max-w-none">
         <Card>
           <SectionLabel className="mb-3">Corpus</SectionLabel>
           <div className="grid grid-cols-3 gap-3">
@@ -78,22 +80,24 @@ export default function TrainingPage() {
             <p className="py-6 text-center text-sm text-muted-foreground">Loading the corpus…</p>
           </Card>
         ) : (
-          <>
+          <div className="grid gap-4 lg:grid-cols-2 lg:items-start">
             <CandidateQueue
               rows={candidates}
               categories={categories}
               onApprove={approve}
               onReject={reject}
             />
-            <RecategorizePanel categories={categories} />
-            <CorpusTable
-              rows={approved}
-              categories={categories}
-              tags={tags}
-              onToggleGold={toggleGold}
-              onRemove={remove}
-            />
-          </>
+            <div className="grid gap-4">
+              <RecategorizePanel categories={categories} />
+              <CorpusTable
+                rows={approved}
+                categories={categories}
+                tags={tags}
+                onToggleGold={toggleGold}
+                onRemove={remove}
+              />
+            </div>
+          </div>
         )}
       </div>
     </>
