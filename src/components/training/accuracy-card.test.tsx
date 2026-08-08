@@ -11,40 +11,43 @@ vi.mock("@/app/actions/accuracy", () => ({
 
 import { AccuracyCard } from "./accuracy-card";
 
-const point = (accuracy: number, at: string): AccuracyPoint => ({
-  at,
+const point = (o: Partial<AccuracyPoint> & { at: string }): AccuracyPoint => ({
   sampled: 60,
-  correct: Math.round(accuracy * 60),
-  accuracy,
+  correct: 21,
+  correctSeen: 57,
+  txTotal: 100,
+  txCovered: 80,
+  misses: [],
+  ...o,
 });
 
 describe("AccuracyCard", () => {
   it("leads with the latest figure and says what it counted", async () => {
-    history.mockResolvedValue([point(0.75, "2026-08-01"), point(0.85, "2026-08-08")]);
+    history.mockResolvedValue([point({ at: "2026-08-01", txCovered: 60 }), point({ at: "2026-08-08" })]);
     renderWithData(<AccuracyCard />);
-    expect(await screen.findByText("85%")).toBeInTheDocument();
-    expect(screen.getByText(/51 of 60 places/)).toBeInTheDocument();
+    expect(await screen.findByText("83%")).toBeInTheDocument();
+    expect(screen.getByText(/expected on your next transaction/)).toBeInTheDocument();
   });
 
   it("names the direction of travel rather than only the current number", async () => {
-    history.mockResolvedValue([point(0.75, "2026-08-01"), point(0.85, "2026-08-08")]);
+    history.mockResolvedValue([point({ at: "2026-08-01", txCovered: 60 }), point({ at: "2026-08-08" })]);
     renderWithData(<AccuracyCard />);
-    expect(await screen.findByText(/↑ 10% since last time/)).toBeInTheDocument();
+    expect(await screen.findByText(/↑ 12%/)).toBeInTheDocument();
   });
 
   it("draws a well-formed path — no NaN from a flat or single-point history", async () => {
-    history.mockResolvedValue([point(0.8, "2026-08-01"), point(0.8, "2026-08-02"), point(0.8, "2026-08-03")]);
+    history.mockResolvedValue([point({ at: "2026-08-01" }), point({ at: "2026-08-02" }), point({ at: "2026-08-03" })]);
     const { container } = renderWithData(<AccuracyCard />);
-    await screen.findByText("80%");
+    await screen.findByText("83%");
     const d = container.querySelector("[data-sparkline] path")!.getAttribute("d")!;
     expect(d).not.toMatch(/NaN|Infinity/);
     expect(d.startsWith("M")).toBe(true);
   });
 
   it("hides the trend rather than drawing a line through one point", async () => {
-    history.mockResolvedValue([point(0.9, "2026-08-08")]);
+    history.mockResolvedValue([point({ at: "2026-08-08" })]);
     const { container } = renderWithData(<AccuracyCard />);
-    await screen.findByText("90%");
+    await screen.findByText("83%");
     expect(container.querySelector("[data-sparkline]")).toBeNull();
   });
 

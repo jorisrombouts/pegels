@@ -2,36 +2,62 @@
 
 import { getUserId } from "@/lib/auth";
 import { categorizeTransactions } from "./ai";
+import { getDataset } from "@/lib/db/queries";
 import { loadCorpus, insertAccuracyRun, loadAccuracyRuns } from "@/lib/db/corpus-queries";
-import { sampleForScoring, scoreAccuracy } from "@/lib/eval/score";
+import { retrieveNeighbours } from "@/lib/ai/retrieve";
+import { coverageFrom } from "@/lib/eval/coverage";
+import { sampleForScoring, scoreAccuracy, type Miss } from "@/lib/eval/score";
 import type { AiRow } from "@/lib/ai/categorize-openai";
 
 export interface AccuracyPoint {
   at: string;
   sampled: number;
+  /** Right about a place hidden from its own lookup — one it has never seen. */
   correct: number;
-  accuracy: number;
+  /** Right about a place the corpus still holds — one it knows. */
+  correctSeen: number;
+  txTotal: number;
+  txCovered: number;
+  misses: Miss[];
 }
 
-const toPoint = (r: { createdAt: string; sampled: number; correct: number }): AccuracyPoint => ({
+type Row = {
+  createdAt: string;
+  sampled: number;
+  correct: number;
+  correctSeen: number;
+  txTotal: number;
+  txCovered: number;
+  misses: Miss[];
+};
+
+const toPoint = (r: Row): AccuracyPoint => ({
   at: r.createdAt,
   sampled: r.sampled,
   correct: r.correct,
-  accuracy: r.sampled ? r.correct / r.sampled : 0,
+  correctSeen: r.correctSeen,
+  txTotal: r.txTotal,
+  txCovered: r.txCovered,
+  misses: r.misses ?? [],
 });
 
 export async function accuracyHistory(): Promise<AccuracyPoint[]> {
-  return (await loadAccuracyRuns(await getUserId())).map(toPoint);
+  return (await loadAccuracyRuns(await getUserId())).map((r) => toPoint(r as Row));
 }
 
 /**
- * Re-label a sample of confirmed places with each one hidden from its own lookup, and count how
- * often the categorizer lands on the label the user confirmed.
+ * One check, three questions.
  *
- * Hiding the place from itself is the whole point: with it visible the lookup would hand the model
- * the answer, and the score would only prove the corpus can find itself. It runs the same
- * `categorizeTransactions` the app uses, so the number describes the real thing rather than a
- * parallel implementation that could drift from it.
+ *  - **Coverage.** Of the transactions you actually have, how many are from a place the categorizer
+ *    already knows? Measured through the real hybrid retrieval, so it describes the system that
+ *    ships rather than a substring proxy that would drift from it.
+ *  - **Knows it.** Score a sample with the corpus intact — exactly how production runs. Expected to
+ *    be high; if it is not, the model is ignoring evidence it was handed, which is worth seeing.
+ *  - **New to it.** Score the same sample with each place hidden from its own lookup. Harder, and
+ *    the number that improves as the corpus grows.
+ *
+ * Both scores come from the same sample so the pair is comparable, and both run the real
+ * `categorizeTransactions` rather than a parallel implementation.
  */
 export async function measureAccuracy(): Promise<AccuracyPoint[]> {
   const userId = await getUserId();
@@ -44,16 +70,33 @@ export async function measureAccuracy(): Promise<AccuracyPoint[]> {
     description: r.cleanedDescription,
     amount: r.amount,
   }));
-  const results = await categorizeTransactions(rows, { excludeSelf: true });
-  const score = scoreAccuracy(sample, results);
+
+  const [unseen, seen] = await Promise.all([
+    categorizeTransactions(rows, { excludeSelf: true }),
+    categorizeTransactions(rows),
+  ]);
+  const unseenScore = scoreAccuracy(sample, unseen);
+  const seenScore = scoreAccuracy(sample, seen);
+
+  // Coverage over the real ledger, not the corpus: the question is what arrives, not what is stored.
+  const data = await getDataset(userId);
+  const ledger = data.transactions
+    .filter((t) => !t.excluded)
+    .map((t, index) => ({ index, description: t.description, amount: t.amount }));
+  const neighbours = ledger.length ? await retrieveNeighbours(userId, ledger) : new Map();
+  const coverage = coverageFrom(ledger, neighbours);
 
   await insertAccuracyRun({
     id: `acc-${crypto.randomUUID()}`,
     userId,
     createdAt: new Date().toISOString(),
-    sampled: score.sampled,
-    correct: score.correct,
+    sampled: unseenScore.sampled,
+    correct: unseenScore.correct,
+    correctSeen: seenScore.correct,
+    txTotal: coverage.total,
+    txCovered: coverage.covered,
     corpusSize: approved.length,
+    misses: unseenScore.misses,
   });
   return accuracyHistory();
 }

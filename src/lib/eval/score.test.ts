@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { sampleForScoring, scoreAccuracy } from "./score";
+import { confusionPairs, sampleForScoring, scoreAccuracy } from "./score";
 import type { CorpusRow } from "@/lib/corpus/types";
 import type { AiResult } from "@/lib/ai/categorize-openai";
 
@@ -54,5 +54,26 @@ describe("scoreAccuracy", () => {
 
   it("reports zero rather than dividing by zero on an empty corpus", () => {
     expect(scoreAccuracy([], [])).toMatchObject({ sampled: 0, correct: 0, accuracy: 0 });
+  });
+});
+
+describe("confusionPairs", () => {
+  it("ranks the pairs it mixes up most, so a taxonomy overlap is visible", () => {
+    const sample = [
+      row("a", "cat-services"), row("b", "cat-services"), row("c", "cat-services"),
+      row("d", "cat-restaurants"),
+    ];
+    const score = scoreAccuracy(sample, [
+      said(0, "cat-other"), said(1, "cat-other"), said(2, "cat-other"),
+      said(3, "cat-cafe"),
+    ]);
+    const pairs = confusionPairs(score.misses);
+    expect(pairs[0]).toEqual({ expected: "cat-services", got: "cat-other", count: 3 });
+    expect(pairs[1]).toEqual({ expected: "cat-restaurants", got: "cat-cafe", count: 1 });
+  });
+
+  it("keeps a missing answer distinct from a wrong one", () => {
+    const score = scoreAccuracy([row("a", "cat-food")], []); // nothing came back
+    expect(confusionPairs(score.misses)).toEqual([{ expected: "cat-food", got: null, count: 1 }]);
   });
 });
