@@ -18,8 +18,18 @@ export function stableHash(s: string): number {
   return h >>> 0;
 }
 
-/** Default hold-out share, in percent. */
-export const GOLD_PCT = 20;
+/**
+ * Default hold-out share, in percent.
+ *
+ * Zero: nothing is held out automatically. A hold-out only pays for itself if evals actually run,
+ * and until one does, every held-out row is evidence the categorizer is forbidden to use. On a
+ * single-user corpus that cost lands hard — a 20% share took ICA (172 sightings) and SL (109) out
+ * of retrieval, so the most-seen merchants in the app were the ones it could not learn.
+ *
+ * Deliberate hold-out is still available per row via the toggle on the training page, and callers
+ * can pass an explicit pct to build an eval set when there is an eval to run.
+ */
+export const GOLD_PCT = 0;
 
 export function isGoldByHash(id: string, pct = GOLD_PCT): boolean {
   return stableHash(id) % 100 < pct;

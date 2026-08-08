@@ -23,10 +23,10 @@ describe("stableHash", () => {
 describe("isGoldByHash", () => {
   const ids = Array.from({ length: 4000 }, (_, i) => `ex-${i}`);
 
-  it("holds out roughly the requested percentage", () => {
-    const share = ids.filter((id) => isGoldByHash(id)).length / ids.length;
-    expect(share).toBeGreaterThan(0.16);
-    expect(share).toBeLessThan(0.24);
+  // Was 20%, which quietly removed a fifth of the corpus from retrieval — including the two
+  // most-seen merchants — to serve an eval that had never been run. Hold-out is opt-in now.
+  it("holds nothing out by default", () => {
+    expect(ids.some((id) => isGoldByHash(id))).toBe(false);
   });
 
   it("honours a custom percentage", () => {
