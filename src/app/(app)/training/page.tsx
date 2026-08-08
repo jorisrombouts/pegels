@@ -18,7 +18,7 @@ import { useData } from "@/store/data";
  * surface in the app — every approval widens the evidence the next import gets to reason from.
  */
 export default function TrainingPage() {
-  const { rows, isLoading, approve, reject, toggleGold, remove, backfill } = useCorpus();
+  const { rows, isLoading, approve, reject, toggleGold, remove, edit, backfill } = useCorpus();
   const { categories, tags } = useData();
   const [backfilling, setBackfilling] = useState(false);
   const [report, setReport] = useState<string | null>(null);
@@ -95,6 +95,7 @@ export default function TrainingPage() {
                 tags={tags}
                 onToggleGold={toggleGold}
                 onRemove={remove}
+                onEdit={edit}
               />
             </div>
           </div>
