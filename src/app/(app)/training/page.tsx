@@ -7,6 +7,7 @@ import { Card, SectionLabel } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { CandidateQueue } from "@/components/training/candidate-queue";
 import { CorpusTable } from "@/components/training/corpus-table";
+import { DismissedList } from "@/components/training/dismissed-list";
 import { RecategorizePanel } from "@/components/training/recategorize-panel";
 import { useCorpus } from "@/store/corpus";
 import { useData } from "@/store/data";
@@ -18,15 +19,16 @@ import { useData } from "@/store/data";
  * surface in the app — every approval widens the evidence the next import gets to reason from.
  */
 export default function TrainingPage() {
-  const { rows, isLoading, approve, reject, toggleGold, remove, edit, backfill } = useCorpus();
+  const { rows, isLoading, approve, reject, restore, toggleGold, remove, edit, backfill } = useCorpus();
   const { categories, tags } = useData();
   const [backfilling, setBackfilling] = useState(false);
   const [report, setReport] = useState<string | null>(null);
 
-  const { candidates, approved } = useMemo(
+  const { candidates, approved, dismissed } = useMemo(
     () => ({
       candidates: rows.filter((r) => r.status === "candidate"),
       approved: rows.filter((r) => r.status === "approved"),
+      dismissed: rows.filter((r) => r.status === "rejected"),
     }),
     [rows],
   );
@@ -81,12 +83,15 @@ export default function TrainingPage() {
           </Card>
         ) : (
           <div className="grid gap-4 lg:grid-cols-2 lg:items-start">
-            <CandidateQueue
-              rows={candidates}
-              categories={categories}
-              onApprove={approve}
-              onReject={reject}
-            />
+            <div className="grid gap-4">
+              <CandidateQueue
+                rows={candidates}
+                categories={categories}
+                onApprove={approve}
+                onReject={reject}
+              />
+              <DismissedList rows={dismissed} onRestore={restore} />
+            </div>
             <div className="grid gap-4">
               <RecategorizePanel categories={categories} />
               <CorpusTable
