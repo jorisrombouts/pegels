@@ -1,6 +1,6 @@
 import { and, desc, eq, isNull, ne, sql, type SQL } from "drizzle-orm";
 import { db } from "./index";
-import { categorizationExamples, evalRuns, EMBED_DIMS, type ExampleStatus } from "./schema";
+import { categorizationExamples, EMBED_DIMS, type ExampleStatus } from "./schema";
 import type { PlannedExample } from "../corpus/record";
 import type { CorpusRow, CurationRow } from "../corpus/types";
 
@@ -9,7 +9,6 @@ import type { TransactionKind } from "../domain/types";
 
 
 /**
- * The one place `gold = false` is enforced.
  *
  * Centralising this is the point: a retrieval path that forgets it silently inflates every eval
  * number by letting the model look up its own answers, and that class of bug is invisible.
@@ -17,7 +16,6 @@ import type { TransactionKind } from "../domain/types";
 export function corpusFilter(userId: string, opts: { includeCandidates: boolean }): SQL {
   const base = and(
     eq(categorizationExamples.userId, userId),
-    eq(categorizationExamples.gold, false),
   )!;
   return opts.includeCandidates
     ? and(base, ne(categorizationExamples.status, "rejected"))!
@@ -121,7 +119,6 @@ export async function upsertExamples(rows: PlannedExample[]): Promise<void> {
     finalCategoryId: p.finalCategoryId,
     finalTagIds: p.finalTagIds,
     status: p.status,
-    gold: p.gold,
     corrected: p.corrected,
     source: p.source,
     createdAt: p.createdAt,
@@ -194,7 +191,6 @@ export async function loadCurationRows(userId: string): Promise<CurationRow[]> {
     hitCount: r.hitCount,
     lastSeenAt: r.lastSeenAt,
     status: r.status,
-    gold: r.gold,
     source: r.source,
     createdAt: r.createdAt,
     embedded: r.embedding !== null,
@@ -207,7 +203,6 @@ export async function updateExample(
   id: string,
   patch: Partial<{
     status: ExampleStatus;
-    gold: boolean;
     finalCategoryId: string | null;
     finalTagIds: string[];
     finalKind: TransactionKind;
@@ -223,21 +218,6 @@ export async function deleteExample(userId: string, id: string): Promise<void> {
   await db
     .delete(categorizationExamples)
     .where(and(eq(categorizationExamples.userId, userId), eq(categorizationExamples.id, id)));
-}
-
-/** Latest eval run, for the accuracy panel. */
-export async function latestEvalRun(userId: string) {
-  const rows = await db
-    .select()
-    .from(evalRuns)
-    .where(eq(evalRuns.userId, userId))
-    .orderBy(desc(evalRuns.createdAt))
-    .limit(1);
-  return rows[0] ?? null;
-}
-
-export async function insertEvalRun(row: typeof evalRuns.$inferInsert): Promise<void> {
-  await db.insert(evalRuns).values(row);
 }
 
 export interface VectorHit {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isGoldByHash, stableHash } from "./hash";
+import { stableHash } from "./hash";
 
 describe("stableHash", () => {
   it("is deterministic across calls", () => {
@@ -17,30 +17,5 @@ describe("stableHash", () => {
       expect(h).toBeGreaterThanOrEqual(0);
       expect(h).toBeLessThan(2 ** 32);
     }
-  });
-});
-
-describe("isGoldByHash", () => {
-  const ids = Array.from({ length: 4000 }, (_, i) => `ex-${i}`);
-
-  // Was 20%, which quietly removed a fifth of the corpus from retrieval — including the two
-  // most-seen merchants — to serve an eval that had never been run. Hold-out is opt-in now.
-  it("holds nothing out by default", () => {
-    expect(ids.some((id) => isGoldByHash(id))).toBe(false);
-  });
-
-  it("honours a custom percentage", () => {
-    const share = ids.filter((id) => isGoldByHash(id, 50)).length / ids.length;
-    expect(share).toBeGreaterThan(0.45);
-    expect(share).toBeLessThan(0.55);
-  });
-
-  it("is stable for a given id, so the holdout doesn't drift between runs", () => {
-    expect(isGoldByHash("ex-42")).toBe(isGoldByHash("ex-42"));
-  });
-
-  it("selects nobody at 0 and everybody at 100", () => {
-    expect(ids.some((id) => isGoldByHash(id, 0))).toBe(false);
-    expect(ids.every((id) => isGoldByHash(id, 100))).toBe(true);
   });
 });

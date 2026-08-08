@@ -24,7 +24,6 @@ const row = (description: string, o: Partial<CurationRow> = {}): CurationRow => 
   hitCount: 1,
   lastSeenAt: "2025-06-01",
   status: "approved",
-  gold: false,
   source: "import",
   createdAt: "2025-06-01",
   embedded: true,
@@ -34,7 +33,7 @@ const row = (description: string, o: Partial<CurationRow> = {}): CurationRow => 
 const many = (n: number) => Array.from({ length: n }, (_, i) => row(`MERCHANT ${String(i).padStart(3, "0")}`));
 const noop = () => {};
 const table = (rows: CurationRow[], onEdit: (id: string, patch: CorpusEdit) => void = noop) => (
-  <CorpusTable rows={rows} categories={CATEGORIES} tags={TAGS} onToggleGold={noop} onRemove={noop} onEdit={onEdit} />
+  <CorpusTable rows={rows} categories={CATEGORIES} tags={TAGS} onRemove={noop} onEdit={onEdit} />
 );
 
 describe("CorpusTable pagination", () => {

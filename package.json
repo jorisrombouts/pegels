@@ -16,7 +16,6 @@
     "db:generate": "drizzle-kit generate",
     "db:seed": "tsx src/lib/db/seed.ts",
     "corpus:backfill": "tsx src/lib/corpus/backfill-cli.ts",
-    "eval": "tsx src/lib/eval/run-cli.ts",
     "prepare": "husky"
   },
   "lint-staged": {

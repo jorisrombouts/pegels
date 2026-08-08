@@ -1,5 +1,4 @@
 import { dedupKeyFor } from "@/lib/ai/normalize";
-import { isGoldByHash } from "@/lib/ai/hash";
 import type { ExampleSource, ExampleStatus } from "@/lib/db/schema";
 import type { ExampleInput } from "./types";
 
@@ -26,7 +25,6 @@ export interface PlannedExample extends ExampleInput {
   userId: string;
   dedupKey: string;
   status: ExampleStatus;
-  gold: boolean;
   corrected: boolean;
   source: ExampleSource;
   createdAt: string;
@@ -91,7 +89,6 @@ export function planExampleWrites(
         userId: opts.userId,
         dedupKey,
         status: mode === "affirm" ? "approved" : "candidate",
-        gold: isGoldByHash(id),
         corrected,
         source,
         createdAt: opts.now,

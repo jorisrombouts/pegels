@@ -110,12 +110,6 @@ describe("planExampleWrites — keying", () => {
     expect(w.lastSeenAt).toBe(NOW);
   });
 
-  it("assigns the gold hold-out deterministically from the id", () => {
-    const a = planExampleWrites([input("ICA MAXI")], "detail", { ...opts, idFor: () => "ex-fixed" })[0];
-    const b = planExampleWrites([input("ICA MAXI")], "detail", { ...opts, idFor: () => "ex-fixed" })[0];
-    expect(a.gold).toBe(b.gold);
-  });
-
   it("plans nothing for an empty batch", () => {
     expect(planExampleWrites([], "import", opts)).toEqual([]);
   });

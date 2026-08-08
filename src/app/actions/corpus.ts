@@ -55,11 +55,6 @@ export async function setExampleStatus(id: string, status: ExampleStatus): Promi
   await updateExample(await getUserId(), id, { status });
 }
 
-/** Move a row in or out of the eval hold-out. Gold rows never take part in retrieval. */
-export async function setExampleGold(id: string, gold: boolean): Promise<void> {
-  await updateExample(await getUserId(), id, { gold });
-}
-
 export async function editExample(
   id: string,
   patch: { finalCategoryId?: string | null; finalTagIds?: string[]; finalKind?: TransactionKind },
