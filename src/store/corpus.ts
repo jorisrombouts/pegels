@@ -44,7 +44,6 @@ export function useCorpus() {
       reject: (id: string) => run(patchRow(id, { status: "rejected" }), () => api.rejectExample(id)),
       restore: (id: string) => run(patchRow(id, { status: "candidate" }), () => api.setExampleStatus(id, "candidate")),
       edit: (id: string, patch: CorpusEdit) => run(patchRow(id, patch), () => api.editExample(id, patch)),
-      toggleGold: (id: string, gold: boolean) => run(patchRow(id, { gold }), () => api.setExampleGold(id, gold)),
       remove: (id: string) => run((rs) => rs.filter((r) => r.id !== id), () => api.removeExample(id)),
       /** Not optimistic: the backfill's effect isn't knowable client-side, so refetch after. */
       backfill: async (includeHighConfidenceModel = false) => {

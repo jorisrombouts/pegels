@@ -17,7 +17,6 @@ const row = (description: string, o: Partial<CurationRow> = {}): CurationRow => 
   hitCount: 3,
   lastSeenAt: "2026-06-01",
   status: "rejected",
-  gold: false,
   source: "import",
   createdAt: "2026-06-01",
   embedded: true,

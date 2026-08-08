@@ -23,7 +23,6 @@ const row = (description: string, o: Partial<CurationRow> = {}): CurationRow => 
   hitCount: 1,
   lastSeenAt: "2025-06-01",
   status: "candidate",
-  gold: false,
   source: "import",
   createdAt: "2025-06-01",
   embedded: true,

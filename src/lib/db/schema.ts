@@ -1,7 +1,6 @@
 import { pgTable, text, numeric, real, boolean, jsonb, index, timestamp, integer, primaryKey, uniqueIndex, vector } from "drizzle-orm/pg-core";
 import type { AccountKind, CategorySource, Split, TransactionKind } from "../domain/types";
 import type { ConfidenceLevel } from "../ai/confidence";
-import type { EvalMetrics, EvalMistake } from "../eval/types";
 
 /** Whether an example participates in retrieval. Only `approved` is trusted evidence. */
 export type ExampleStatus = "candidate" | "approved" | "rejected";
@@ -125,7 +124,6 @@ export const categorizationExamples = pgTable(
     // Corpus membership.
     status: text("status").$type<ExampleStatus>().notNull().default("candidate"),
     /** Held out of retrieval and scored by the eval harness. */
-    gold: boolean("gold").notNull().default(false),
     corrected: boolean("corrected").notNull(),
     source: text("source").$type<ExampleSource>().notNull(),
     /** Times this merchant has been observed. Drives the lexical tie-break and the curation sort. */
@@ -147,24 +145,6 @@ export const categorizationExamples = pgTable(
 );
 
 /** One row per eval run, so the /training accuracy panel can show a trend rather than a snapshot. */
-export const evalRuns = pgTable(
-  "eval_runs",
-  {
-    id: text("id").primaryKey(),
-    userId: text("user_id").notNull(),
-    createdAt: text("created_at").notNull(),
-    chatModel: text("chat_model").notNull(),
-    embeddingModel: text("embedding_model").notNull(),
-    promptVersion: text("prompt_version").notNull(),
-    corpusSize: integer("corpus_size").notNull(),
-    goldSize: integer("gold_size").notNull(),
-    /** JSONB so the metric set can evolve without a migration. */
-    metrics: jsonb("metrics").$type<EvalMetrics>().notNull(),
-    /** Only the wrong rows, capped — powers the "worst mistakes" list. */
-    mistakes: jsonb("mistakes").$type<EvalMistake[]>().notNull().default([]),
-  },
-  (t) => [index("eval_runs_user_idx").on(t.userId)],
-);
 
 
 // --- Auth.js (next-auth) tables. users.id is the app-wide userId. ---

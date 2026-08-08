@@ -4,7 +4,6 @@ import { useMemo, useState } from "react";
 import { Pencil, Trash2 } from "lucide-react";
 import { Card, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Switch } from "@/components/ui/switch";
 import { EvidenceEditor } from "./evidence-editor";
 import { merchantTokens } from "@/lib/text/merchant-tokens";
 import { cn } from "@/lib/utils";
@@ -26,14 +25,12 @@ export function CorpusTable({
   rows,
   categories,
   tags,
-  onToggleGold,
   onRemove,
   onEdit,
 }: {
   rows: CurationRow[];
   categories: Category[];
   tags: Tag[];
-  onToggleGold: (id: string, gold: boolean) => void;
   onRemove: (id: string) => void;
   onEdit: (id: string, patch: CorpusEdit) => void;
 }) {
@@ -101,15 +98,6 @@ export function CorpusTable({
                       {!r.embedded && " · still preparing"}
                     </p>
                   </div>
-
-                  <label className="flex shrink-0 items-center gap-2 text-xs text-muted-foreground">
-                    Ignore
-                    <Switch
-                      checked={r.gold}
-                      onCheckedChange={(v) => onToggleGold(r.id, v)}
-                      aria-label={`Ignore ${r.cleanedDescription} when categorizing`}
-                    />
-                  </label>
 
                   <button
                     type="button"

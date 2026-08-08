@@ -44,7 +44,6 @@ export interface CorpusRow {
 
 /** A corpus row as the curation page shows it. */
 export interface CurationRow extends CorpusRow {
-  gold: boolean;
   source: string;
   createdAt: string;
   embedded: boolean;

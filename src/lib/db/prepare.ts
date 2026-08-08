@@ -52,7 +52,6 @@ export async function prepareDatabase(opts: { dryRun?: boolean } = {}): Promise<
       ADD COLUMN IF NOT EXISTS dedup_key       text    NOT NULL DEFAULT '',
       ADD COLUMN IF NOT EXISTS final_tag_ids   jsonb   NOT NULL DEFAULT '[]'::jsonb,
       ADD COLUMN IF NOT EXISTS status          text    NOT NULL DEFAULT 'candidate',
-      ADD COLUMN IF NOT EXISTS gold            boolean NOT NULL DEFAULT false,
       ADD COLUMN IF NOT EXISTS hit_count       integer NOT NULL DEFAULT 1,
       ADD COLUMN IF NOT EXISTS last_seen_at    text    NOT NULL DEFAULT '',
       ADD COLUMN IF NOT EXISTS embedding_model text
@@ -75,7 +74,6 @@ export async function prepareDatabase(opts: { dryRun?: boolean } = {}): Promise<
       UPDATE categorization_examples
       SET dedup_key = ${k.dedupKey},
           status = ${k.status},
-          gold = ${k.gold},
           hit_count = ${k.hitCount},
           last_seen_at = ${k.lastSeenAt},
           final_kind = ${k.finalKind},
@@ -115,6 +113,11 @@ async function dropRetiredTables(): Promise<void> {
   // database that still has rules, dump the table and check the manual ones are covered:
   //   SELECT * FROM categorization_rules WHERE origin = 'manual';
   await db.execute(sql`DROP TABLE IF EXISTS categorization_rules`);
+  // The hold-out is gone. It only ever excluded rows from retrieval to reserve them for an eval,
+  // and it cost more than it returned: a 20% share hid the two most-seen merchants in the app from
+  // the categorizer, for an eval that was never run. Every approved example is evidence now.
+  await db.execute(sql`ALTER TABLE categorization_examples DROP COLUMN IF EXISTS gold`);
+  await db.execute(sql`DROP TABLE IF EXISTS eval_runs`);
 }
 
 /**

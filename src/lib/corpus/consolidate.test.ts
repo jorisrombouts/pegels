@@ -83,13 +83,6 @@ describe("planConsolidation", () => {
     expect(plan.deleteIds).toHaveLength(1);
   });
 
-  it("assigns the gold hold-out deterministically", () => {
-    const rows = [row("ICA MAXI"), row("COOP"), row("WILLYS")];
-    const a = planConsolidation(rows).keep.map((k) => k.gold);
-    const b = planConsolidation(rows).keep.map((k) => k.gold);
-    expect(a).toEqual(b);
-  });
-
   it("plans nothing for an empty corpus", () => {
     expect(planConsolidation([])).toEqual({ keep: [], deleteIds: [] });
   });
