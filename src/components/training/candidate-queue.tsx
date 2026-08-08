@@ -3,11 +3,8 @@
 import { useState } from "react";
 import { Check, X } from "lucide-react";
 import { Card, CardHeader } from "@/components/ui/card";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { TagEditor } from "@/components/transactions/tag-editor";
-import { orderCategories } from "@/lib/domain/selectors";
+import { EvidenceEditor } from "./evidence-editor";
 import { formatSEKAbs } from "@/lib/format";
-import { cn } from "@/lib/utils";
 import type { CurationRow } from "@/lib/corpus/types";
 import type { Category } from "@/lib/domain/types";
 import type { CorpusEdit } from "@/store/corpus";
@@ -41,8 +38,6 @@ export function CandidateQueue({
   const [edits, setEdits] = useState<Record<string, CorpusEdit>>({});
   const [page, setPage] = useState(0);
   const patch = (id: string, p: CorpusEdit) => setEdits((e) => ({ ...e, [id]: { ...e[id], ...p } }));
-  const ordered = orderCategories(categories);
-  const nameOf = new Map(categories.map((c) => [c.id, c]));
   // Rows leave this list as they're approved, so the page can shrink out from under the user;
   // paginate clamps rather than showing an empty page.
   const shown = paginate(rows, page, PAGE_SIZE);
@@ -64,7 +59,6 @@ export function CandidateQueue({
             const chosen = edit.finalCategoryId === undefined ? r.finalCategoryId ?? NONE : edit.finalCategoryId ?? NONE;
             const kind = edit.finalKind ?? r.finalKind;
             const tagIds = edit.finalTagIds ?? r.finalTagIds;
-            const current = chosen === NONE ? null : nameOf.get(chosen);
             return (
               <li key={r.id} className="py-2.5 first:pt-0">
                 <div className="flex items-start gap-2">
@@ -97,45 +91,15 @@ export function CandidateQueue({
                   </div>
                 </div>
 
-                <div className="mt-2 flex flex-wrap items-center gap-2">
-                  {/* Only expenses carry a category — income and transfers have none to pick. */}
-                  <div className="flex overflow-hidden rounded-xl glass-inset p-0.5" role="group" aria-label={`Type for ${r.cleanedDescription}`}>
-                    {(["expense", "income", "transfer"] as const).map((k) => (
-                      <button
-                        key={k}
-                        type="button"
-                        onClick={() => patch(r.id, { finalKind: k, ...(k !== "expense" && { finalCategoryId: null }) })}
-                        aria-pressed={kind === k}
-                        className={cn(
-                          "pressable rounded-lg px-2 py-1 text-xs font-medium capitalize",
-                          kind === k ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground",
-                        )}
-                      >
-                        {k}
-                      </button>
-                    ))}
-                  </div>
-
-                  {kind === "expense" && (
-                    <Select value={chosen} onValueChange={(v) => patch(r.id, { finalCategoryId: v === NONE ? null : v })}>
-                      <SelectTrigger className="w-44 shrink-0">
-                        <SelectValue placeholder="Uncategorized">
-                          {current ? `${current.icon} ${current.name}` : "Uncategorized"}
-                        </SelectValue>
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value={NONE}>Uncategorized</SelectItem>
-                        {ordered.map((c) => (
-                          <SelectItem key={c.id} value={c.id}>
-                            {c.parentId ? "↳ " : ""}
-                            {c.icon} {c.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  )}
-
-                  <TagEditor tagIds={tagIds} onChange={(ids) => patch(r.id, { finalTagIds: ids })} />
+                <div className="mt-2">
+                  <EvidenceEditor
+                    kind={kind}
+                    categoryId={chosen === NONE ? null : chosen}
+                    tagIds={tagIds}
+                    categories={categories}
+                    label={r.cleanedDescription}
+                    onChange={(p) => patch(r.id, p)}
+                  />
                 </div>
               </li>
             );
