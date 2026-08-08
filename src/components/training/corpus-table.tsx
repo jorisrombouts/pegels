@@ -54,16 +54,15 @@ export function CorpusTable({
     });
   }, [rows, query]);
 
-  const goldCount = rows.filter((r) => r.gold).length;
   const shown = paginate(matches, page, PAGE_SIZE);
 
   return (
     <Card>
       <CardHeader
-        label="Approved corpus"
+        label="Shops it recognises"
         action={
           <span className="tnum text-xs text-muted-foreground">
-            {rows.length} merchants · {goldCount} held out
+            {rows.length} shops
           </span>
         }
       />
@@ -73,12 +72,12 @@ export function CorpusTable({
           setQuery(e.target.value);
           setPage(0); // a new search should land on its first page, not page 3 of it
         }}
-        placeholder="Search merchants…"
+        placeholder="Find a shop…"
         className="mb-3"
       />
       {matches.length === 0 ? (
         <p className="py-6 text-center text-sm text-muted-foreground">
-          {rows.length === 0 ? "No approved examples yet." : "No merchant matches that search."}
+          {rows.length === 0 ? "Nothing confirmed yet — start with the list on the left." : "No shop matches that."}
         </p>
       ) : (
         <ul className="divide-y divide-[hsl(var(--glass-border))]">
@@ -96,19 +95,19 @@ export function CorpusTable({
                         : cat
                           ? `${cat.icon} ${cat.name}`
                           : "Uncategorized"}{" "}
-                      · seen {r.hitCount}×
+                      · {r.hitCount} transaction{r.hitCount === 1 ? "" : "s"}
                       {r.finalTagIds.length > 0 &&
                         ` · ${r.finalTagIds.map((id) => tagById.get(id)?.name ?? id).join(", ")}`}
-                      {!r.embedded && " · not yet embedded"}
+                      {!r.embedded && " · still preparing"}
                     </p>
                   </div>
 
                   <label className="flex shrink-0 items-center gap-2 text-xs text-muted-foreground">
-                    Hold out
+                    Ignore
                     <Switch
                       checked={r.gold}
                       onCheckedChange={(v) => onToggleGold(r.id, v)}
-                      aria-label={`Hold ${r.cleanedDescription} out of retrieval`}
+                      aria-label={`Ignore ${r.cleanedDescription} when categorizing`}
                     />
                   </label>
 
@@ -154,7 +153,7 @@ export function CorpusTable({
           })}
         </ul>
       )}
-      <Pager page={shown} onPage={setPage} noun="merchants" />
+      <Pager page={shown} onPage={setPage} noun="shops" />
     </Card>
   );
 }

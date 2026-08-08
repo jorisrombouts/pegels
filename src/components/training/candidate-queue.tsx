@@ -45,12 +45,12 @@ export function CandidateQueue({
   return (
     <Card>
       <CardHeader
-        label="Needs review"
-        action={<span className="tnum text-xs text-muted-foreground">{rows.length} merchants</span>}
+        label="Check these"
+        action={<span className="tnum text-xs text-muted-foreground">{rows.length} to go</span>}
       />
       {rows.length === 0 ? (
         <p className="py-6 text-center text-sm text-muted-foreground">
-          Nothing waiting — every merchant the AI has seen is either approved or dismissed.
+          All caught up. Every shop it has seen is either confirmed or hidden.
         </p>
       ) : (
         <ul className="divide-y divide-[hsl(var(--glass-border))]">
@@ -65,7 +65,7 @@ export function CandidateQueue({
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium">{r.cleanedDescription}</p>
                     <p className="tnum text-xs text-muted-foreground">
-                      seen {r.hitCount}×{` · ~${formatSEKAbs(Math.abs(r.amount), false)}`}
+                      {r.hitCount} transaction{r.hitCount === 1 ? "" : "s"}{` · about ${formatSEKAbs(Math.abs(r.amount), false)} each`}
                     </p>
                   </div>
                   <div className="flex shrink-0 gap-1">
@@ -106,7 +106,7 @@ export function CandidateQueue({
           })}
         </ul>
       )}
-      <Pager page={shown} onPage={setPage} noun="merchants" />
+      <Pager page={shown} onPage={setPage} noun="shops" />
     </Card>
   );
 }

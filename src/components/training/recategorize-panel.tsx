@@ -13,10 +13,10 @@ import { useData } from "@/store/data";
 import type { Category } from "@/lib/domain/types";
 
 const SCOPES: { value: RecategorizeScope; label: string }[] = [
-  { value: "needs-review", label: "Flagged for review" },
-  { value: "uncategorized", label: "Uncategorized expenses" },
-  { value: "all-model", label: "Everything the AI categorized" },
-  { value: "all-including-user", label: "Everything, including my corrections" },
+  { value: "needs-review", label: "Ones it wasn't sure about" },
+  { value: "uncategorized", label: "Purchases with no category" },
+  { value: "all-model", label: "Everything it labelled itself" },
+  { value: "all-including-user", label: "Everything, even what I fixed myself" },
 ];
 
 /**
@@ -58,7 +58,7 @@ export function RecategorizePanel({ categories }: { categories: Category[] }) {
       setSkipped(new Set()); // a fresh preview starts with every change ticked
     } catch (e) {
       console.error("recategorize preview failed", e);
-      setError("Couldn't reach the AI service. Nothing was changed.");
+      setError("Couldn't reach the categorizer. Nothing was changed.");
     } finally {
       setBusy(null);
     }
@@ -90,16 +90,16 @@ export function RecategorizePanel({ categories }: { categories: Category[] }) {
 
   return (
     <Card>
-      <SectionLabel className="mb-3">Re-categorize</SectionLabel>
+      <SectionLabel className="mb-3">Re-label old transactions</SectionLabel>
       <p className="mb-3 text-xs text-muted-foreground">
-        Runs the current categorizer over transactions an older version classified.{" "}
+        Now that it knows more, it can take another look at transactions it labelled earlier.
+        Nothing changes until you pick the ones you want.{" "}
         {scope === "all-including-user" ? (
           <span style={{ color: "hsl(var(--warning))" }}>
-            This scope also revisits the ones you corrected by hand — review the preview before
-            applying.
+            This choice also revisits the ones you fixed yourself — check the list carefully.
           </span>
         ) : (
-          "Anything you corrected by hand is left alone."
+          "The ones you fixed yourself are left alone."
         )}
       </p>
 
@@ -130,17 +130,17 @@ export function RecategorizePanel({ categories }: { categories: Category[] }) {
       {result && (
         <div className="mt-4">
           <p className="text-sm">
-            <strong className="tnum">{result.changes.length}</strong> would change
+            <strong className="tnum">{result.changes.length}</strong> it would change
             <span className="text-muted-foreground">
-              {" · "}{result.unchanged} already agree
-              {result.truncated && " · more remain, run again after applying"}
+              {" · "}{result.unchanged} it would leave as they are
+              {result.truncated && " · more to come, run this again afterwards"}
             </span>
           </p>
 
           {result.changes.length > 0 && (
             <>
               <div className="mt-2 flex items-center justify-between text-xs text-muted-foreground">
-                <span className="tnum">{selected.length} of {result.changes.length} selected</span>
+                <span className="tnum">{selected.length} of {result.changes.length} ticked</span>
                 <button
                   type="button"
                   onClick={() =>
@@ -152,7 +152,7 @@ export function RecategorizePanel({ categories }: { categories: Category[] }) {
                   }
                   className="pressable hover:text-foreground"
                 >
-                  {selected.length === result.changes.length ? "Select none" : "Select all"}
+                  {selected.length === result.changes.length ? "Untick all" : "Tick all"}
                 </button>
               </div>
 
@@ -177,7 +177,7 @@ export function RecategorizePanel({ categories }: { categories: Category[] }) {
                         type="checkbox"
                         checked={on}
                         onChange={() => toggle(c.id)}
-                        aria-label={`Apply the change to ${c.description}`}
+                        aria-label={`Change ${c.description}`}
                         className="mt-1 size-4 shrink-0 accent-[hsl(var(--primary))]"
                       />
                       <div className={cn("min-w-0 flex-1", !on && "opacity-40")}>

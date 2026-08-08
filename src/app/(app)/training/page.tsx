@@ -41,9 +41,9 @@ export default function TrainingPage() {
     setReport(null);
     try {
       const r = await backfill(false);
-      setReport(`${r.considered} hand-corrected transactions → ${r.merchants} merchants.`);
+      setReport(`Read ${r.considered} transaction${r.considered === 1 ? "" : "s"} you had fixed yourself, and learned ${r.merchants} shop${r.merchants === 1 ? "" : "s"} from them.`);
     } catch {
-      setReport("Backfill failed — check the server logs.");
+      setReport("Something went wrong — nothing was changed.");
     } finally {
       setBackfilling(false);
     }
@@ -51,35 +51,41 @@ export default function TrainingPage() {
 
   return (
     <>
-      <PageHeader title="Training" subtitle="What the categorizer has learned" />
+      <PageHeader title="Teach" subtitle="Shops it recognises, and what it still needs from you" />
 
       {/* Narrow single column on phones; on desktop the queue and the corpus sit side by side so
           reviewing doesn't mean scrolling past everything already learned. */}
       <div className="mx-auto max-w-2xl space-y-4 lg:max-w-none">
         <Card>
-          <SectionLabel className="mb-3">Corpus</SectionLabel>
+          <SectionLabel className="mb-3">What it has learned</SectionLabel>
           <div className="grid grid-cols-3 gap-3">
-            <Stat label="Approved" value={approved.length} sub="used for retrieval" />
-            <Stat label="Awaiting review" value={candidates.length} sub="not yet evidence" />
-            <Stat label="Sightings" value={sightings} sub="transactions behind them" />
+            <Stat label="Recognises" value={approved.length} sub="shops it can label on its own" />
+            <Stat label="Needs a check" value={candidates.length} sub="not used until you confirm" />
+            <Stat label="Transactions" value={sightings} sub="behind those shops" />
           </div>
           <p className="mt-3 text-xs text-muted-foreground">
-            Only approved merchants are retrieved. {tagged === 0
-              ? "None carry tags yet, so tag predictions still come from the prompt alone."
-              : `${tagged} carry tags, which is what teaches tag prediction.`}
+            A shop only helps once you confirm it. {tagged === 0
+              ? "None of them have tags yet, so it has to guess tags from scratch every time."
+              : `${tagged} of them have tags, which is how it learns to tag new purchases.`}
           </p>
-          <div className="mt-3 flex items-center gap-3">
-            <Button variant="glass" size="sm" onClick={runBackfill} disabled={backfilling} className="gap-1.5">
-              {backfilling ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />}
-              Seed from my corrections
-            </Button>
-            {report && <span className="text-xs text-muted-foreground">{report}</span>}
+          <div className="mt-4 rounded-2xl glass-inset px-3 py-3">
+            <p className="text-xs text-muted-foreground">
+              Goes back through every transaction you categorised yourself and learns those shops.
+              Safe to run more than once — it updates what it already knows instead of duplicating it.
+            </p>
+            <div className="mt-2 flex flex-wrap items-center gap-3">
+              <Button variant="glass" size="sm" onClick={runBackfill} disabled={backfilling} className="gap-1.5">
+                {backfilling ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />}
+                Learn from my past edits
+              </Button>
+              {report && <span className="text-xs text-muted-foreground">{report}</span>}
+            </div>
           </div>
         </Card>
 
         {isLoading ? (
           <Card>
-            <p className="py-6 text-center text-sm text-muted-foreground">Loading the corpus…</p>
+            <p className="py-6 text-center text-sm text-muted-foreground">Loading…</p>
           </Card>
         ) : (
           <div className="grid gap-4 lg:grid-cols-2 lg:items-start">
