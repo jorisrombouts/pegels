@@ -1,167 +1,138 @@
 "use server";
 
 import { getUserId } from "@/lib/auth";
+import { getDataset } from "@/lib/db/queries";
+import { matchesOwnAccount } from "@/lib/domain/own-account";
+import { reconcileKindWithSign } from "@/lib/ai/reconcile";
 import {
-  getDataset,
-  insertCategorizationExamples,
-  recentCategorizationExamples,
-  affirmedExamples,
-  upsertTransactions,
-} from "@/lib/db/queries";
-import { categorize, matchesOwnAccount } from "@/lib/categorize";
-import { applyRules, planRuleBackfill, selectRulesForBackfill } from "@/lib/rules";
-import { categorizeWithOpenAI, type AiExample, type AiResult, type AiRow } from "@/lib/ai/categorize-openai";
-import { selectExamples } from "@/lib/ai/select-examples";
-import type { TransactionKind } from "@/lib/domain/types";
+  PROMPT_VERSION,
+  categorizeWithOpenAI,
+  type AiNeighbour,
+  type AiResult,
+  type AiRow,
+  type NeighboursByRow,
+  type PromptTaxonomy,
+} from "@/lib/ai/categorize-openai";
+import { retrieveNeighbours } from "@/lib/ai/retrieve";
+import { merchantTokens, tokenOverlap } from "@/lib/text/merchant-tokens";
+import { gradeConfidence } from "@/lib/ai/confidence";
+import { stableHash } from "@/lib/ai/hash";
 
-interface CorrectionInput {
-  rawDescription: string;
-  cleanedDescription: string;
-  amount: number;
-  predictedKind: TransactionKind | null;
-  predictedCategoryId: string | null;
-  predictedConfidence: number | null;
-  finalKind: TransactionKind;
-  finalCategoryId: string | null;
+
+/**
+ * Routing hint for OpenAI's prompt cache. It must change whenever the stable system message does,
+ * or a request routes to a machine whose cached prefix no longer matches.
+ */
+function cacheKeyFor(userId: string, taxonomy: PromptTaxonomy): string {
+  const signature = [
+    ...taxonomy.categories.map((c) => `${c.id}=${c.name}`),
+    ...taxonomy.tags.map((t) => `${t.id}=${t.name}`),
+    PROMPT_VERSION,
+  ]
+    .sort()
+    .join("|");
+  return `cat:${userId}:${stableHash(signature)}`;
 }
 
 export async function categorizeTransactions(rows: AiRow[]): Promise<AiResult[]> {
   const userId = await getUserId();
   const data = await getDataset(userId);
-  const categories = data.categories.map((c) => ({ id: c.id, name: c.name }));
-  const validIds = new Set(categories.map((c) => c.id));
+  const taxonomy: PromptTaxonomy = {
+    categories: data.categories.map((c) => ({ id: c.id, name: c.name })),
+    tags: data.tags.map((t) => ({ id: t.id, name: t.name })),
+  };
+  const validIds = new Set(taxonomy.categories.map((c) => c.id));
+  const categoryName = new Map(taxonomy.categories.map((c) => [c.id, c.name]));
+  const tagName = new Map(taxonomy.tags.map((t) => [t.id, t.name]));
 
-  // Feedback loop: build the few-shot from the user's past corrections (high-signal), with recent
-  // rows as a cold-start top-up. The relevance-matched selection happens once `remaining` is known.
-  const categoryName = new Map(categories.map((c) => [c.id, c.name]));
-  const [affirmed, recent] = await Promise.all([
-    affirmedExamples(userId, 60),
-    recentCategorizationExamples(userId, 40),
-  ]);
-
-  // 1) deterministic: own-account transfers, then user rules
+  // 1) The only non-LLM step left: a description naming one of the user's own account numbers is
+  //    a transfer between their accounts. That is account *identity*, not a categorization rule.
   const ownNumbers = data.accounts.map((a) => a.accountNumber).filter((n): n is string => !!n);
   const ruled = new Map<number, AiResult>();
-  const ruleTags = new Map<number, string[]>(); // tags from a non-resolving rule, merged after the LLM
   const remaining: AiRow[] = [];
   for (const r of rows) {
     if (matchesOwnAccount(r.description, ownNumbers)) {
-      ruled.set(r.index, { index: r.index, kind: "transfer", categoryId: null, confidence: 1, addTagIds: [] });
+      ruled.set(r.index, { index: r.index, kind: "transfer", categoryId: null, confidence: 1, tagIds: [], level: "high" });
       continue;
     }
-    const outcome = applyRules(r.description, data.rules);
-    const resolves = outcome && (outcome.categoryId != null || outcome.kind === "income" || outcome.kind === "transfer");
-    if (outcome && resolves) {
-      ruled.set(r.index, {
-        index: r.index,
-        kind: outcome.kind ?? (r.amount < 0 ? "expense" : "income"),
-        categoryId: outcome.categoryId ?? null,
-        confidence: 1,
-        addTagIds: outcome.addTagIds,
-      });
-    } else {
-      if (outcome) ruleTags.set(r.index, outcome.addTagIds); // tag-only rule: still LLM-categorize, but keep tags
-      remaining.push(r);
-    }
+    remaining.push(r);
   }
 
-  // 2) OpenAI for the rest; on any failure, fall back to keyword categorize + sign-based kind
+  // 2) retrieve confirmed examples, then classify. Retrieval failing must not fail the import —
+  //    an empty neighbour map degrades to the model's own prior plus the priors in the prompt.
   let aiResults: AiResult[] = [];
+  let neighbours: NeighboursByRow = new Map();
   if (remaining.length) {
-    const exampleList: AiExample[] = selectExamples({ rows: remaining, corrected: affirmed, recent }).map((e) => ({
-      description: e.cleanedDescription,
-      kind: e.finalKind,
-      categoryName: e.finalCategoryId ? categoryName.get(e.finalCategoryId) ?? null : null,
-    }));
     try {
-      aiResults = await categorizeWithOpenAI(remaining, categories, exampleList, `cat:${userId}`);
-    } catch {
-      aiResults = remaining.map((r) => {
-        const g = categorize(r.description);
-        return { index: r.index, kind: r.amount < 0 ? "expense" : "income", categoryId: g.categoryId, confidence: g.confidence } as AiResult;
-      });
+      const retrieved = await retrieveNeighbours(userId, remaining);
+      neighbours = new Map(
+        [...retrieved].map(([index, list]) => [
+          index,
+          list.map(
+            (n): AiNeighbour => ({
+              id: n.id,
+              description: n.cleanedDescription,
+              kind: n.finalKind,
+              categoryName: n.finalCategoryId ? categoryName.get(n.finalCategoryId) ?? null : null,
+              tagNames: n.finalTagIds.map((id) => tagName.get(id)).filter((x): x is string => !!x),
+              approved: n.approved,
+            }),
+          ),
+        ]),
+      );
+    } catch (e) {
+      console.error("retrieval failed; classifying without evidence", e);
     }
+
+    // Deliberately no fallback. A hardcoded keyword table silently produced plausible-looking
+    // categories whenever the API failed, which is how an expired API key went unnoticed for an
+    // unknown number of imports. Failing loudly is the only way the user finds out.
+    aiResults = await categorizeWithOpenAI(remaining, taxonomy, neighbours, cacheKeyFor(userId, taxonomy));
   }
 
-  // 3) merge, defensively null out unknown categoryIds
+  // 3) merge, defensively null out unknown categoryIds, and re-anchor confidence on the evidence
+  const byIndex = new Map(rows.map((r) => [r.index, r]));
   const out: AiResult[] = [];
   for (const r of rows) {
+    const fromModel = aiResults.find((a) => a.index === r.index);
     const res =
       ruled.get(r.index) ??
-      aiResults.find((a) => a.index === r.index) ??
-      ({ index: r.index, kind: r.amount < 0 ? "expense" : "income", categoryId: null, confidence: 0.4 } as AiResult);
+      fromModel ??
+      ({ index: r.index, kind: r.amount < 0 ? "expense" : "income", categoryId: null, tagIds: [], confidence: 0.4, level: "low" } as AiResult);
     reconcileKindWithSign(res, r.amount); // the data model forbids income<0 / expense>0; the sign wins
     if (res.categoryId && !validIds.has(res.categoryId)) res.categoryId = null;
-    if (!ruled.has(r.index)) res.addTagIds = ruleTags.get(r.index) ?? [];
+
+    if (!ruled.has(r.index) && !fromModel) {
+      // Nobody classified this row — its chunk failed, and categorizeWithOpenAI returns the chunks
+      // that survived. The retrieval evidence describes the merchant, not this non-answer, so
+      // grading against it would manufacture confidence in a blank and keep the row out of the
+      // review queue. An unanswered row is exactly what a human should see.
+      res.level = "low";
+    } else if (!ruled.has(r.index)) {
+      const near = neighbours.get(r.index) ?? [];
+      const top = near[0];
+      const queryTokens = new Set(merchantTokens(byIndex.get(r.index)!.description));
+      const graded = gradeConfidence(
+        res.confidence,
+        {
+          neighbourCount: near.length,
+          topOverlap: top ? tokenOverlap(queryTokens, merchantTokens(top.description)) : 0,
+          topNeighbourCategoryId: top ? categoryIdOf(top.categoryName, categoryName) : null,
+        },
+        res.categoryId,
+      );
+      res.confidence = graded.score;
+      res.level = graded.level;
+      res.tagIds = res.tagIds ?? [];
+    }
     out.push(res);
   }
   return out;
 }
 
-/**
- * Enforce the sign convention (negative = expense, positive = income) the LLM can violate.
- * Transfers move in either direction, so they're left untouched; a kind flipped to a non-expense
- * also drops its category (only expenses carry one).
- */
-function reconcileKindWithSign(res: AiResult, amount: number): void {
-  if (res.kind === "transfer" || amount === 0) return;
-  const expected: TransactionKind = amount < 0 ? "expense" : "income";
-  if (res.kind !== expected) {
-    res.kind = expected;
-    if (expected !== "expense") res.categoryId = null;
-  }
-}
-
-export async function previewRuleBackfill(ruleId?: string): Promise<{ count: number; samples: { description: string }[] }> {
-  const userId = await getUserId();
-  const data = await getDataset(userId);
-  const plan = planRuleBackfill(data.transactions, selectRulesForBackfill(data.rules, ruleId));
-  return { count: plan.length, samples: plan.slice(0, 8).map((p) => ({ description: p.description })) };
-}
-
-export async function applyRuleBackfill(ruleId?: string): Promise<number> {
-  const userId = await getUserId();
-  const data = await getDataset(userId);
-  const plan = planRuleBackfill(data.transactions, selectRulesForBackfill(data.rules, ruleId));
-  const byId = new Map(data.transactions.map((t) => [t.id, t]));
-  await upsertTransactions(userId, plan.map((c) => ({ ...byId.get(c.id)!, ...c.patch, categorySource: "model" as const })));
-  return plan.length;
-}
-
-function toExampleRow(ex: CorrectionInput, source: "import" | "detail", corrected: boolean) {
-  return {
-    id: `ex-${crypto.randomUUID()}`,
-    rawDescription: ex.rawDescription,
-    cleanedDescription: ex.cleanedDescription,
-    amount: String(ex.amount),
-    predictedKind: ex.predictedKind,
-    predictedCategoryId: ex.predictedCategoryId,
-    predictedConfidence: ex.predictedConfidence,
-    finalKind: ex.finalKind,
-    finalCategoryId: ex.finalCategoryId,
-    corrected,
-    source,
-    createdAt: new Date().toISOString(),
-  };
-}
-
-/** Log every imported row: predicted = the AI's original guess, final = what the user kept/edited. */
-export async function logImportExamples(rows: CorrectionInput[]): Promise<void> {
-  if (!rows.length) return;
-  const examples = rows.map((ex) => {
-    const corrected = ex.predictedKind !== ex.finalKind || ex.predictedCategoryId !== ex.finalCategoryId;
-    return toExampleRow(ex, "import", corrected);
-  });
-  await insertCategorizationExamples(await getUserId(), examples);
-}
-
-/** Log a single detail-panel correction (always corrected). */
-export async function logDetailCorrection(ex: CorrectionInput): Promise<void> {
-  await insertCategorizationExamples(await getUserId(), [toExampleRow(ex, "detail", true)]);
-}
-
-/** Log a detail-panel approval: the user confirmed the AI's guess (final == predicted). Not a
- *  correction, but still an explicit affirmation — it feeds the few-shot via affirmedExamples. */
-export async function logDetailApproval(ex: CorrectionInput): Promise<void> {
-  await insertCategorizationExamples(await getUserId(), [toExampleRow(ex, "detail", false)]);
+/** The prompt renders neighbours by category *name*; map back for the agreement check. */
+function categoryIdOf(name: string | null, byId: Map<string, string>): string | null {
+  if (!name) return null;
+  for (const [id, n] of byId) if (n === name) return id;
+  return null;
 }

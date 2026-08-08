@@ -43,10 +43,11 @@ guesses, and turns the corrected history into a private training signal.
 **Goals**
 - G1 — Import bank CSV exports (SEB and Revolut), de-duplicated, with foreign currency converted to
   SEK at import time.
-- G2 — Auto-categorize each transaction (rules → LLM few-shot → keyword fallback) and flag
-  low-confidence rows for review.
+- G2 — Auto-categorize each transaction (retrieval-grounded LLM) and flag low-confidence
+  rows for review. A failure is surfaced, never papered over with a guess.
 - G3 — Learn from every correction and approval so future predictions improve.
-- G4 — Provide budgets, categories, tags, and rules with full CRUD.
+- G4 — Provide budgets, categories and tags with full CRUD, and a page for curating what the
+  categorizer has learned.
 - G5 — Give a focused dashboard and a calm spending breakdown/trend view.
 - G6 — Work as an installable, offline-capable PWA on phone and desktop.
 - G7 — Be private and secure: single-owner sign-in, per-user data isolation.
@@ -76,7 +77,7 @@ There are no secondary personas. The app is **single-owner**: exactly one Google
 **In scope:** CSV import (SEB + Revolut, incl. localized Revolut exports), FX conversion,
 de-duplication, transfer-pair detection, the categorization pipeline + learning loop, transactions
 (list/filter/detail/edit/split/tag/delete), dashboard, budgets,
-categories (nested), tags, rules (+ backfill + suggestions), settings,
+categories (nested), tags, corpus curation + accuracy measurement, settings,
 Google auth with single-owner allowlist, PWA (install + offline shell).
 
 **Out of scope (this version):** Web Push overspend alerts, an offline write queue, a dedicated
@@ -96,10 +97,9 @@ Dates are **ISO `yyyy-mm-dd` strings**.
 | **Account** | `id, name, type, kind('spending'\|'savings'), icon(emoji), color(hsl), balance, accountNumber?, archived` | `savings` never counts toward expenses. A transaction whose description references an `accountNumber` is auto-classified `transfer`. |
 | **Category** | `id, name, icon(emoji), color(hsl), parentId(null=top-level)` | One level of nesting (parent → sub). |
 | **Tag** | `id, name, color(hsl)` | Free-form labels, many-per-transaction. |
-| **Transaction** | `id, date, description, amount(signed SEK), accountId, categoryId?, predictedCategoryId?, categoryConfidence?(0..1), categorySource('model'\|'user'), needsReview, excluded?, tagIds[], splits?[], notes?, kind('expense'\|'income'\|'transfer')` | The central entity. |
+| **Transaction** | `id, date, description, amount(signed SEK), accountId, categoryId?, predictedCategoryId?, categoryConfidence?(0..1, internal), categoryLevel?('high'\|'medium'\|'low'), categorySource('model'\|'user'), needsReview, excluded?, tagIds[], splits?[], notes?, kind('expense'\|'income'\|'transfer')` | The central entity. |
 | **Split** | `id, label?, amount(absolute SEK), mine(bool)` | A portion of a transaction; **only `mine` portions count** toward expenses. |
 | **Budget** | `id, categoryId, limit(positive SEK), month('yyyy-mm'\|null)` | `null` month = repeats every month. Targets a top-level or sub category. |
-| **CategorizationRule** | `id, priority(lower wins), enabled, matchText, matchMode('contains'\|'startsWith'\|'exact'), setCategoryId?, setKind?, addTagIds[], origin('seed'\|'manual'\|'suggested')` | Runs before the LLM at import (BR-3). |
 | **CategorizationExample** | `id, rawDescription, cleanedDescription, amount, predictedKind?, predictedCategoryId?, predictedConfidence?, finalKind, finalCategoryId?, corrected(bool), source('import'\|'detail'), createdAt` | The training set (BR-4). |
 | **Auth (users/accounts/sessions/verificationTokens)** | Auth.js standard shape | `users.id` is the app-wide `userId`. |
 
@@ -160,7 +160,7 @@ after first sign-in. Visiting any authed route while signed out redirects to `/s
 **Story:** *As the owner, my data loads instantly, works offline for reads, and stays consistent.*
 
 - FR-2.1 — A single read/write facade (`useData()`) exposes the whole dataset (accounts, categories,
-  tags, transactions, budgets, rules) and one mutation per operation.
+  tags, transactions, budgets) and one mutation per operation.
 - FR-2.2 — Reads come from one cache entry, **persisted to `localStorage`** for instant + offline
   reads, rehydrated on load.
 - FR-2.3 — Every mutation is **optimistic**: update the cache immediately, persist via a server
@@ -213,7 +213,7 @@ A two-step modal (Upload → Review), opened globally from the nav.
   ones so internal movements between the user's own accounts aren't double-counted; matched existing
   legs are reclassified as `transfer` on import.
 - FR-3.9 — **Editable review screen:** each row shows include checkbox, date, amount, description,
-  kind, and (for expenses) category + a confidence dot. A filter bar offers All/Expense/Transfer/
+  kind, and (for expenses) category + a confidence dot naming the level on hover. A filter bar offers All/Expense/Transfer/
   Income, Needs-review, Uncategorized, Hide-duplicates, and search. A live summary shows
   will-import/duplicates/date-range/needs-review/money-in/out/net/type counts. Confirm imports only
   the included rows and logs AI predictions vs. final choices (BR-4).
@@ -229,19 +229,30 @@ correct or approve one.*
 
 - FR-4.1 — **BR-3 Pipeline order**, per imported row:
   1. **Own-account transfer** — description references one of the user's `accountNumber`s → `transfer`.
-  2. **User rules** (`rules`) — contains/starts-with/exact, by `priority`; a resolving match sets
-     category/kind/tags and **skips the LLM**.
-  3. **OpenAI** (`gpt-4o-mini`, structured output → `{kind, categoryId, confidence}`) for the rest,
-     with a **few-shot built from the owner's affirmations**.
-  4. **Keyword fallback** (`categorize`) if OpenAI errors.
-- FR-4.2 — Confidence `< 0.6` sets `needsReview`.
+  3. **Retrieval + OpenAI** (`gpt-4o-mini`, structured output →
+     `{kind, categoryId, tagIds, confidence}`) for the rest, grounded in examples retrieved from
+     the owner's own confirmations.
+  There is deliberately **no fallback**: if OpenAI errors the import surfaces it. Rows resolved by
+  steps 1–2 are unaffected by an outage.
+- FR-4.2 — **Confidence is categorical.** `gradeConfidence` labels each row from the retrieval
+  evidence: `high` (a near-identical approved merchant agreed), `medium` (evidence existed but
+  nothing decisive), `low` (nothing retrieved). `needsReview` is `level === 'low'`. Each label is
+  shown with its reason on hover, so "low" reads as "nothing like this in your approved examples
+  yet" rather than as the model hedging. The raw
+  score is retained for the eval's calibration metric and is **never shown** — on the hold-out its
+  mean on right and wrong answers are indistinguishable, so a percentage would overstate what is
+  known.
 - FR-4.3 — **BR-4 Learning signal.** Every correction and approval is logged to
   `categorization_examples`. The **high-signal set** = corrections (`corrected=true`) **plus**
   detail-panel approvals (`source='detail'`), excluding passive import-keeps.
-- FR-4.4 — **Few-shot selection** (`select-examples`, pure): relevance-match the high-signal examples
-  to the current batch's merchants (past "ICA" fixes steer new "ICA" rows), dedupe, and cap, topping
-  up with recent rows for cold-start.
-- FR-4.5 — Without `OPENAI_API_KEY`, import still works via the keyword fallback.
+- FR-4.4 — **Retrieval** (`retrieve`): two arms fused by reciprocal rank — pgvector cosine over the
+  embedded corpus, and lexical merchant-token overlap — capped per row and diversified so one
+  merchant cannot fill every slot. A hit below the similarity floor is noise and is dropped, so an
+  unrecognised merchant retrieves nothing and is flagged for review.
+- FR-4.5 — `OPENAI_API_KEY` is **required**. Without it, import fails with a visible error.
+- FR-4.6 — **Curation** (`/training`): unreviewed merchants are queued most-seen-first; approving
+  one makes it retrievable, dismissing one is sticky. Accuracy is measured against a hold-out
+  (`npm run eval`).
 
 **AC:** A low-confidence row is flagged; correcting it changes future predictions for similar
 merchants; approving a correct low-confidence guess also improves them. The few-shot selection is
@@ -310,28 +321,18 @@ uncategorized rather than orphaning or deleting them.
   either for a specific `month` or repeating (`month=null`).
 - FR-6.9.2 — Show **health** (BR-5) and a **forecast** (BR-6, shared with the dashboard).
 
-### 6.10 Rules
+### 6.10 Settings
 
-**Story:** *As the owner, I codify recurring categorizations so the LLM doesn't re-decide them.*
-
-- FR-6.10.1 — `/rules` page: description rules (contains/starts-with/exact) that set category/kind/
-  tags, ordered by `priority`, run **before** the LLM at import (FR-4.1).
-- FR-6.10.2 — **Backfill:** apply a rule to existing matching transactions (per-rule and bulk).
-- FR-6.10.3 — **Suggestions:** per-month, mine candidate rules from corrected data; the owner
-  approves/edits them. Keep the rule set small — only deterministic cases, not what the LLM can infer.
-
-### 6.11 Settings
-
-- FR-6.11.1 — Settings page: account avatar + sign-out (also in every header), data reset/clear.
-- FR-6.11.2 — `masked` (privacy blur), selected `month`, and `accountFilter` stay **device-local**
+- FR-6.10.1 — Settings page: account avatar + sign-out (also in every header), data reset/clear.
+- FR-6.10.2 — `masked` (privacy blur), selected `month`, and `accountFilter` stay **device-local**
   (not synced).
 
-### 6.12 PWA
+### 6.11 PWA
 
-- FR-6.12.1 — Installable (manifest + icon set) and offline app-shell via a **hand-rolled** service
+- FR-6.11.1 — Installable (manifest + icon set) and offline app-shell via a **hand-rolled** service
   worker (app-shell cache, network-first navigation, stale-while-revalidate — no bundler plugin).
-- FR-6.12.2 — Register the service worker **in production only** (install/test from the deployed URL).
-- FR-6.12.3 — Privacy mask: a toggle blurs all monetary amounts for over-the-shoulder privacy.
+- FR-6.11.2 — Register the service worker **in production only** (install/test from the deployed URL).
+- FR-6.11.3 — Privacy mask: a toggle blurs all monetary amounts for over-the-shoulder privacy.
 
 ---
 
@@ -349,10 +350,12 @@ uncategorized rather than orphaning or deleting them.
 - **NFR-5 Localization of money/dates.** SEK + `sv-SE` formatting; ISO dates; English UI chrome.
   Import parsing tolerates localized bank exports (FR-3.4).
 - **NFR-6 Theming.** Dark-first; HSL semantic tokens only (no raw hex, BR-7); `next-themes`.
-- **NFR-7 Testing (TDD).** New behavior gets a failing test first. Pure logic (selectors, fx, rules,
+- **NFR-7 Testing (TDD).** New behavior gets a failing test first. Pure logic (selectors, fx, retrieval,
   example selection, parsers, mutations) is unit-tested directly; UI tests render with a seeded
   QueryClient. The suite is the regression net (269 tests in the reference build).
-- **NFR-8 Resilience.** AI/FX failures degrade gracefully (keyword fallback; held-back rows + retry).
+- **NFR-8 Resilience.** FX failures degrade gracefully (held-back rows + retry) and a retrieval
+  failure still classifies, without evidence. An OpenAI failure is **surfaced, not absorbed** — a
+  plausible-looking guess hides an outage indefinitely.
   Behind a TLS-inspecting proxy, Node may reject outbound TLS (`SELF_SIGNED_CERT_IN_CHAIN`) — document
   the `NODE_OPTIONS=--use-system-ca` local workaround.
 
@@ -388,7 +391,7 @@ auth seam keying every query. UI-local state in `lib`/`store/ui.ts` (Zustand). S
 
 Domain tables (each `userId`-scoped, with a `userId` index; `transactions` indexed by `(userId,
 date)`): `accounts`, `categories`, `tags`, `transactions`, `budgets`,
-`categorization_rules`, `categorization_examples`. Auth tables (Auth.js shape):
+`categorization_examples`, `eval_runs`. Auth tables (Auth.js shape):
 `auth_users` (`id` = app `userId`), `auth_accounts`, `auth_sessions`, `auth_verification_tokens`.
 Money columns are `numeric(12,2)`; confidence/priority are `real`; `tagIds`/`splits`/`addTagIds`/
 `layout`/`navConfig` are `jsonb`; dates are `text` ISO strings. Field-level detail is in §5.1 and the
@@ -401,7 +404,7 @@ Drizzle schema.
 | Var | Required | Purpose |
 |---|---|---|
 | `DATABASE_URL` | yes | Neon Postgres connection string |
-| `OPENAI_API_KEY` | for AI | OpenAI; without it, import uses keyword rules |
+| `OPENAI_API_KEY` | yes | OpenAI. No fallback — import fails visibly without a valid key |
 | `AUTH_SECRET` | yes | Auth.js session encryption |
 | `AUTH_GOOGLE_ID` / `AUTH_GOOGLE_SECRET` | yes | Google OAuth (redirect `…/api/auth/callback/google`) |
 | `OWNER_EMAIL` | yes | Single-owner allowlist (fail-closed) |
@@ -415,9 +418,9 @@ Bootstrap: `npm install` → `npm run db:push` (sync schema) → `npm run db:see
 ## 11. Acceptance / definition of done
 
 A reproduction is "done" when: a SEB and a Revolut (English **and** Dutch) CSV import correctly with
-FX conversion, dedupe, and transfer detection; the categorization pipeline + learning loop work (or
-degrade to keyword fallback without a key); transactions can be reviewed/edited/split/tagged/excluded/
-**deleted-with-confirmation**; budgets/categories/tags/rules have full CRUD with their business
+FX conversion, dedupe, and transfer detection; the categorization pipeline + learning loop work
+(and fail visibly without a key); transactions can be reviewed/edited/split/tagged/excluded/
+**deleted-with-confirmation**; budgets/categories/tags have full CRUD with their business
 rules (BR-5, detach/strip on delete); Google
 single-owner auth gates access and claims stub data; the PWA installs and serves an offline shell; and
 the test suite passes with build + lint clean.
@@ -428,7 +431,8 @@ the test suite passes with build + lint clean.
 
 - **Localized bank exports** silently mis-importing (the EUR-as-SEK class): mitigated by FR-3.4 alias
   detection + FR-3.6 hold-back-on-failed-FX (never import foreign as SEK).
-- **AI/network failure:** keyword fallback (FR-4.5) and held-back FX rows with retry (FR-3.6).
+- **AI/network failure:** surfaced to the user (FR-4.5), never masked by a guess; held-back FX rows
+  with retry (FR-3.6).
 - **Local dev writing to prod data:** use a separate Neon dev branch + `DEV_USER_ID` (see §13/PLAN).
 - **Commit attribution / TLS proxy:** see PLAN.md notes (repo-local git identity; `--use-system-ca`).
 

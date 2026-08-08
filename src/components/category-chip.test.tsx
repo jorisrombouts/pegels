@@ -17,8 +17,14 @@ describe("CategoryChip", () => {
     expect(screen.getByText("Uncategorized")).toBeInTheDocument();
   });
 
-  it("shows a confidence dot with a percentage title", () => {
-    const { container } = render(<CategoryChip category={groceries} confidence={0.61} />);
-    expect(container.querySelector('[title="61% confidence"]')).toBeInTheDocument();
+  it("marks an unseen merchant with a dot the user can hover for the reason", () => {
+    // Named rather than scored: a percentage would imply a calibration the model doesn't have.
+    render(<CategoryChip category={groceries} level="low" />);
+    expect(screen.getByLabelText("Low confidence")).toBeInTheDocument();
+  });
+
+  it("shows no dot when there is no level to report", () => {
+    const { container } = render(<CategoryChip category={groceries} />);
+    expect(container.querySelector("[aria-label]")).toBeNull();
   });
 });

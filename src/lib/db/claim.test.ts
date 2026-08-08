@@ -10,8 +10,8 @@ vi.mock("./index", () => ({ db: { update: (...a: unknown[]) => update(...a), bat
 import { CLAIMABLE_TABLES, claimStubData, STUB_USER_ID } from "./claim";
 
 describe("CLAIMABLE_TABLES", () => {
-  it("covers all 7 user-scoped data tables", () => {
-    expect(CLAIMABLE_TABLES).toHaveLength(7);
+  it("covers all 6 user-scoped data tables", () => {
+    expect(CLAIMABLE_TABLES).toHaveLength(6);
   });
 });
 
@@ -20,9 +20,9 @@ describe("claimStubData", () => {
 
   it("re-points every claimable table from the stub to the new user in one batch", async () => {
     await claimStubData("real-user");
-    expect(update).toHaveBeenCalledTimes(7);
+    expect(update).toHaveBeenCalledTimes(6);
     expect(batch).toHaveBeenCalledTimes(1);
-    expect((batch.mock.calls[0][0] as unknown[]).length).toBe(7);
+    expect((batch.mock.calls[0][0] as unknown[]).length).toBe(6);
     expect(STUB_USER_ID).toBe("user-stub");
   });
 });

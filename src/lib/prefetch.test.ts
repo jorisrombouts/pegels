@@ -9,7 +9,6 @@ const sample = {
   transactions: [{ id: "t-1" }],
   budgets: [],
   goals: [],
-  rules: [],
 } as unknown as Dataset;
 
 describe("dehydrateDataset", () => {

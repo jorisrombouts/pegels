@@ -1,8 +1,7 @@
 "use client";
 
 import { useTheme } from "next-themes";
-import Link from "next/link";
-import { Monitor, Moon, Sun, Trash2, Wand2 } from "lucide-react";
+import { Monitor, Moon, Sun, Trash2 } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { Card, SectionLabel } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
@@ -29,7 +28,6 @@ export default function SettingsPage() {
       <div className="mx-auto max-w-xl space-y-4">
         <AccountCard />
         <AppearanceSection />
-        <RulesSection />
         <PrivacySection />
         <DataSection />
         <AboutSection />
@@ -86,18 +84,6 @@ function AppearanceSection() {
   );
 }
 
-function RulesSection() {
-  return (
-    <Card>
-      <SectionLabel className="mb-3">Categorization</SectionLabel>
-      <SettingRow
-        title="Rules"
-        description="Create rules that auto-categorize transactions before the AI runs."
-        control={<Link href="/rules" className="pressable inline-flex items-center gap-1.5 rounded-full glass-inset px-3 py-1.5 text-xs font-medium"><Wand2 className="size-3.5" /> Open</Link>}
-      />
-    </Card>
-  );
-}
 
 function PrivacySection() {
   const masked = useUI((s) => s.masked);

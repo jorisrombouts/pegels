@@ -13,6 +13,7 @@ function makeTx(date: string, description: string, amount: number, o: Partial<Tr
     categoryId: "cat-housing",
     predictedCategoryId: null,
     categoryConfidence: null,
+    categoryLevel: null,
     categorySource: "user",
     needsReview: false,
     tagIds: [],
