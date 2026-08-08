@@ -143,7 +143,7 @@ describe("categorySpendInMonth", () => {
 });
 
 describe("detectTransfersOnImport", () => {
-  const mk = (id: string, accountId: string, amount: number, date: string) => ({ id, accountId, amount, date, kind: (amount < 0 ? "expense" : "income") as const });
+  const mk = (id: string, accountId: string, amount: number, date: string) => ({ id, accountId, amount, date, kind: amount < 0 ? ("expense" as const) : ("income" as const) });
 
   it("marks a new inflow as transfer and updates the existing outflow leg", () => {
     const existing = [mk("seb-out", "seb", -5000, "2025-03-10")];

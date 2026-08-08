@@ -108,9 +108,12 @@ async function dropRetiredTables(): Promise<void> {
   await db.execute(sql`ALTER TABLE transactions DROP COLUMN IF EXISTS goal_id`);
   await db.execute(sql`DROP TABLE IF EXISTS goals`);
   await db.execute(sql`DROP TABLE IF EXISTS user_preferences`);
-  // Rules are replaced by retrieval over the corpus. Safe to drop only because the personal ones
-  // were first migrated into the corpus as approved examples — a rule naming a *person* is
-  // knowledge no prompt prior could reconstruct.
+  // Rules are replaced by retrieval over the corpus. NOTE: nothing migrates them first — this is a
+  // plain drop. Hand-written rules ("origin":"manual") encode knowledge no prompt prior can
+  // reconstruct, e.g. a rule naming a person. That knowledge survives only where the corpus already
+  // holds corrections for the same merchant, which is not guaranteed. Before running this against a
+  // database that still has rules, dump the table and check the manual ones are covered:
+  //   SELECT * FROM categorization_rules WHERE origin = 'manual';
   await db.execute(sql`DROP TABLE IF EXISTS categorization_rules`);
 }
 
