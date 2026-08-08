@@ -49,6 +49,7 @@ export function QuickAddModal() {
       categoryId: categoryId || null,
       predictedCategoryId: null,
       categoryConfidence: null,
+      categoryLevel: null,
       categorySource: "user",
       needsReview: false,
       tagIds: [],

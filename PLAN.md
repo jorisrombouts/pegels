@@ -5,7 +5,7 @@
 > analysis (budgets, trends). Built with Next.js 16 (App Router) + Neon Postgres + OpenAI,
 > deployed on Vercel.
 >
-> **Status — 2026-06-09:** live on Vercel, 269 tests passing, build + lint clean. Every feature
+> **Status — 2026-08-06:** live on Vercel, 481 tests passing, build + lint clean. Every feature
 > screen, the import + categorization pipeline, auth, and per-user sync are shipped. What remains
 > is a short, optional roadmap (see the end of this file).
 >
@@ -18,11 +18,13 @@
 
 ```bash
 npm install
-npm run db:push      # create/sync the Neon schema (drizzle-kit)
-npm run db:seed      # load the Swedish sample dataset
-npm run dev          # http://localhost:3000
-npm test             # vitest (269 tests)
-npm run build        # production build (Turbopack)
+npm run db:push          # create/sync the Neon schema (runs db:prepare first)
+npm run db:seed          # load the Swedish sample dataset
+npm run corpus:backfill  # seed the categorization corpus from your own corrections
+npm run eval             # score categorization against the hold-out
+npm run dev              # http://localhost:3000
+npm test                 # vitest (481 tests)
+npm run build            # production build (Turbopack)
 ```
 
 **Environment** (`.env.local`):
@@ -30,7 +32,7 @@ npm run build        # production build (Turbopack)
 | Var | Required | Purpose |
 |---|---|---|
 | `DATABASE_URL` | yes | Neon Postgres connection string |
-| `OPENAI_API_KEY` | yes (for AI categorization) | OpenAI; without it, import falls back to keyword rules |
+| `OPENAI_API_KEY` | yes | OpenAI. There is no fallback — without a valid key, import fails with a visible error rather than guessing |
 | `AUTH_SECRET` | yes | Auth.js session encryption |
 | `AUTH_GOOGLE_ID` / `AUTH_GOOGLE_SECRET` | yes | Google OAuth client (redirect URI `…/api/auth/callback/google`) |
 | `OWNER_EMAIL` | yes | Single-owner allowlist — only this Google account may sign in (fail-closed) |
@@ -56,7 +58,7 @@ The app is a **client-side SPA** backed by server actions, not a set of server-r
   queries (`queries.ts`). `src/app/actions/data.ts` exposes one server action per mutation.
 - **`useData()`** (`src/store/data.ts`) is the single read/write facade. It's a TanStack Query
   wrapper over one `['dataset']` entry (the whole user dataset: accounts, categories, tags,
-  transactions, budgets, rules). Reads are **persisted to `localStorage`** (instant + offline
+  transactions, budgets). Reads are **persisted to `localStorage`** (instant + offline
   reads). Each mutation updates the cache **optimistically**, persists via a server action, and
   **rolls back + resyncs on failure**.
 - **`getUserId()`** (`src/lib/auth.ts`) is the auth seam every query is keyed by — the real session
@@ -81,21 +83,57 @@ Money is decimal throughout (`numeric(12,2)`), displayed in Swedish notation (`1
 
 For each imported row, in order:
 1. **Own-account transfers** — description references one of the user's `accountNumber`s → `transfer`.
-2. **User rules** (`src/lib/rules.ts`) — contains / starts-with / exact rules set category/kind/tags
-   and run **before the LLM**; a resolving match skips inference.
-3. **OpenAI** (`gpt-4o-mini`, structured output → `{kind, categoryId, confidence}`,
-   `src/lib/ai/categorize-openai.ts`) for the rest, with a **few-shot built from the user's
-   affirmations**.
-4. **Keyword fallback** (`src/lib/categorize.ts`) if OpenAI errors.
+2. **Retrieval + OpenAI** (`gpt-4o-mini`, structured output → `{kind, categoryId, tagIds,
+   confidence}`, `src/lib/ai/categorize-openai.ts`) for the rest.
 
-Low confidence (`< 0.6`) sets `needsReview`.
+There is deliberately **no fallback**. If the model is unreachable, categorization fails and the
+import surfaces the error. The keyword table that used to stand in produced plausible-looking
+categories on every failure, which is precisely how an expired API key went unnoticed. Rows already
+resolved by steps 1–2 are unaffected by an outage.
 
-**The learning loop:** every correction/approval is logged to `categorization_examples`.
-`affirmedExamples()` returns the high-signal set — corrections (`corrected = true`) **plus**
-detail-panel approvals (`source = 'detail'`) — excluding passive import-keeps. `selectExamples()`
-(`src/lib/ai/select-examples.ts`, pure) then **relevance-matches** those to the batch's merchants
-(your past "ICA" fixes steer new "ICA" rows), dedupes, and caps, with recent rows as a cold-start
-top-up. So both **correcting** and **approving** a category sharpen future predictions.
+**Confidence is categorical, not a percentage.** `gradeConfidence()` labels each row from what
+retrieval actually found — `high` (a near-identical approved merchant agreed), `medium` (there
+was evidence, nothing decisive), `low` (nothing retrieved). `needsReview` is simply
+`level === "low"`. The words are the familiar magnitude scale, but they are not the model's opinion
+of itself; the UI carries the reason on hover so the label is never the whole story. The model's own
+number is retained but never shown: measured against the
+hold-out its mean on correct answers (0.58) and wrong ones (0.53) are indistinguishable, so a
+percentage would claim a precision that does not exist. The number stays only so the eval can keep
+watching for calibration.
+
+**The learning loop.** Corrections and approvals land in `categorization_examples`, which is a
+**curated corpus** — one row per merchant (`dedupKey`), not one per event, so a merchant corrected
+forty times is one row with `hitCount = 40` rather than forty chances to flood retrieval.
+
+`retrieveNeighbours()` (`src/lib/ai/retrieve.ts`) then finds the examples most likely to settle each
+row, using two arms fused by reciprocal rank: **pgvector** cosine over `normalizeMerchant`
+embeddings, and **lexical** merchant-token overlap. The lexical arm is deliberately independent of
+embeddings, so an embeddings outage degrades quality without breaking import. `gold` rows are
+excluded from every retrieval path by one shared predicate — they belong to the eval hold-out.
+
+The prompt splits into a **stable, cacheable system message** (instructions, priors, both
+taxonomies) and a volatile user message carrying a deduplicated evidence table. The review queue
+therefore means *"the system has never seen this merchant"* — a fact — rather than *"the model felt
+unsure"*, which is a self-report.
+
+**Curating it** — `/training` (`src/app/(app)/training/page.tsx`). Retrieval fires only on
+**approved** merchants, so the review queue is the highest-leverage surface in the app: it is
+ordered most-seen-first, because approving a merchant seen 47 times buys far more future accuracy
+than one seen once. The corpus lives in its own `['corpus']` query rather than `['dataset']`, which
+is on every page's critical path.
+
+**Re-running it** — the same page can re-categorize transactions an older pipeline classified
+(`src/lib/corpus/recategorize.ts`, pure). Preview then apply, where apply sends back exactly the
+changes shown, so there is no drift between the two and no second call to the model.
+`categorySource === "user"` rows are excluded at both ends. It deliberately writes **no** corpus
+examples: the model's own output is not evidence, and recording it would train the system on its
+own predictions.
+
+**Measuring it** — `npm run eval` (`src/lib/eval/`) scores the live pipeline against a
+deterministic hold-out (`gold`, excluded from retrieval). Reports kind, exact and root category,
+and micro-averaged tag F1, each split overall / seen-merchant / unseen-merchant, plus confidence
+calibration and review precision. The unseen number is the one that predicts how the next import
+will feel.
 
 ### Import pipeline (`src/components/import/import-modal.tsx`)
 
@@ -115,7 +153,7 @@ exports; the format is auto-detected.
 
 A `needsReview` row shows a warning dot in the list and a "Needs review" filter on `/transactions`.
 Open the detail panel to either **change** the category (corrects + logs) or **Approve** the guess
-(confirms a correct low-confidence prediction, marks it user-affirmed → 100%, logs the affirmation).
+(confirms a prediction for a merchant with no evidence yet, and records it as evidence).
 Both feed the few-shot above.
 
 ### Auth & single-owner (`src/lib/auth*.ts`, `src/lib/db/claim.ts`)
@@ -161,7 +199,7 @@ roadmap.)
 src/
   app/
     (app)/            authed routes: dashboard (page.tsx), transactions, budgets,
-                      categories, accounts, tags, rules, settings; layout = auth gate
+                      categories, accounts, tags, training, settings; layout = auth gate
     actions/          server actions: data (CRUD), ai (categorize + training log), fx, auth
     layout.tsx        root: fonts, Providers, metadata; manifest.ts; apple-icon.png
   components/
@@ -175,7 +213,10 @@ src/
     forecast/         recurrence detection + fixed/variable projection (pure, date-injected)
     ai/               categorize-openai, select-examples (few-shot selection)
     db/               schema, queries, map (row<->domain), claim, index
-    rules.ts fx.ts parse-csv.ts parse-revolut.ts categorize.ts format.ts auth*.ts
+    corpus/           the categorization corpus: capture, backfill, consolidation
+    eval/             hold-out scoring (npm run eval)
+    text/             shared description tokenisers
+    fx.ts parse-csv.ts parse-revolut.ts format.ts auth*.ts
   store/              data.ts (TanStack Query facade) + ui.ts (Zustand)
   data/mock.ts        seed dataset (24 categories, sample accounts/transactions)
 docs/superpowers/     design specs + implementation plans (the decision record)
@@ -188,7 +229,7 @@ public/               sw.js, icons, mock-imports/
 ## Conventions
 
 - **TDD.** New behavior gets a failing test first (the suite is the regression net). Pure logic
-  (selectors, fx, rules, example selection, parsers) is unit-tested directly; UI tests render with
+  (selectors, fx, retrieval fusion, corpus planning, eval metrics, parsers) is unit-tested directly; UI tests render with
   `src/test/render.tsx` (`renderWithData` seeds a QueryClient).
 - **Spending math only via `effectiveExpense`** — never sum `amount`.
 - **Money is decimal** (`numeric(12,2)`), displayed `sv-SE`; parse `100,75`.
@@ -245,12 +286,13 @@ A quick map of what's done, for orientation. Details + rationale are in the desi
 - **Budgets / Categories / Tags / Accounts** — full CRUD; budgets have health + forecast (the
   shared engine, not their own maths);
   categories nest (parent/sub).
-- **Rules** — `/rules` page: description rules set category/kind/tags, run before the LLM at import,
-  with per-rule and bulk backfill; per-month suggestions mined from corrected data.
+- **Training** — `/training` page: review queue ordered most-seen-first, approved corpus with
+  search and hold-out toggles, and a one-click seed from your own corrections.
 - **Import** — SEB + Revolut CSV, non-SEK→SEK conversion, dedupe, transfer-pair detection, editable
-  review with kind/category/confidence and a filter bar.
-- **AI categorization + learning loop** — rules → OpenAI few-shot (built from your corrections +
-  approvals, relevance-matched) → keyword fallback; training set in `categorization_examples`.
+  review with kind/category/confidence level and a filter bar.
+- **AI categorization + learning loop** — hybrid retrieval (pgvector + lexical) over a
+  curated corpus of your corrections → OpenAI. No fallback. Curate at `/training`, measure with
+  `npm run eval`.
 - **Auth** — Google sign-in (Auth.js v5), single-owner allowlist, stub-data claim, dev bypass.
 - **Per-user sync** — dashboard layout + nav config in Neon; account avatar + sign-out in every header.
 - **PWA + polish** — installable, offline shell, level-bars icon; native tap feedback, iOS safe-area,

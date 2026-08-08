@@ -2,7 +2,6 @@ import type {
   Account,
   Budget,
   Category,
-  CategorizationRule,
   Tag,
   Transaction,
 } from "@/lib/domain/types";
@@ -13,7 +12,6 @@ export interface Dataset {
   tags: Tag[];
   transactions: Transaction[];
   budgets: Budget[];
-  rules: CategorizationRule[];
 }
 
 export const accounts: Account[] = [
@@ -58,15 +56,6 @@ export const tags: Tag[] = [
   { id: "tag-other", name: "Other", color: "35 85% 55%" },
 ];
 
-export const rules: CategorizationRule[] = [
-  { id: "rule-revolut", priority: 10, enabled: true, matchText: "revolut", matchMode: "contains", setCategoryId: null, setKind: "transfer", addTagIds: [], origin: "seed" },
-  { id: "rule-sebkort", priority: 20, enabled: true, matchText: "seb kort", matchMode: "contains", setCategoryId: null, setKind: "transfer", addTagIds: [], origin: "seed" },
-  { id: "rule-amex-1", priority: 30, enabled: true, matchText: "american express", matchMode: "contains", setCategoryId: null, setKind: "transfer", addTagIds: [], origin: "seed" },
-  { id: "rule-amex-2", priority: 40, enabled: true, matchText: "amex", matchMode: "contains", setCategoryId: null, setKind: "transfer", addTagIds: [], origin: "seed" },
-  { id: "rule-avanza", priority: 50, enabled: true, matchText: "avanza", matchMode: "contains", setCategoryId: null, setKind: "transfer", addTagIds: [], origin: "seed" },
-  { id: "rule-lon", priority: 60, enabled: true, matchText: "lön", matchMode: "contains", setCategoryId: null, setKind: "income", addTagIds: [], origin: "seed" },
-  { id: "rule-lan", priority: 70, enabled: true, matchText: "lån", matchMode: "contains", setCategoryId: "cat-mortgage", setKind: "expense", addTagIds: ["tag-fixed"], origin: "seed" },
-];
 
 // Helper to build a transaction with sensible defaults.
 let n = 0;
@@ -86,7 +75,7 @@ function t(
     accountId: "acc-lon",
     categoryId,
     predictedCategoryId: categoryId,
-    categoryConfidence: opts.categorySource === "user" ? null : 0.94,
+    categoryConfidence: opts.categorySource === "user" ? null : 0.94, categoryLevel: null,
     categorySource: "model",
     needsReview: false,
     tagIds: [],
@@ -173,4 +162,4 @@ export const budgets: Budget[] = [
 ];
 
 
-export const seedDataset: Dataset = { accounts, categories, tags, transactions, budgets, rules };
+export const seedDataset: Dataset = { accounts, categories, tags, transactions, budgets };

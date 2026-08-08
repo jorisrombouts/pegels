@@ -10,7 +10,7 @@ let seq = 0;
 function tx(amount: number, o: Partial<Transaction> = {}): Transaction {
   return {
     id: `t${++seq}`, date: "2025-03-10", description: "x", amount, accountId: "a",
-    categoryId: "food", predictedCategoryId: "food", categoryConfidence: 0.9, categorySource: "model",
+    categoryId: "food", predictedCategoryId: "food", categoryConfidence: 0.9, categoryLevel: null, categorySource: "model",
     needsReview: false, tagIds: [],
     kind: amount < 0 ? "expense" : "income", ...o,
   };

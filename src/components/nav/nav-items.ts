@@ -5,7 +5,7 @@ import {
   PiggyBank,
   Landmark,
   Tag,
-  Wand2,
+  GraduationCap,
   Settings,
   type LucideIcon,
 } from "lucide-react";
@@ -27,7 +27,7 @@ export const NAV_REGISTRY: NavItem[] = [
   { key: "categories", href: "/categories", label: "Categories", icon: Layers, primary: true },
   { key: "accounts", href: "/accounts", label: "Accounts", icon: Landmark, primary: false },
   { key: "tags", href: "/tags", label: "Tags", icon: Tag, primary: false },
-  { key: "rules", href: "/rules", label: "Rules", icon: Wand2, primary: false },
+  { key: "training", href: "/training", label: "Training", icon: GraduationCap, primary: false },
   { key: "settings", href: "/settings", label: "Settings", icon: Settings, primary: false },
 ];
 

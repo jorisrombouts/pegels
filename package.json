@@ -11,9 +11,12 @@
     "check:docs": "node scripts/check-doc-refs.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
-    "db:push": "drizzle-kit push",
+    "db:prepare": "tsx src/lib/db/prepare-cli.ts",
+    "db:push": "npm run db:prepare && drizzle-kit push",
     "db:generate": "drizzle-kit generate",
     "db:seed": "tsx src/lib/db/seed.ts",
+    "corpus:backfill": "tsx src/lib/corpus/backfill-cli.ts",
+    "eval": "tsx src/lib/eval/run-cli.ts",
     "prepare": "husky"
   },
   "lint-staged": {

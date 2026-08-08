@@ -1,11 +1,11 @@
-import { and, desc, eq, or, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { db } from "./index";
-import { accounts, categories, tags, transactions, budgets, categorizationExamples, categorizationRules } from "./schema";
+import { accounts, categories, tags, transactions, budgets, categorizationExamples } from "./schema";
 import {
-  rowToAccount, rowToCategory, rowToTag, rowToTransaction, rowToBudget, rowToRule,
-  accountToRow, categoryToRow, tagToRow, transactionToRow, budgetToRow, ruleToRow,
+  rowToAccount, rowToCategory, rowToTag, rowToTransaction, rowToBudget,
+  accountToRow, categoryToRow, tagToRow, transactionToRow, budgetToRow,
 } from "./map";
-import type { Account, Category, Tag, Transaction, Budget, CategorizationRule } from "../domain/types";
+import type { Account, Category, Tag, Transaction, Budget } from "../domain/types";
 import type { Dataset } from "../../data/mock";
 
 type Batchable = Parameters<typeof db.batch>[0][number];
@@ -18,21 +18,20 @@ function chunked<T>(xs: T[], size: number): T[][] {
   return out;
 }
 
-// Postgres caps bind parameters at 65,535. The widest row here is transactionToRow's 16 columns
-// → 4,095 rows/statement; categorization examples are 13 → 5,041. 2,000 leaves headroom for both.
+// Postgres caps bind parameters at 65,535. The widest row here is transactionToRow's 17 columns
+// → 3,855 rows/statement; categorization examples are 13 → 5,041. 2,000 leaves headroom for both.
 const ROW_CHUNK = 2000;
 
 // ── Reads ──
 
 export async function getDataset(userId: string): Promise<Dataset> {
   // One Neon round-trip for all seven reads (batch) instead of seven parallel HTTP requests.
-  const [accRows, catRows, tagRows, txRows, budRows, ruleRows] = await batch([
+  const [accRows, catRows, tagRows, txRows, budRows] = await batch([
     db.select().from(accounts).where(eq(accounts.userId, userId)),
     db.select().from(categories).where(eq(categories.userId, userId)),
     db.select().from(tags).where(eq(tags.userId, userId)),
     db.select().from(transactions).where(eq(transactions.userId, userId)),
     db.select().from(budgets).where(eq(budgets.userId, userId)),
-    db.select().from(categorizationRules).where(eq(categorizationRules.userId, userId)),
   ]);
   return {
     accounts: accRows.map(rowToAccount),
@@ -40,7 +39,6 @@ export async function getDataset(userId: string): Promise<Dataset> {
     tags: tagRows.map(rowToTag),
     transactions: txRows.map(rowToTransaction),
     budgets: budRows.map(rowToBudget),
-    rules: ruleRows.map(rowToRule),
   };
 }
 
@@ -62,6 +60,7 @@ export async function upsertTransactions(userId: string, txs: Transaction[]): Pr
         userId: sql`excluded.user_id`, date: sql`excluded.date`, description: sql`excluded.description`,
         amount: sql`excluded.amount`, accountId: sql`excluded.account_id`, categoryId: sql`excluded.category_id`,
         predictedCategoryId: sql`excluded.predicted_category_id`, categoryConfidence: sql`excluded.category_confidence`,
+        categoryLevel: sql`excluded.category_level`,
         categorySource: sql`excluded.category_source`, needsReview: sql`excluded.needs_review`,
         excluded: sql`excluded.excluded`, kind: sql`excluded.kind`,
         tagIds: sql`excluded.tag_ids`, splits: sql`excluded.splits`, notes: sql`excluded.notes`,
@@ -74,6 +73,16 @@ export async function insertTransactions(userId: string, txs: Transaction[]): Pr
   for (const part of chunked(txs, ROW_CHUNK)) {
     await db.insert(transactions).values(part.map((t) => transactionToRow(t, userId)));
   }
+}
+
+/** Update many transactions in one round-trip. Looping upsertTransaction would be N of them. */
+export async function bulkUpsertTransactions(userId: string, txs: Transaction[]): Promise<void> {
+  if (txs.length === 0) return;
+  const ops = txs.map((t) => {
+    const row = transactionToRow(t, userId);
+    return db.insert(transactions).values(row).onConflictDoUpdate({ target: transactions.id, set: row });
+  });
+  await batch(ops);
 }
 
 export async function removeTransaction(userId: string, id: string): Promise<void> {
@@ -101,23 +110,8 @@ export async function upsertBudget(userId: string, b: Budget): Promise<void> {
 }
 
 
-export async function upsertRule(userId: string, r: CategorizationRule): Promise<void> {
-  const row = ruleToRow(r, userId);
-  await db.insert(categorizationRules).values(row).onConflictDoUpdate({ target: categorizationRules.id, set: row });
-}
 
-export async function removeRule(userId: string, id: string): Promise<void> {
-  await db.delete(categorizationRules).where(and(eq(categorizationRules.userId, userId), eq(categorizationRules.id, id)));
-}
 
-export async function reorderRules(userId: string, orderedIds: string[]): Promise<void> {
-  if (!orderedIds.length) return;
-  await batch(
-    orderedIds.map((id, i) =>
-      db.update(categorizationRules).set({ priority: (i + 1) * 10 }).where(and(eq(categorizationRules.userId, userId), eq(categorizationRules.id, id))),
-    ),
-  );
-}
 
 // ── Removes (cascades mirror the old store semantics) ──
 
@@ -159,43 +153,7 @@ export async function insertCategorizationExamples(
   }
 }
 
-export async function recentCategorizationExamples(userId: string, limit = 40) {
-  const rows = await db
-    .select()
-    .from(categorizationExamples)
-    .where(eq(categorizationExamples.userId, userId))
-    .orderBy(desc(categorizationExamples.createdAt))
-    .limit(limit);
-  return rows.map((r) => ({
-    cleanedDescription: r.cleanedDescription,
-    finalKind: r.finalKind,
-    finalCategoryId: r.finalCategoryId,
-  }));
-}
 
-/**
- * The user's explicit affirmations — the high-signal few-shot source: every correction (corrected=true,
- * incl. import edits) plus detail-panel approvals (source='detail', corrected=false). Excludes passive
- * import-keeps (the AI agreeing with itself).
- */
-export async function affirmedExamples(userId: string, limit = 60) {
-  const rows = await db
-    .select()
-    .from(categorizationExamples)
-    .where(
-      and(
-        eq(categorizationExamples.userId, userId),
-        or(eq(categorizationExamples.corrected, true), eq(categorizationExamples.source, "detail")),
-      ),
-    )
-    .orderBy(desc(categorizationExamples.createdAt))
-    .limit(limit);
-  return rows.map((r) => ({
-    cleanedDescription: r.cleanedDescription,
-    finalKind: r.finalKind,
-    finalCategoryId: r.finalCategoryId,
-  }));
-}
 
 // ── Bulk ──
 
@@ -206,7 +164,6 @@ export async function clearAll(userId: string): Promise<void> {
     db.delete(categories).where(eq(categories.userId, userId)),
     db.delete(tags).where(eq(tags.userId, userId)),
     db.delete(accounts).where(eq(accounts.userId, userId)),
-    db.delete(categorizationRules).where(eq(categorizationRules.userId, userId)),
   ]);
 }
 
@@ -218,13 +175,11 @@ export async function replaceAll(userId: string, data: Dataset): Promise<void> {
     db.delete(categories).where(eq(categories.userId, userId)),
     db.delete(tags).where(eq(tags.userId, userId)),
     db.delete(accounts).where(eq(accounts.userId, userId)),
-    db.delete(categorizationRules).where(eq(categorizationRules.userId, userId)),
   ];
   if (data.accounts.length) ops.push(db.insert(accounts).values(data.accounts.map((a) => accountToRow(a, userId))));
   if (data.categories.length) ops.push(db.insert(categories).values(data.categories.map((c) => categoryToRow(c, userId))));
   if (data.tags.length) ops.push(db.insert(tags).values(data.tags.map((t) => tagToRow(t, userId))));
   if (data.transactions.length) ops.push(db.insert(transactions).values(data.transactions.map((t) => transactionToRow(t, userId))));
   if (data.budgets.length) ops.push(db.insert(budgets).values(data.budgets.map((b) => budgetToRow(b, userId))));
-  if (data.rules.length) ops.push(db.insert(categorizationRules).values(data.rules.map((r) => ruleToRow(r, userId))));
   await batch(ops);
 }

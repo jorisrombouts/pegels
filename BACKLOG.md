@@ -40,7 +40,7 @@ Let other tools (or an AI assistant) read/write pegels data.
 New users land with no orientation (empty or seeded app). Add a first-run flow:
 - choose **"explore the sample data"** vs **"import my bank CSV"**;
 - a short guided tour: dashboard → transactions → the **review loop** (correct/approve teaches the
-  categorizer) → rules → budgets;
+  categorizer) → training → budgets;
 - empty-state hints ("Import a SEB/Revolut CSV to begin", "Approve or fix flagged rows to teach the
   categorizer").
 - Open Qs: tour vs checklist vs inline empty-states; how much to explain the AI/learning loop. Value

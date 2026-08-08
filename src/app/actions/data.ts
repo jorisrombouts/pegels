@@ -3,7 +3,7 @@
 import { getUserId } from "@/lib/auth";
 import { seedDataset } from "@/data/mock";
 import * as q from "@/lib/db/queries";
-import type { Account, Category, Tag, Transaction, Budget, CategorizationRule } from "@/lib/domain/types";
+import type { Account, Category, Tag, Transaction, Budget } from "@/lib/domain/types";
 import type { Dataset } from "@/data/mock";
 
 // Read path: the TanStack Query `queryFn`.
@@ -59,17 +59,8 @@ export async function removeBudget(id: string): Promise<void> {
 
 
 
-export async function upsertRule(r: CategorizationRule): Promise<void> {
-  return q.upsertRule(await getUserId(), r);
-}
 
-export async function removeRule(id: string): Promise<void> {
-  return q.removeRule(await getUserId(), id);
-}
 
-export async function reorderRules(orderedIds: string[]): Promise<void> {
-  return q.reorderRules(await getUserId(), orderedIds);
-}
 
 export async function clearData(): Promise<void> {
   return q.clearAll(await getUserId());
@@ -77,4 +68,9 @@ export async function clearData(): Promise<void> {
 
 export async function resetData(): Promise<void> {
   return q.replaceAll(await getUserId(), seedDataset);
+}
+
+/** Persist many transaction updates in one round-trip. */
+export async function bulkUpdateTransactions(txs: Transaction[]): Promise<void> {
+  return q.bulkUpsertTransactions(await getUserId(), txs);
 }

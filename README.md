@@ -28,7 +28,7 @@ Fill in `.env.local` (all documented in [`.env.example`](./.env.example)):
 | Var | Required | Purpose |
 |---|---|---|
 | `DATABASE_URL` | yes | Neon Postgres connection string (pooled) |
-| `OPENAI_API_KEY` | for AI categorization | OpenAI; without it, import uses keyword rules |
+| `OPENAI_API_KEY` | yes | OpenAI. There is no fallback — without a valid key, import fails visibly rather than guessing |
 | `AUTH_SECRET` | yes | Auth.js session secret (`npx auth secret`) |
 | `AUTH_GOOGLE_ID` / `AUTH_GOOGLE_SECRET` | yes | Google OAuth client |
 | `OWNER_EMAIL` | yes | The one Google account allowed to sign in |
@@ -43,13 +43,16 @@ With `DEV_USER_ID` set you can run locally without configuring Google at all (th
 |---|---|
 | `npm run dev` | Dev server (Turbopack) |
 | `npm run build` / `start` | Production build / serve |
-| `npm test` | Vitest suite (296 tests) |
+| `npm test` | Vitest suite (481 tests) |
 | `npm run lint` | ESLint — fails on unused imports/vars |
 | `npm run lint:fix` | ESLint with autofix |
 | `npm run check:docs` | Verify markdown links + source-path references resolve |
-| `npm run db:push` | Sync the Drizzle schema to Neon |
+| `npm run db:push` | Sync the Drizzle schema to Neon (runs `db:prepare` first) |
+| `npm run db:prepare` | Create pgvector + migrate the example log into the corpus. `-- --dry-run` to preview |
 | `npm run db:seed` | Load the sample dataset |
 | `npm run db:generate` | Generate a SQL migration |
+| `npm run corpus:backfill` | Seed the categorization corpus from your own corrections |
+| `npm run eval` | Score categorization against the hold-out |
 
 A Husky pre-commit hook runs `lint-staged` (ESLint + autofix on staged files) and `check:docs` on every commit.
 
@@ -60,9 +63,10 @@ A Husky pre-commit hook runs `lint-staged` (ESLint + autofix on staged files) an
   optimistic update backed by a server action.
 - **Spending math** lives only in `effectiveExpense` (`src/lib/domain/`) — a tx counts iff
   `kind === "expense"`, not excluded, `amount < 0` (split → your share). Never sum `amount` directly.
-- **Categorization** runs own-account-transfer detection → user rules → OpenAI few-shot → keyword
-  fallback. The few-shot is built from your **corrections and approvals** and relevance-matched to the
-  batch, so the model gets better the more you use it.
+- **Categorization** runs own-account-transfer detection → retrieval + OpenAI. There is
+  no fallback: if the model is unreachable the import says so instead of guessing. Retrieval is
+  hybrid — pgvector cosine plus lexical merchant-token overlap — over a **corpus built from your own
+  corrections**, one row per merchant. Curate it at `/training`; measure it with `npm run eval`.
 - **Import** parses SEB + Revolut CSV, converts non-SEK rows to SEK at today's ECB rate, dedupes, and
   detects transfer pairs.
 

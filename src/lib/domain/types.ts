@@ -1,3 +1,5 @@
+import type { ConfidenceLevel } from "@/lib/ai/confidence";
+
 /**
  * Pegels domain model (PRD §5). All amounts are SEK.
  * Negative `amount` = expense, positive = income/transfer-in.
@@ -48,20 +50,7 @@ export type CategorySource = "model" | "user";
 
 export type TransactionKind = "expense" | "income" | "transfer";
 
-export type MatchMode = "contains" | "startsWith" | "exact";
-export type RuleOrigin = "seed" | "manual" | "suggested";
 
-export interface CategorizationRule {
-  id: string;
-  priority: number; // lower wins first; also defines list order
-  enabled: boolean;
-  matchText: string; // matched case-insensitively against the description
-  matchMode: MatchMode;
-  setCategoryId: string | null;
-  setKind: TransactionKind | null;
-  addTagIds: string[]; // union'd into the transaction's tags
-  origin: RuleOrigin;
-}
 
 export interface Transaction {
   id: string;
@@ -73,6 +62,8 @@ export interface Transaction {
   predictedCategoryId: string | null;
   /** Model confidence 0..1 for the predicted category. */
   categoryConfidence: number | null;
+  /** How much the categorization is worth trusting. Null for hand-picked rows. */
+  categoryLevel: ConfidenceLevel | null;
   /** "model" = AI-assigned, "user" = manually corrected. */
   categorySource: CategorySource;
   needsReview: boolean;

@@ -2,7 +2,7 @@
 // removeCategory/removeTag cascades) so they can drive optimistic cache updates AND be
 // unit-tested without React or a database.
 import type { Dataset } from "@/data/mock";
-import type { Account, Budget, Category, CategorizationRule, Tag, Transaction } from "@/lib/domain/types";
+import type { Account, Budget, Category, Tag, Transaction } from "@/lib/domain/types";
 
 export const emptyDataset: Dataset = {
   accounts: [],
@@ -10,7 +10,6 @@ export const emptyDataset: Dataset = {
   tags: [],
   transactions: [],
   budgets: [],
-  rules: [],
 };
 
 function upsertById<T extends { id: string }>(list: T[], item: T): T[] {
@@ -23,6 +22,16 @@ function upsertById<T extends { id: string }>(list: T[], item: T): T[] {
 
 export function applyUpdateTransaction(d: Dataset, id: string, patch: Partial<Transaction>): Dataset {
   return { ...d, transactions: d.transactions.map((t) => (t.id === id ? { ...t, ...patch } : t)) };
+}
+
+/** Apply many transaction patches at once — one cache write, not one per row. */
+export function applyBulkTransactionPatch(
+  d: Dataset,
+  patches: { id: string; patch: Partial<Transaction> }[],
+): Dataset {
+  const byId = new Map(patches.map((p) => [p.id, p.patch]));
+  if (byId.size === 0) return d;
+  return { ...d, transactions: d.transactions.map((t) => (byId.has(t.id) ? { ...t, ...byId.get(t.id)! } : t)) };
 }
 
 export function applyAddTransaction(d: Dataset, tx: Transaction): Dataset {
@@ -81,18 +90,5 @@ export function applyRemoveBudget(d: Dataset, id: string): Dataset {
 
 
 
-export function applyUpsertRule(d: Dataset, r: CategorizationRule): Dataset {
-  return { ...d, rules: upsertById(d.rules, r) };
-}
 
-export function applyRemoveRule(d: Dataset, id: string): Dataset {
-  return { ...d, rules: d.rules.filter((r) => r.id !== id) };
-}
 
-export function applyReorderRules(d: Dataset, orderedIds: string[]): Dataset {
-  const byId = new Map(d.rules.map((r) => [r.id, r]));
-  const rules = orderedIds
-    .map((id, i) => { const r = byId.get(id); return r ? { ...r, priority: (i + 1) * 10 } : null; })
-    .filter((r): r is CategorizationRule => r !== null);
-  return { ...d, rules };
-}

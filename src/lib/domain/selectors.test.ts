@@ -8,7 +8,7 @@ const maps = buildMaps([food]);
 function tx(amount: number, o: Partial<Transaction> = {}): Transaction {
   return {
     id: `t${Math.random()}`, date: "2025-03-10", description: "x", amount, accountId: "a",
-    categoryId: "food", predictedCategoryId: "food", categoryConfidence: 0.9, categorySource: "model",
+    categoryId: "food", predictedCategoryId: "food", categoryConfidence: 0.9, categoryLevel: null, categorySource: "model",
     needsReview: false, tagIds: [],
     kind: amount < 0 ? "expense" : "income", ...o,
   };
@@ -41,7 +41,7 @@ describe("categoryTrends subcategories", () => {
   const m2 = buildMaps(cats);
   const t2 = (catId: string, amount: number, date: string): Transaction => ({
     id: `t${Math.random()}`, date, description: "x", amount, accountId: "a",
-    categoryId: catId, predictedCategoryId: null, categoryConfidence: null, categorySource: "user",
+    categoryId: catId, predictedCategoryId: null, categoryConfidence: null, categoryLevel: null, categorySource: "user",
     needsReview: false, tagIds: [], kind: "expense",
   });
 
@@ -197,7 +197,7 @@ describe("spendBySubcategory", () => {
   const m = buildMaps(cats);
   const t = (id: string | null, amount: number): Transaction => ({
     id: `t${Math.random()}`, date: "2025-03-10", description: "x", amount, accountId: "a",
-    categoryId: id, predictedCategoryId: null, categoryConfidence: null, categorySource: "user",
+    categoryId: id, predictedCategoryId: null, categoryConfidence: null, categoryLevel: null, categorySource: "user",
     needsReview: false, tagIds: [], kind: "expense",
   });
   it("groups a parent's spend by immediate subcategory, sorted desc", () => {
@@ -219,7 +219,7 @@ describe("spendByTag", () => {
   ];
   const t = (amount: number, tagIds: string[]): Transaction => ({
     id: `t${Math.random()}`, date: "2025-03-10", description: "x", amount, accountId: "a",
-    categoryId: "c", predictedCategoryId: null, categoryConfidence: null, categorySource: "user",
+    categoryId: "c", predictedCategoryId: null, categoryConfidence: null, categoryLevel: null, categorySource: "user",
     needsReview: false, tagIds, kind: "expense",
   });
   it("adds a transaction's spend to every tag it carries (overlap)", () => {

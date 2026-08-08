@@ -13,12 +13,14 @@ import { parseCsv, parseAmount, parseDate, cleanDescription, type ColumnField, t
 import { isRevolutCsv, normalizeRevolut } from "@/lib/parse-revolut";
 import { convertRowsToSEK, foreignCurrencies } from "@/lib/fx";
 import { fetchRatesToSEK } from "@/app/actions/fx";
-import { needsReview } from "@/lib/categorize";
-import { categorizeTransactions, logImportExamples } from "@/app/actions/ai";
+import { needsReview } from "@/lib/domain/review";
+import { categorizeTransactions } from "@/app/actions/ai";
+import { recordExamples } from "@/app/actions/corpus";
 import { detectTransfersOnImport, orderCategories, type ExistingTransferUpdate } from "@/lib/domain/selectors";
 import { formatSEK } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type { Category, Transaction, TransactionKind } from "@/lib/domain/types";
+import type { ConfidenceLevel } from "@/lib/ai/confidence";
 
 interface DraftRow {
   date: string;
@@ -29,12 +31,14 @@ interface DraftRow {
   unconverted?: boolean; // non-SEK row whose rate couldn't be fetched yet (held back from import)
   categoryId: string | null;
   confidence: number;
+  level: ConfidenceLevel;
   tagIds: string[];
   include: boolean;
   kind: TransactionKind;
   // Original AI prediction, kept separate from the user-editable values above.
   predictedKind: TransactionKind | null;
   predictedCategoryId: string | null;
+  predictedTagIds: string[] | null;
   predictedConfidence: number | null;
 }
 
@@ -73,6 +77,7 @@ export function ImportModal() {
   const [search, setSearch] = useState("");
   const [fx, setFx] = useState<FxInfo | null>(null);
   const [retryingFx, setRetryingFx] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   function reset() {
     setStep("upload");
@@ -82,6 +87,7 @@ export function ImportModal() {
     setExistingUpdates([]);
     setCategorizing(false);
     setFx(null);
+    setError(null);
   }
 
   function loadText(text: string, name: string) {
@@ -166,11 +172,13 @@ export function ImportModal() {
         accountId,
         categoryId: isTransfer ? null : res?.categoryId ?? null,
         confidence: isTransfer ? 1 : res?.confidence ?? 0.4,
-        tagIds: isTransfer ? [] : res?.addTagIds ?? [],
+        level: (isTransfer ? "high" : res?.level ?? "low") as ConfidenceLevel,
+        tagIds: isTransfer ? [] : res?.tagIds ?? [],
         include: !isDup && !b.unconverted, // a row with no exchange rate yet can't be imported
         kind: (b.forcedKind ?? res?.kind ?? (b.amount < 0 ? "expense" : "income")) as TransactionKind,
         predictedKind: (b.forcedKind ?? res?.kind ?? null) as TransactionKind | null,
         predictedCategoryId: isTransfer ? null : res?.categoryId ?? null,
+        predictedTagIds: isTransfer ? [] : res?.tagIds ?? null,
         predictedConfidence: isTransfer ? 1 : res?.confidence ?? null,
       };
     });
@@ -179,17 +187,27 @@ export function ImportModal() {
     setExistingUpdates(detected.existingUpdates);
     return drafts.map((d, i): DraftRow => ({
       date: d.date, description: d.description, amount: d.amount, currency: d.currency, notes: d.notes, unconverted: d.unconverted,
-      categoryId: d.categoryId, confidence: d.confidence, tagIds: d.tagIds, include: d.include, kind: detected.rows[i].kind,
-      predictedKind: d.predictedKind, predictedCategoryId: d.predictedCategoryId, predictedConfidence: d.predictedConfidence,
+      categoryId: d.categoryId, confidence: d.confidence, level: d.level, tagIds: d.tagIds, include: d.include, kind: detected.rows[i].kind,
+      predictedKind: d.predictedKind, predictedCategoryId: d.predictedCategoryId,
+      predictedTagIds: d.predictedTagIds, predictedConfidence: d.predictedConfidence,
     }));
   }
 
   async function handleContinue() {
     setCategorizing(true);
+    setError(null);
     try {
       const built = await buildRows();
       setRows(built);
       setStep("review");
+    } catch (e) {
+      // Categorization no longer degrades to a keyword guess, so a failure here is real and has
+      // to be visible — a silent fallback is how an expired API key went unnoticed.
+      console.error("import: categorization failed", e);
+      setError(
+        "Couldn't categorize these transactions — the AI service didn't respond. " +
+          "Check that OPENAI_API_KEY is valid, then try again.",
+      );
     } finally {
       setCategorizing(false);
     }
@@ -237,20 +255,20 @@ export function ImportModal() {
   // Live summary over the current draft.
   const included = rows.filter((r) => r.include);
   const dupCount = rows.filter(isDup).length;
-  const reviewCount = included.filter((r) => needsReview(r.confidence)).length;
+  const reviewCount = included.filter((r) => needsReview(r.level)).length;
   const moneyIn = included.filter((r) => r.amount > 0).reduce((s, r) => s + r.amount, 0);
   const moneyOut = included.filter((r) => r.amount < 0).reduce((s, r) => s + r.amount, 0);
   const kindCounts = { expense: 0, income: 0, transfer: 0 } as Record<TransactionKind, number>;
   included.forEach((r) => { kindCounts[r.kind] += 1; });
   const kindTotals = { expense: 0, income: 0, transfer: 0 } as Record<TransactionKind, number>;
   rows.forEach((r) => { kindTotals[r.kind] += 1; });
-  const reviewTotal = rows.filter((r) => needsReview(r.confidence)).length;
+  const reviewTotal = rows.filter((r) => needsReview(r.level)).length;
   const isUncategorized = (r: DraftRow) => r.kind === "expense" && !r.categoryId;
   const uncategorizedTotal = rows.filter(isUncategorized).length;
   const query = search.trim().toLowerCase();
   const matchesFilters = (r: DraftRow) =>
     (kindFilter === "all" || r.kind === kindFilter) &&
-    (!reviewOnly || needsReview(r.confidence)) &&
+    (!reviewOnly || needsReview(r.level)) &&
     (!uncategorizedOnly || isUncategorized(r)) &&
     (!hideDuplicates || !isDup(r)) &&
     (!query || r.description.toLowerCase().includes(query));
@@ -274,27 +292,33 @@ export function ImportModal() {
       categoryId: r.categoryId,
       predictedCategoryId: r.categoryId,
       categoryConfidence: r.confidence,
+      categoryLevel: r.level,
       categorySource: "model",
-      needsReview: needsReview(r.confidence),
+      needsReview: needsReview(r.level),
       tagIds: r.tagIds,
       kind: r.kind,
       notes: r.notes,
     }));
     addTransactions(txs);
-    // Log the AI's prediction vs. the user's final choice for the feedback loop (fire-and-forget).
+    // The AI's prediction vs. what the user actually kept (fire-and-forget). Rows the user edited
+    // become approved corpus evidence; untouched rows are only counted as sightings.
     const examples = included.map((r) => ({
       rawDescription: r.description,
       cleanedDescription: r.description,
       amount: r.amount,
       predictedKind: r.predictedKind,
       predictedCategoryId: r.predictedCategoryId,
+      predictedTagIds: r.predictedTagIds,
       predictedConfidence: r.predictedConfidence,
       finalKind: r.kind,
       finalCategoryId: r.categoryId,
+      finalTagIds: r.tagIds,
     }));
     // Batched for the same body limit as addTransactions above.
     for (let i = 0; i < examples.length; i += IMPORT_BATCH) {
-      void logImportExamples(examples.slice(i, i + IMPORT_BATCH)).catch((e) => console.error("Failed to log import examples", e));
+      void recordExamples(examples.slice(i, i + IMPORT_BATCH), "import").catch((e) =>
+        console.error("Failed to log import examples", e),
+      );
     }
     // Reclassify each matched existing leg as a transfer.
     existingUpdates.forEach((u) => updateTransaction(u.id, { kind: "transfer" }));
@@ -359,6 +383,16 @@ export function ImportModal() {
                     </SelectContent>
                   </Select>
                 </Field>
+
+                {error && (
+                  <p
+                    role="alert"
+                    className="rounded-xl px-3 py-2 text-sm"
+                    style={{ backgroundColor: "hsl(var(--negative) / 0.12)", color: "hsl(var(--negative))" }}
+                  >
+                    {error}
+                  </p>
+                )}
 
                 <div className="flex justify-end">
                   <Button onClick={handleContinue} disabled={!accountId || categorizing}>
