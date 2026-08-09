@@ -21,7 +21,6 @@ npm install
 npm run db:push          # create/sync the Neon schema (runs db:prepare first)
 npm run db:seed          # load the Swedish sample dataset
 npm run corpus:backfill  # seed the categorization corpus from your own corrections
-npm run eval             # score categorization against the hold-out
 npm run dev              # http://localhost:3000
 npm test                 # vitest (481 tests)
 npm run build            # production build (Turbopack)
@@ -92,33 +91,33 @@ categories on every failure, which is precisely how an expired API key went unno
 resolved by steps 1–2 are unaffected by an outage.
 
 **Confidence is categorical, not a percentage.** `gradeConfidence()` labels each row from what
-retrieval actually found — `high` (a near-identical approved merchant agreed), `medium` (there
+retrieval actually found — `high` (a near-identical approved name agreed), `medium` (there
 was evidence, nothing decisive), `low` (nothing retrieved). `needsReview` is simply
 `level === "low"`. The words are the familiar magnitude scale, but they are not the model's opinion
 of itself; the UI carries the reason on hover so the label is never the whole story. The model's own
-number is retained but never shown: measured against the
-hold-out its mean on correct answers (0.58) and wrong ones (0.53) are indistinguishable, so a
-percentage would claim a precision that does not exist. The number stays only so the eval can keep
-watching for calibration.
+number is retained but never shown: measured against the user's own labels its mean on correct
+answers (0.58) and wrong ones (0.53) are indistinguishable, so a percentage would claim a precision
+that does not exist.
 
 **The learning loop.** Corrections and approvals land in `categorization_examples`, which is a
-**curated corpus** — one row per merchant (`dedupKey`), not one per event, so a merchant corrected
+**curated corpus** — one row per name (`dedupKey`), not one per event, so a name corrected
 forty times is one row with `hitCount = 40` rather than forty chances to flood retrieval.
 
 `retrieveNeighbours()` (`src/lib/ai/retrieve.ts`) then finds the examples most likely to settle each
 row, using two arms fused by reciprocal rank: **pgvector** cosine over `normalizeMerchant`
 embeddings, and **lexical** merchant-token overlap. The lexical arm is deliberately independent of
-embeddings, so an embeddings outage degrades quality without breaking import. `gold` rows are
-excluded from every retrieval path by one shared predicate — they belong to the eval hold-out.
+embeddings, so an embeddings outage degrades quality without breaking import. Nothing is excluded:
+every approved name is evidence, and the accuracy pass buys its honesty by hiding a name from
+its own lookup for one question rather than reserving any of them.
 
 The prompt splits into a **stable, cacheable system message** (instructions, priors, both
 taxonomies) and a volatile user message carrying a deduplicated evidence table. The review queue
-therefore means *"the system has never seen this merchant"* — a fact — rather than *"the model felt
+therefore means *"the system has never seen this name"* — a fact — rather than *"the model felt
 unsure"*, which is a self-report.
 
-**Curating it** — `/training` (`src/app/(app)/training/page.tsx`). Retrieval fires only on
-**approved** merchants, so the review queue is the highest-leverage surface in the app: it is
-ordered most-seen-first, because approving a merchant seen 47 times buys far more future accuracy
+**Curating it** — the **Teach** page, `/training` (`src/app/(app)/training/page.tsx`). Retrieval fires only on
+**approved** names, so the review queue is the highest-leverage surface in the app: it is
+ordered most-seen-first, because approving a name seen 47 times buys far more future accuracy
 than one seen once. The corpus lives in its own `['corpus']` query rather than `['dataset']`, which
 is on every page's critical path.
 
@@ -129,11 +128,27 @@ changes shown, so there is no drift between the two and no second call to the mo
 examples: the model's own output is not evidence, and recording it would train the system on its
 own predictions.
 
-**Measuring it** — `npm run eval` (`src/lib/eval/`) scores the live pipeline against a
-deterministic hold-out (`gold`, excluded from retrieval). Reports kind, exact and root category,
-and micro-averaged tag F1, each split overall / seen-merchant / unseen-merchant, plus confidence
-calibration and review precision. The unseen number is the one that predicts how the next import
-will feel.
+**Measuring it** — a button on `/training` (`src/app/actions/accuracy.ts` over `src/lib/eval/`).
+Three numbers from one run: **coverage** (of the last 400 transactions, how many land on a name
+retrieval already returns by `dedupKey` — measured *through* `retrieveNeighbours` rather than a
+substring proxy, which would drift from the retrieval it claims to describe), **seen** (a stable
+60-name sample scored with the corpus intact, exactly how production runs), and **unseen** (the
+same sample with each name hidden from its own lookup — leave-one-out). The headline blends the
+two accuracy figures by coverage, so it describes the user's ledger rather than a test set.
+
+The sample is fixed by hashing the row id, so the number moves when the categorizer changes rather
+than when the dice do. Only the category is scored: kind is largely settled by the amount's sign
+before the model sees it, and tags are genuinely multi-valued. Misses are kept rather than counted
+and discarded — two near-synonymous categories trading places is a taxonomy problem no number of
+examples will fix. The two passes run **sequentially**: each already chunks into concurrent model
+calls, so running them together puts four large structured-output requests in flight and trips rate
+limiting, which the SDK absorbs as silent backoff (13s measured for one pass, 570s for the pair in
+parallel).
+
+Leave-one-out replaced a permanent hold-out (`gold`, 20%, excluded from retrieval). That set never
+paid for itself — `eval_runs` sat empty for months while the share it reserved hid ICA and SL, the
+two most-seen names in the app, from the categorizer. The same honest number now costs no
+evidence.
 
 ### Import pipeline (`src/components/import/import-modal.tsx`)
 
@@ -153,7 +168,7 @@ exports; the format is auto-detected.
 
 A `needsReview` row shows a warning dot in the list and a "Needs review" filter on `/transactions`.
 Open the detail panel to either **change** the category (corrects + logs) or **Approve** the guess
-(confirms a prediction for a merchant with no evidence yet, and records it as evidence).
+(confirms a prediction for a name with no evidence yet, and records it as evidence).
 Both feed the few-shot above.
 
 ### Auth & single-owner (`src/lib/auth*.ts`, `src/lib/db/claim.ts`)
@@ -214,7 +229,7 @@ src/
     ai/               categorize-openai, select-examples (few-shot selection)
     db/               schema, queries, map (row<->domain), claim, index
     corpus/           the categorization corpus: capture, backfill, consolidation
-    eval/             hold-out scoring (npm run eval)
+    eval/             accuracy scoring: coverage + leave-one-out (run from /training)
     text/             shared description tokenisers
     fx.ts parse-csv.ts parse-revolut.ts format.ts auth*.ts
   store/              data.ts (TanStack Query facade) + ui.ts (Zustand)
@@ -286,13 +301,13 @@ A quick map of what's done, for orientation. Details + rationale are in the desi
 - **Budgets / Categories / Tags / Accounts** — full CRUD; budgets have health + forecast (the
   shared engine, not their own maths);
   categories nest (parent/sub).
-- **Training** — `/training` page: review queue ordered most-seen-first, approved corpus with
-  search and hold-out toggles, and a one-click seed from your own corrections.
+- **Training** — `/training` page: review queue ordered most-seen-first, a searchable approved
+  corpus, restorable dismissals, an accuracy card, and a one-click seed from your own corrections.
 - **Import** — SEB + Revolut CSV, non-SEK→SEK conversion, dedupe, transfer-pair detection, editable
   review with kind/category/confidence level and a filter bar.
 - **AI categorization + learning loop** — hybrid retrieval (pgvector + lexical) over a
-  curated corpus of your corrections → OpenAI. No fallback. Curate at `/training`, measure with
-  `npm run eval`.
+  curated corpus of your corrections → OpenAI. No fallback. Curate at `/training` and measure there:
+  coverage plus a leave-one-out accuracy pass, with nothing withheld from real imports.
 - **Auth** — Google sign-in (Auth.js v5), single-owner allowlist, stub-data claim, dev bypass.
 - **Per-user sync** — dashboard layout + nav config in Neon; account avatar + sign-out in every header.
 - **PWA + polish** — installable, offline shell, level-bars icon; native tap feedback, iOS safe-area,

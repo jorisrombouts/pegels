@@ -3,14 +3,14 @@
 Your bank says you spent 412 kr at `ICA KVANTUM STHLM`. Pegels turns that into **Groceries**. This
 is how — and how it gets better every time you correct it.
 
-No AI model is ever trained. Everything the categorizer knows is a list of merchants in your own
-database that you can read, edit, or delete.
+No AI model is ever trained. Everything the categorizer knows is a list of **names** — the text that
+appears on a transaction — kept in your own database, where you can read, edit, or delete it.
 
 ---
 
 ## Step one: it looks up what you did last time
 
-Pegels keeps a list of every merchant you have already sorted. When a new transaction arrives, it
+Pegels keeps a list of every name you have already sorted. When a new transaction arrives, it
 finds the entries that look most like it and shows those to the AI as worked examples.
 
 ```mermaid
@@ -21,7 +21,7 @@ flowchart LR
     M3["COOP KONSUM — Groceries"]
     ANS["Groceries<br/>same as last time"]
     NEW --> M1
-    NEW -- "closest merchants<br/>you already sorted" --> M2
+    NEW -- "closest names<br/>you already sorted" --> M2
     NEW --> M3
     M1 --> ANS
     M2 --> ANS
@@ -32,7 +32,11 @@ flowchart LR
 under Coffee and someone else files theirs under Eating out, both are right, and each instance
 follows its own owner.
 
-Two lookups actually run side by side: one on meaning and one on plain spelling. A merchant both
+Half the list is not a shop at all: a transit pass, an insurance premium, a mortgage payment, a
+person you split rent with. What it holds is the *name* on the transaction, whatever sits behind
+it.
+
+Two lookups actually run side by side: one on meaning and one on plain spelling. A name both
 agree on wins. Keeping them independent means a dead embeddings API degrades quality instead of
 breaking categorization outright.
 
@@ -43,9 +47,9 @@ actually find anything?
 
 | Level | What it means |
 |---|---|
-| **Confident** | It found this exact merchant, and the answer matches what you filed it under before. |
+| **Confident** | It found this exact name, and the answer matches what you filed it under before. |
 | **Reasonable** | It found something related, but nothing that settles it. |
-| **No idea** | It has never seen this merchant. This one comes to you. |
+| **No idea** | It has never seen this name. This one comes to you. |
 
 This is why the UI shows words instead of a percentage. A number like "87% sure" would be made up —
 an AI's own sense of certainty is unreliable, and measured on this app's own data its mean on
@@ -54,27 +58,27 @@ and never shown.
 
 ## Step three: your answer becomes the next lookup
 
-Anything the app couldn't settle waits for you at `/training`. You pick the right category, and that
-merchant joins the list — so the same question never comes back.
+Anything the app couldn't settle waits for you on the **Teach** page. You pick the right category,
+and that name joins the list — so the same question never comes back.
 
 ```mermaid
 flowchart LR
     NEW["New transaction"] --> LOOK["Looks up your list<br/>finds the closest matches"]
     LOOK --> Q{"Did it find any?"}
     Q -- yes --> DONE["Sorted"]
-    Q -- no --> ASK["It asks you<br/>on the Training page"]
+    Q -- no --> ASK["It asks you<br/>on the Teach page"]
     ASK --> SAVE["Your answer is saved"]
     SAVE -- "ready for next time" --> LOOK
 ```
 
-**It is a circle, not a production line.** The merchants it is worst at are exactly the ones it
+**It is a circle, not a production line.** The names it is worst at are exactly the ones it
 hands to you — and those are the ones that teach it the most. A month or two in, it is asking about
 almost nothing.
 
 ## The one rule: it is not allowed to teach itself
 
-Only categories *you* touched go on the list. When the AI sorts a merchant and you leave it alone,
-nothing is learned from that — the app just notes it saw the merchant again.
+Only categories *you* touched go on the list. When the AI sorts a name and you leave it alone,
+nothing is learned from that — the app just notes it saw the name again.
 
 ```mermaid
 flowchart LR
@@ -86,24 +90,24 @@ flowchart LR
 **Otherwise it would end up confirming its own mistakes.** A system that treats its own guesses as
 proof drifts further from the truth the longer it runs, and sounds more confident the whole way.
 
-That split is what the Training page is showing you:
+That split is what the Teach page is showing you:
 
 | State | Meaning |
 |---|---|
-| **Approved** | You said yes. Used for every future guess. |
-| **Awaiting review** | Seen but not confirmed. Counted, not used. One click promotes it. |
+| **Recognised** | You said yes. Used for every future guess. |
+| **Needs a check** | Seen but not confirmed. Counted, not used. One click promotes it. |
 
-One escape hatch, for the cold start: below 50 approved merchants, unconfirmed ones are allowed into
+One escape hatch, for the cold start: below 50 confirmed names, unconfirmed ones are allowed into
 the prompt too, under a separate and explicitly weaker heading. An empty list that retrieves nothing
 would otherwise never get off the ground.
 
 ## Keeping it honest: a quiz it can't study for
 
-Think of the list as flashcards. Each card says "this shop, this category", and the AI gets to peek
+Think of the list as flashcards. Each card says "this name, this category", and the AI gets to peek
 at the closest cards before answering.
 
 To test it fairly, a card is taken off the table **while that card is the question** — then put
-straight back. It has to work the shop out from everything else it knows instead of reading the
+straight back. It has to work the name out from everything else it knows instead of reading the
 answer off its own card. Nothing is hidden from your actual transactions, not for a moment.
 
 ```mermaid
@@ -114,23 +118,23 @@ flowchart LR
 ```
 
 **That used to cost something.** An earlier version reserved a fifth of the list permanently, so
-every merchant that made the measurement better made your categorization worse. Setting a card aside
+every name that made the measurement better made your categorization worse. Setting a card aside
 only for its own question buys the same honest number and charges nothing for it.
 
-The check runs from the Training page, over a sample of about sixty confirmed places, and answers
+The check runs from the Teach page, over a sample of about sixty confirmed names, and answers
 three separate questions:
 
 | Number | What it asks |
 |---|---|
-| **Places it knows** | Of the transactions you actually have, how many come from a shop already on the list? |
-| **…it gets right** | When it *has* seen the shop, does it agree with you? Should be high — if not, it is ignoring evidence it was handed. |
-| **New places** | With the card set aside, can it still work it out? This is the one that climbs as the list grows. |
+| **Recognised** | Of the transactions you actually have, how many carry a name already on the list? |
+| **…and right** | When it *has* seen the name, does it agree with you? Should be high — if not, it is ignoring evidence it was handed. |
+| **New names** | With the card set aside, can it still work it out? This is the one that climbs as the list grows. |
 
-The headline figure blends the three by how often each case really happens, so it describes your
-ledger rather than a test set. Both scores run the real categorization path, not a parallel copy of
+The headline figure blends the two accuracy numbers by how often each case really happens, so it
+describes your ledger rather than a test set. Both scores run the real categorization path, not a parallel copy of
 it that could quietly drift.
 
-The same places are picked every run (by hashing each row's id, not at random). If the sample
+The same names are picked every run (by hashing each row's id, not at random). If the sample
 changed between runs, a better score might just mean an easier quiz.
 
 Every disagreement is kept rather than counted and thrown away. Two near-synonymous categories
@@ -146,7 +150,7 @@ None of the ideas above are homemade. Each step has a name people in the field u
 | Term | Where it lands |
 |---|---|
 | **Retrieval-augmented generation (RAG)** | Step one. Looking things up and handing the AI what you found, instead of trusting it to remember. |
-| **Embeddings** | How "similar" is measured. Every merchant name becomes a position in space, arranged so names meaning similar things land near each other. |
+| **Embeddings** | How "similar" is measured. Every name becomes a position in space, arranged so names meaning similar things land near each other. |
 | **Hybrid search** | The two lookups running side by side — meaning and spelling — merged by rank. |
 | **Few-shot prompting** | Showing the AI a handful of solved examples rather than writing out rules. |
 | **Human in the loop** | Routing the least certain cases to a person and treating that answer as truth. Also what stops the AI grading its own homework. |
@@ -163,10 +167,10 @@ shown. That is the whole reason a mistake is one edit away instead of a retraini
 | The hybrid lookup | `src/lib/ai/retrieve.ts` |
 | Merging the two searches | `src/lib/ai/fuse.ts` |
 | The three confidence levels | `src/lib/ai/confidence.ts` |
-| Choosing which places get scored | `src/lib/ai/hash.ts` |
+| Choosing which names get scored | `src/lib/ai/hash.ts` |
 | The approved / candidate gate | `src/lib/corpus/record.ts` |
-| Setting a place's own card aside | `src/lib/ai/retrieve.ts` |
+| Setting a name's own card aside | `src/lib/ai/retrieve.ts` |
 | Scoring, and the confusion pairs | `src/lib/eval/score.ts` |
 | How much of your ledger it knows | `src/lib/eval/coverage.ts` |
 | Running a check | `src/app/actions/accuracy.ts` |
-| The Training page | `src/app/(app)/training/page.tsx` |
+| The Teach page | `src/app/(app)/training/page.tsx` |

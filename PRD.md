@@ -235,27 +235,31 @@ correct or approve one.*
   There is deliberately **no fallback**: if OpenAI errors the import surfaces it. Rows resolved by
   steps 1–2 are unaffected by an outage.
 - FR-4.2 — **Confidence is categorical.** `gradeConfidence` labels each row from the retrieval
-  evidence: `high` (a near-identical approved merchant agreed), `medium` (evidence existed but
+  evidence: `high` (a near-identical approved name agreed), `medium` (evidence existed but
   nothing decisive), `low` (nothing retrieved). `needsReview` is `level === 'low'`. Each label is
   shown with its reason on hover, so "low" reads as "nothing like this in your approved examples
-  yet" rather than as the model hedging. The raw
-  score is retained for the eval's calibration metric and is **never shown** — on the hold-out its
-  mean on right and wrong answers are indistinguishable, so a percentage would overstate what is
-  known.
+  yet" rather than as the model hedging. The raw score is retained internally and is **never
+  shown** — measured against the user's own labels its mean on right and wrong answers are
+  indistinguishable, so a percentage would overstate what is known.
 - FR-4.3 — **BR-4 Learning signal.** Every correction and approval is logged to
   `categorization_examples`. The **high-signal set** = corrections (`corrected=true`) **plus**
   detail-panel approvals (`source='detail'`), excluding passive import-keeps.
 - FR-4.4 — **Retrieval** (`retrieve`): two arms fused by reciprocal rank — pgvector cosine over the
   embedded corpus, and lexical merchant-token overlap — capped per row and diversified so one
-  merchant cannot fill every slot. A hit below the similarity floor is noise and is dropped, so an
-  unrecognised merchant retrieves nothing and is flagged for review.
+  name cannot fill every slot. A hit below the similarity floor is noise and is dropped, so an
+  unrecognised name retrieves nothing and is flagged for review.
 - FR-4.5 — `OPENAI_API_KEY` is **required**. Without it, import fails with a visible error.
-- FR-4.6 — **Curation** (`/training`): unreviewed merchants are queued most-seen-first; approving
-  one makes it retrievable, dismissing one is sticky. Accuracy is measured against a hold-out
-  (`npm run eval`).
+- FR-4.6 — **Curation** (the **Teach** page, `/training`): unreviewed names are queued
+  most-seen-first; approving one makes it retrievable, dismissing one is sticky. **Nothing is
+  withheld from retrieval** — every approved name is evidence.
+- FR-4.7 — **Measurement** (`/training`): one run reports coverage (how often an incoming
+  transaction carries a name already known), accuracy with the corpus intact, and accuracy with
+  each name hidden from its own lookup (leave-one-out). The headline blends the latter two by
+  coverage. Scoring runs the real categorization path, not a parallel copy, and every disagreement
+  is retained so recurring category confusions stay visible.
 
 **AC:** A low-confidence row is flagged; correcting it changes future predictions for similar
-merchants; approving a correct low-confidence guess also improves them. The few-shot selection is
+names; approving a correct low-confidence guess also improves them. The few-shot selection is
 unit-tested as a pure function.
 
 ### 6.5 Transactions
