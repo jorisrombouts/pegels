@@ -37,7 +37,7 @@ describe("DismissedList", () => {
     expect(screen.getByText("SKRÄPPOST")).toBeInTheDocument();
   });
 
-  it("puts a dismissed merchant back into the review queue", async () => {
+  it("puts a dismissed name back into the review queue", async () => {
     const user = userEvent.setup();
     const onRestore = vi.fn();
     const junk = row("SKRÄPPOST");

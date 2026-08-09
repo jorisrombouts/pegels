@@ -26,7 +26,7 @@ export function EvidenceEditor({
   categoryId: string | null;
   tagIds: string[];
   categories: Category[];
-  /** Merchant name, for accessible labels — several of these render in one list. */
+  /** The transaction name, for accessible labels — several of these render in one list. */
   label: string;
   onChange: (patch: CorpusEdit) => void;
 }) {

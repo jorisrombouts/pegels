@@ -30,7 +30,7 @@ const row = (description: string, o: Partial<CurationRow> = {}): CurationRow => 
   ...o,
 });
 
-const many = (n: number) => Array.from({ length: n }, (_, i) => row(`MERCHANT ${String(i).padStart(3, "0")}`));
+const many = (n: number) => Array.from({ length: n }, (_, i) => row(`NAME ${String(i).padStart(3, "0")}`));
 const noop = () => {};
 const table = (rows: CurationRow[], onEdit: (id: string, patch: CorpusEdit) => void = noop) => (
   <CorpusTable rows={rows} categories={CATEGORIES} tags={TAGS} onRemove={noop} onEdit={onEdit} />
@@ -39,17 +39,17 @@ const table = (rows: CurationRow[], onEdit: (id: string, patch: CorpusEdit) => v
 describe("CorpusTable pagination", () => {
   it("shows one page at a time instead of the whole corpus", () => {
     renderWithData(table(many(60)));
-    expect(screen.getByText("MERCHANT 000")).toBeInTheDocument();
-    expect(screen.queryByText("MERCHANT 030")).not.toBeInTheDocument();
-    expect(screen.getByText(/1–25 of 60 places/)).toBeInTheDocument();
+    expect(screen.getByText("NAME 000")).toBeInTheDocument();
+    expect(screen.queryByText("NAME 030")).not.toBeInTheDocument();
+    expect(screen.getByText(/1–25 of 60 names/)).toBeInTheDocument();
   });
 
   it("moves to the next page", async () => {
     const user = userEvent.setup();
     renderWithData(table(many(60)));
     await user.click(screen.getByRole("button", { name: /next page/i }));
-    expect(screen.getByText("MERCHANT 025")).toBeInTheDocument();
-    expect(screen.queryByText("MERCHANT 000")).not.toBeInTheDocument();
+    expect(screen.getByText("NAME 025")).toBeInTheDocument();
+    expect(screen.queryByText("NAME 000")).not.toBeInTheDocument();
     expect(screen.getByText(/26–50 of 60/)).toBeInTheDocument();
   });
 
@@ -70,7 +70,7 @@ describe("CorpusTable pagination", () => {
     const user = userEvent.setup();
     renderWithData(table([...many(40), row("SPOTIFY AB")]));
     await user.click(screen.getByRole("button", { name: /next page/i }));
-    await user.type(screen.getByPlaceholderText("Find a place…"), "spotify");
+    await user.type(screen.getByPlaceholderText("Find a name…"), "spotify");
     expect(screen.getByText("SPOTIFY AB")).toBeInTheDocument();
   });
 });

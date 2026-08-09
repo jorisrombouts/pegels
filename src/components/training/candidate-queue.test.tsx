@@ -32,7 +32,7 @@ const row = (description: string, o: Partial<CurationRow> = {}): CurationRow => 
 const noop = () => {};
 
 describe("CandidateQueue", () => {
-  it("shows how many transactions each shop covers", () => {
+  it("shows how many transactions each name covers", () => {
     renderWithData(<CandidateQueue rows={[row("ICA MAXI", { hitCount: 47 })]} categories={CATEGORIES} onApprove={noop} onReject={noop} />);
     expect(screen.getByText("ICA MAXI")).toBeInTheDocument();
     expect(screen.getByText(/47 transactions/)).toBeInTheDocument();
@@ -44,7 +44,7 @@ describe("CandidateQueue", () => {
     const ica = row("ICA MAXI");
     renderWithData(<CandidateQueue rows={[ica]} categories={CATEGORIES} onApprove={onApprove} onReject={noop} />);
     await user.click(screen.getByRole("button", { name: /approve ICA MAXI/i }));
-    // Kind rides along with every approval now, so a merchant approved as income/transfer keeps
+    // Kind rides along with every approval now, so a name approved as income/transfer keeps
     // that classification rather than silently reverting to the row's original kind.
     expect(onApprove).toHaveBeenCalledWith(ica.id, { finalCategoryId: "cat-groceries", finalKind: "expense" });
   });
@@ -71,7 +71,7 @@ describe("CandidateQueue", () => {
     );
   });
 
-  it("dismisses a merchant without approving it", async () => {
+  it("dismisses a name without approving it", async () => {
     const user = userEvent.setup();
     const onReject = vi.fn();
     const onApprove = vi.fn();
@@ -90,11 +90,11 @@ describe("CandidateQueue", () => {
   });
 
   it("pages a long queue rather than rendering all of it", () => {
-    const rows = Array.from({ length: 45 }, (_, i) => row(`MERCHANT ${String(i).padStart(3, "0")}`));
+    const rows = Array.from({ length: 45 }, (_, i) => row(`NAME ${String(i).padStart(3, "0")}`));
     renderWithData(<CandidateQueue rows={rows} categories={CATEGORIES} onApprove={noop} onReject={noop} />);
-    expect(screen.getByText("MERCHANT 000")).toBeInTheDocument();
-    expect(screen.queryByText("MERCHANT 025")).not.toBeInTheDocument();
-    expect(screen.getByText(/1–20 of 45 places/)).toBeInTheDocument();
+    expect(screen.getByText("NAME 000")).toBeInTheDocument();
+    expect(screen.queryByText("NAME 025")).not.toBeInTheDocument();
+    expect(screen.getByText(/1–20 of 45 names/)).toBeInTheDocument();
   });
 
   it("falls back to the last page when approvals shrink the queue underneath it", async () => {
