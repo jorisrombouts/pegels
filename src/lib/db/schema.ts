@@ -204,8 +204,16 @@ export const accuracyRuns = pgTable(
     userId: text("user_id").notNull(),
     createdAt: text("created_at").notNull(), // ISO string, set by the caller
     sampled: integer("sampled").notNull(),
+    /** Correct with the place hidden from its own lookup — a place it has never seen. */
     correct: integer("correct").notNull(),
+    /** Correct with the corpus intact — a place it already knows. */
+    correctSeen: integer("correct_seen").notNull().default(0),
+    /** Transactions checked for coverage, and how many landed on a known place. */
+    txTotal: integer("tx_total").notNull().default(0),
+    txCovered: integer("tx_covered").notNull().default(0),
     corpusSize: integer("corpus_size").notNull(),
+    /** The disagreements themselves, so a run says what it confused and not just how often. */
+    misses: jsonb("misses").$type<{ expected: string | null; got: string | null }[]>().notNull().default([]),
   },
   (t) => [index("accuracy_runs_user_idx").on(t.userId)],
 );
