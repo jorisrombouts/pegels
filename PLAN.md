@@ -91,7 +91,7 @@ categories on every failure, which is precisely how an expired API key went unno
 resolved by steps 1–2 are unaffected by an outage.
 
 **Confidence is categorical, not a percentage.** `gradeConfidence()` labels each row from what
-retrieval actually found — `high` (a near-identical approved merchant agreed), `medium` (there
+retrieval actually found — `high` (a near-identical approved name agreed), `medium` (there
 was evidence, nothing decisive), `low` (nothing retrieved). `needsReview` is simply
 `level === "low"`. The words are the familiar magnitude scale, but they are not the model's opinion
 of itself; the UI carries the reason on hover so the label is never the whole story. The model's own
@@ -100,24 +100,24 @@ answers (0.58) and wrong ones (0.53) are indistinguishable, so a percentage woul
 that does not exist.
 
 **The learning loop.** Corrections and approvals land in `categorization_examples`, which is a
-**curated corpus** — one row per merchant (`dedupKey`), not one per event, so a merchant corrected
+**curated corpus** — one row per name (`dedupKey`), not one per event, so a name corrected
 forty times is one row with `hitCount = 40` rather than forty chances to flood retrieval.
 
 `retrieveNeighbours()` (`src/lib/ai/retrieve.ts`) then finds the examples most likely to settle each
 row, using two arms fused by reciprocal rank: **pgvector** cosine over `normalizeMerchant`
 embeddings, and **lexical** merchant-token overlap. The lexical arm is deliberately independent of
 embeddings, so an embeddings outage degrades quality without breaking import. Nothing is excluded:
-every approved merchant is evidence, and the accuracy pass buys its honesty by hiding a place from
+every approved name is evidence, and the accuracy pass buys its honesty by hiding a name from
 its own lookup for one question rather than reserving any of them.
 
 The prompt splits into a **stable, cacheable system message** (instructions, priors, both
 taxonomies) and a volatile user message carrying a deduplicated evidence table. The review queue
-therefore means *"the system has never seen this merchant"* — a fact — rather than *"the model felt
+therefore means *"the system has never seen this name"* — a fact — rather than *"the model felt
 unsure"*, which is a self-report.
 
-**Curating it** — `/training` (`src/app/(app)/training/page.tsx`). Retrieval fires only on
-**approved** merchants, so the review queue is the highest-leverage surface in the app: it is
-ordered most-seen-first, because approving a merchant seen 47 times buys far more future accuracy
+**Curating it** — the **Teach** page, `/training` (`src/app/(app)/training/page.tsx`). Retrieval fires only on
+**approved** names, so the review queue is the highest-leverage surface in the app: it is
+ordered most-seen-first, because approving a name seen 47 times buys far more future accuracy
 than one seen once. The corpus lives in its own `['corpus']` query rather than `['dataset']`, which
 is on every page's critical path.
 
@@ -129,11 +129,11 @@ examples: the model's own output is not evidence, and recording it would train t
 own predictions.
 
 **Measuring it** — a button on `/training` (`src/app/actions/accuracy.ts` over `src/lib/eval/`).
-Three numbers from one run: **coverage** (of the last 400 transactions, how many land on a place
+Three numbers from one run: **coverage** (of the last 400 transactions, how many land on a name
 retrieval already returns by `dedupKey` — measured *through* `retrieveNeighbours` rather than a
 substring proxy, which would drift from the retrieval it claims to describe), **seen** (a stable
-60-place sample scored with the corpus intact, exactly how production runs), and **unseen** (the
-same sample with each place hidden from its own lookup — leave-one-out). The headline blends the
+60-name sample scored with the corpus intact, exactly how production runs), and **unseen** (the
+same sample with each name hidden from its own lookup — leave-one-out). The headline blends the
 two accuracy figures by coverage, so it describes the user's ledger rather than a test set.
 
 The sample is fixed by hashing the row id, so the number moves when the categorizer changes rather
@@ -147,7 +147,7 @@ parallel).
 
 Leave-one-out replaced a permanent hold-out (`gold`, 20%, excluded from retrieval). That set never
 paid for itself — `eval_runs` sat empty for months while the share it reserved hid ICA and SL, the
-two most-seen merchants in the app, from the categorizer. The same honest number now costs no
+two most-seen names in the app, from the categorizer. The same honest number now costs no
 evidence.
 
 ### Import pipeline (`src/components/import/import-modal.tsx`)
@@ -168,7 +168,7 @@ exports; the format is auto-detected.
 
 A `needsReview` row shows a warning dot in the list and a "Needs review" filter on `/transactions`.
 Open the detail panel to either **change** the category (corrects + logs) or **Approve** the guess
-(confirms a prediction for a merchant with no evidence yet, and records it as evidence).
+(confirms a prediction for a name with no evidence yet, and records it as evidence).
 Both feed the few-shot above.
 
 ### Auth & single-owner (`src/lib/auth*.ts`, `src/lib/db/claim.ts`)
