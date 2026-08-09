@@ -126,8 +126,8 @@ three separate questions:
 | **…it gets right** | When it *has* seen the shop, does it agree with you? Should be high — if not, it is ignoring evidence it was handed. |
 | **New places** | With the card set aside, can it still work it out? This is the one that climbs as the list grows. |
 
-The headline figure blends the three by how often each case really happens, so it describes your
-ledger rather than a test set. Both scores run the real categorization path, not a parallel copy of
+The headline figure blends the two accuracy numbers by how often each case really happens, so it
+describes your ledger rather than a test set. Both scores run the real categorization path, not a parallel copy of
 it that could quietly drift.
 
 The same places are picked every run (by hashing each row's id, not at random). If the sample

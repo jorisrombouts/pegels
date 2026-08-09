@@ -52,7 +52,6 @@ With `DEV_USER_ID` set you can run locally without configuring Google at all (th
 | `npm run db:seed` | Load the sample dataset |
 | `npm run db:generate` | Generate a SQL migration |
 | `npm run corpus:backfill` | Seed the categorization corpus from your own corrections |
-| `npm run eval` | Score categorization against the hold-out |
 
 A Husky pre-commit hook runs `lint-staged` (ESLint + autofix on staged files) and `check:docs` on every commit.
 
@@ -66,7 +65,11 @@ A Husky pre-commit hook runs `lint-staged` (ESLint + autofix on staged files) an
 - **Categorization** runs own-account-transfer detection → retrieval + OpenAI. There is
   no fallback: if the model is unreachable the import says so instead of guessing. Retrieval is
   hybrid — pgvector cosine plus lexical merchant-token overlap — over a **corpus built from your own
-  corrections**, one row per merchant. Curate it at `/training`; measure it with `npm run eval`.
+  corrections**, one row per merchant. Curate it at `/training` and measure it there too: a
+  leave-one-out pass scores each place with its own entry hidden from its own lookup, so an honest
+  number costs no evidence — nothing is ever withheld from a real import.
+  [How the categorizer works](./docs/how-the-categorizer-works.md) explains the whole loop in plain
+  language.
 - **Import** parses SEB + Revolut CSV, converts non-SEK rows to SEK at today's ECB rate, dedupes, and
   detects transfer pairs.
 
