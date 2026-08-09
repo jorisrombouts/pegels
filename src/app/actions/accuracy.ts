@@ -9,6 +9,9 @@ import { coverageFrom } from "@/lib/eval/coverage";
 import { sampleForScoring, scoreAccuracy, type Miss } from "@/lib/eval/score";
 import type { AiRow } from "@/lib/ai/categorize-openai";
 
+/** Transactions sampled for coverage — newest first. */
+const COVERAGE_WINDOW = 400;
+
 export interface AccuracyPoint {
   at: string;
   sampled: number;
@@ -71,17 +74,25 @@ export async function measureAccuracy(): Promise<AccuracyPoint[]> {
     amount: r.amount,
   }));
 
-  const [unseen, seen] = await Promise.all([
-    categorizeTransactions(rows, { excludeSelf: true }),
-    categorizeTransactions(rows),
-  ]);
+  // Sequential, not Promise.all. Both passes chunk into concurrent model calls of their own, so
+  // running them together puts four large structured-output requests in flight at once — enough to
+  // trip rate limiting, which the SDK absorbs as silent retries with backoff. Measured: 13s for one
+  // pass alone, against 570s for the pair in parallel.
+  const unseen = await categorizeTransactions(rows, { excludeSelf: true });
+  const seen = await categorizeTransactions(rows);
   const unseenScore = scoreAccuracy(sample, unseen);
   const seenScore = scoreAccuracy(sample, seen);
 
   // Coverage over the real ledger, not the corpus: the question is what arrives, not what is stored.
   const data = await getDataset(userId);
+  // Newest first, capped: coverage is a proportion, and the recent slice is both the honest question
+  // ("what will the next import look like") and cheaper. Retrieval dedupes by merchant anyway, so
+  // the saving is smaller than the row count suggests — but it keeps the check bounded as the
+  // ledger grows past a few thousand.
   const ledger = data.transactions
     .filter((t) => !t.excluded)
+    .sort((a, b) => b.date.localeCompare(a.date))
+    .slice(0, COVERAGE_WINDOW)
     .map((t, index) => ({ index, description: t.description, amount: t.amount }));
   const neighbours = ledger.length ? await retrieveNeighbours(userId, ledger) : new Map();
   const coverage = coverageFrom(ledger, neighbours);
