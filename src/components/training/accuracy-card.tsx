@@ -19,7 +19,7 @@ const seenRate = (p: AccuracyPoint) => (p.sampled ? p.correctSeen / p.sampled : 
  *
  * The headline is the blend, because that is the question — how often will the next transaction be
  * labelled correctly. Its two parts sit directly beneath rather than in a tooltip: nearly all
- * transactions land on a place already known, and a small tail does not, and those two regimes have
+ * transactions carry a name already known, and a small tail does not, and those two regimes have
  * very different hit rates. Averaging them into one figure without showing the split is how a
  * number stops being explainable.
  */
@@ -80,15 +80,15 @@ export function AccuracyCard() {
           </div>
 
           <dl className="mt-4 grid grid-cols-3 gap-3">
-            <Part label="Places it knows" value={pct(share(latest))} sub={`${latest.txCovered} of ${latest.txTotal} transactions`} />
-            <Part label="…it gets right" value={pct(seenRate(latest))} sub="when it has seen the place" />
-            <Part label="New places" value={pct(unseenRate(latest))} sub={`${latest.sampled} checked blind`} />
+            <Part label="Recognised" value={pct(share(latest))} sub={`${latest.txCovered} of ${latest.txTotal} transactions`} />
+            <Part label="…and right" value={pct(seenRate(latest))} sub="when it knows the name" />
+            <Part label="New names" value={pct(unseenRate(latest))} sub={`${latest.sampled} checked blind`} />
           </dl>
 
           {latest.misses.length > 0 && (
             <div className="mt-4">
               <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-                What it confuses on a new place
+                What it confuses on a name it does not know
               </p>
               <ul className="mt-1.5 space-y-1">
                 {confusionPairs(latest.misses).slice(0, 4).map((c) => (
@@ -124,8 +124,8 @@ export function AccuracyCard() {
       )}
 
       <p className="mt-4 text-xs text-muted-foreground">
-        Checks every transaction against the places you have confirmed, then re-labels a sample of
-        those places twice — once normally, once with the place hidden from its own lookup so it has
+        Checks your transactions against the names you have confirmed, then re-labels a sample of
+        those names twice — once normally, once with the name hidden from its own lookup so it has
         to work the answer out. Costs a little each time it runs.
       </p>
 

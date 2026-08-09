@@ -16,9 +16,9 @@ const NONE = "__none__";
 const PAGE_SIZE = 20;
 
 /**
- * Unreviewed merchants, most-seen first.
+ * Names not yet reviewed, the ones on most transactions first.
  *
- * The ordering is the whole point: approving the merchant you've seen 47 times buys far more
+ * The ordering is the whole point: approving the name you've seen on 47 transactions buys far more
  * future accuracy than one seen once, so a minute spent at the top of this list is worth more
  * than a minute anywhere else in the app.
  */
@@ -34,7 +34,7 @@ export function CandidateQueue({
   onReject: (id: string) => void;
 }) {
   // Pending edits per row, applied on approve. Category, kind and tags are all part of the evidence
-  // a merchant contributes, so all three are editable before it becomes retrievable.
+  // a name contributes, so all three are editable before it becomes retrievable.
   const [edits, setEdits] = useState<Record<string, CorpusEdit>>({});
   const [page, setPage] = useState(0);
   const patch = (id: string, p: CorpusEdit) => setEdits((e) => ({ ...e, [id]: { ...e[id], ...p } }));
@@ -50,7 +50,7 @@ export function CandidateQueue({
       />
       {rows.length === 0 ? (
         <p className="py-6 text-center text-sm text-muted-foreground">
-          All caught up. Every place it has seen is either confirmed or hidden.
+          All caught up. Every name it has seen is either confirmed or hidden.
         </p>
       ) : (
         <ul className="divide-y divide-[hsl(var(--glass-border))]">
@@ -106,7 +106,7 @@ export function CandidateQueue({
           })}
         </ul>
       )}
-      <Pager page={shown} onPage={setPage} noun="places" />
+      <Pager page={shown} onPage={setPage} noun="names" />
     </Card>
   );
 }

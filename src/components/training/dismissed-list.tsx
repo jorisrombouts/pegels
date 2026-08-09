@@ -10,7 +10,7 @@ import { Pager } from "@/components/ui/pager";
 const PAGE_SIZE = 10;
 
 /**
- * Merchants dismissed from the review queue.
+ * Names dismissed from the review queue.
  *
  * Dismissing is sticky by design — no passive import can resurrect one — which also means a
  * mistaken dismissal was unreachable until this list existed. Collapsed by default because the
@@ -64,7 +64,7 @@ export function DismissedList({
               </li>
             ))}
           </ul>
-          <Pager page={shown} onPage={setPage} noun="places" />
+          <Pager page={shown} onPage={setPage} noun="names" />
         </>
       )}
     </Card>

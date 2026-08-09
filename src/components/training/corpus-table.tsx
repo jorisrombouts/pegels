@@ -16,7 +16,7 @@ import { Pager } from "@/components/ui/pager";
 /**
  * The approved corpus — what the model actually retrieves from.
  *
- * Search matches on `merchantTokens`, the same tokeniser the lexical arm uses, so finding a row
+ * Search matches on the same tokeniser the lexical arm uses, so finding a row
  * here behaves like retrieval finding it rather than like a substring match.
  */
 const PAGE_SIZE = 25;
@@ -37,7 +37,7 @@ export function CorpusTable({
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(0);
   // Editing is opt-in per row: this list is mostly for browsing what has been learned, and 25 rows
-  // of always-on controls would bury the merchant names the search exists to find.
+  // of always-on controls would bury the names the search exists to find.
   const [editing, setEditing] = useState<string | null>(null);
   const categoryById = useMemo(() => new Map(categories.map((c) => [c.id, c])), [categories]);
   const tagById = useMemo(() => new Map(tags.map((t) => [t.id, t])), [tags]);
@@ -56,10 +56,10 @@ export function CorpusTable({
   return (
     <Card>
       <CardHeader
-        label="Places it recognises"
+        label="Names it recognises"
         action={
           <span className="tnum text-xs text-muted-foreground">
-            {rows.length} places
+            {rows.length} names
           </span>
         }
       />
@@ -69,12 +69,12 @@ export function CorpusTable({
           setQuery(e.target.value);
           setPage(0); // a new search should land on its first page, not page 3 of it
         }}
-        placeholder="Find a place…"
+        placeholder="Find a name…"
         className="mb-3"
       />
       {matches.length === 0 ? (
         <p className="py-6 text-center text-sm text-muted-foreground">
-          {rows.length === 0 ? "Nothing confirmed yet — start with the list on the left." : "No place matches that."}
+          {rows.length === 0 ? "Nothing confirmed yet — start with the list on the left." : "No name matches that."}
         </p>
       ) : (
         <ul className="divide-y divide-[hsl(var(--glass-border))]">
@@ -141,7 +141,7 @@ export function CorpusTable({
           })}
         </ul>
       )}
-      <Pager page={shown} onPage={setPage} noun="places" />
+      <Pager page={shown} onPage={setPage} noun="names" />
     </Card>
   );
 }
